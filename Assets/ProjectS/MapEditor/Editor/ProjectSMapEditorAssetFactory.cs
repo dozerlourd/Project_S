@@ -22,6 +22,8 @@ namespace ProjectS.Maps.Editor
             var highGround = CreateGroundPrefab("HighGround", 1f);
             var baseGround = CreateGroundPrefab("BaseGround", 0f);
             var baseToHighRamp = CreateRampPrefab("Base_To_High_Ramp", 0f, 1f);
+            var baseToHighRampTwoCells = CreateRampPrefab("Base_To_High_Ramp_2_Cells", 0f, 1f, 2);
+            var baseToHighRampThreeCells = CreateRampPrefab("Base_To_High_Ramp_3_Cells", 0f, 1f, 3);
             var lowerBlockedGround = CreateGroundPrefab("LowerBlockedGround", -1f);
             var lowGroundStraightEnd = CreateEdgePrefab("LowGround_Straight_End", -1f, false);
             var lowGroundCornerEdge = CreateCornerPrefab("LowGround_Corner_Edge", -1f, false);
@@ -50,6 +52,8 @@ namespace ProjectS.Maps.Editor
             AddEntry(serialized, "terrainTiles", "high_ground", "High Ground", highGround, MapTerrainType.HighGround, 1, true, true);
             AddEntry(serialized, "terrainTiles", "base_ground", "Base Ground", baseGround, MapTerrainType.BaseGround, 0, true, true);
             AddEntry(serialized, "rampTiles", "base_to_high_ramp", "Base To High Ramp", baseToHighRamp, MapTerrainType.BaseToHighRamp, 0, true, false);
+            AddEntry(serialized, "rampTiles", "base_to_high_ramp_2_cells", "Base To High Ramp - 2 Cells", baseToHighRampTwoCells, MapTerrainType.BaseToHighRampTwoCell, 0, true, false, size: new Vector2Int(1, 2));
+            AddEntry(serialized, "rampTiles", "base_to_high_ramp_3_cells", "Base To High Ramp - 3 Cells", baseToHighRampThreeCells, MapTerrainType.BaseToHighRampThreeCell, 0, true, false, size: new Vector2Int(1, 3));
             AddEntry(serialized, "terrainTiles", "lower_blocked_ground", "Lower Blocked Ground", lowerBlockedGround, MapTerrainType.LowerBlockedGround, -1, false, false);
             AddEntry(serialized, "terrainTiles", "low_ground_straight_end", "Low Ground - Straight End", lowGroundStraightEnd, MapTerrainType.LowGroundStraightEnd, -1, false, false);
             AddEntry(serialized, "terrainTiles", "low_ground_corner_edge", "Low Ground - Corner Edge", lowGroundCornerEdge, MapTerrainType.LowGroundCornerEdge, -1, false, false);
@@ -82,7 +86,8 @@ namespace ProjectS.Maps.Editor
             bool buildable,
             PlacedMapObjectType objectType = PlacedMapObjectType.Terrain,
             bool blocksMovement = false,
-            bool blocksConstruction = false)
+            bool blocksConstruction = false,
+            Vector2Int? size = null)
         {
             var list = serialized.FindProperty(listName);
             list.arraySize++;
@@ -92,7 +97,7 @@ namespace ProjectS.Maps.Editor
             item.FindPropertyRelative("prefab").objectReferenceValue = prefab;
             item.FindPropertyRelative("objectType").enumValueIndex = (int)objectType;
             item.FindPropertyRelative("terrainType").enumValueIndex = (int)terrainType;
-            item.FindPropertyRelative("size").vector2IntValue = Vector2Int.one;
+            item.FindPropertyRelative("size").vector2IntValue = size ?? Vector2Int.one;
             item.FindPropertyRelative("heightLevel").intValue = heightLevel;
             item.FindPropertyRelative("defaultWalkable").boolValue = walkable;
             item.FindPropertyRelative("defaultBuildable").boolValue = buildable;
@@ -160,16 +165,25 @@ namespace ProjectS.Maps.Editor
 
         private static GameObject CreateRampPrefab(string name, float lowerHeight, float upperHeight)
         {
+            return CreateRampPrefab(name, lowerHeight, upperHeight, 1);
+        }
+
+        private static GameObject CreateRampPrefab(string name, float lowerHeight, float upperHeight, int lengthInCells)
+        {
             var path = $"{PrefabFolder}/{name}.prefab";
             DeleteExistingAsset(path);
 
             var root = new GameObject(name);
-            var ramp = AddPrimitiveChild(root.transform, "Ramp Surface", PrimitiveType.Cube, new Vector3(2f, 0.18f, 2.25f), Vector3.zero);
+            var length = Mathf.Max(1, lengthInCells) * 2f;
+            var ramp = AddPrimitiveChild(root.transform, "Ramp Surface", PrimitiveType.Cube, new Vector3(2f, 0.18f, length + 0.25f), Vector3.zero);
             ramp.transform.localPosition = new Vector3(0f, (lowerHeight + upperHeight) * 0.5f - 0.09f, 0f);
-            ramp.transform.localRotation = Quaternion.Euler(-26.565f, 0f, 0f);
+            ramp.transform.localRotation = Quaternion.Euler(-Mathf.Atan2(upperHeight - lowerHeight, length) * Mathf.Rad2Deg, 0f, 0f);
 
-            AddPrimitiveChild(root.transform, "Lower Lip", PrimitiveType.Cube, new Vector3(2f, 0.12f, 0.18f), new Vector3(0f, lowerHeight - 0.06f, -0.95f));
-            AddPrimitiveChild(root.transform, "Upper Lip", PrimitiveType.Cube, new Vector3(2f, 0.12f, 0.18f), new Vector3(0f, upperHeight - 0.06f, 0.95f));
+            var halfLength = length * 0.5f;
+            AddPrimitiveChild(root.transform, "Lower Lip", PrimitiveType.Cube, new Vector3(2f, 0.12f, 0.18f), new Vector3(0f, lowerHeight - 0.06f, -halfLength + 0.05f));
+            AddPrimitiveChild(root.transform, "Upper Lip", PrimitiveType.Cube, new Vector3(2f, 0.12f, 0.18f), new Vector3(0f, upperHeight - 0.06f, halfLength - 0.05f));
+            AddRampSideWall(root.transform, "Left Ramp Side Wall", lowerHeight, upperHeight, length, -0.91f);
+            AddRampSideWall(root.transform, "Right Ramp Side Wall", lowerHeight, upperHeight, length, 0.91f);
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
             Object.DestroyImmediate(root);
@@ -178,7 +192,7 @@ namespace ProjectS.Maps.Editor
 
         private static void DeleteExistingAsset(string path)
         {
-            if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+            if (AssetDatabase.LoadAssetAtPath<Object>(path) != null)
             {
                 AssetDatabase.DeleteAsset(path);
             }
@@ -191,6 +205,13 @@ namespace ProjectS.Maps.Editor
             var scale = rotateToWest ? new Vector3(0.18f, wallHeight, 2f) : new Vector3(2f, wallHeight, 0.18f);
             var position = rotateToWest ? new Vector3(-0.91f, centerY, 0f) : new Vector3(0f, centerY, -0.91f);
             AddPrimitiveChild(parent, name, PrimitiveType.Cube, scale, position);
+        }
+
+        private static void AddRampSideWall(Transform parent, string name, float lowerHeight, float upperHeight, float length, float xPosition)
+        {
+            var wallHeight = 0.65f;
+            var wall = AddPrimitiveChild(parent, name, PrimitiveType.Cube, new Vector3(0.12f, wallHeight, length), new Vector3(xPosition, (lowerHeight + upperHeight) * 0.5f - wallHeight * 0.5f, 0f));
+            wall.transform.localRotation = Quaternion.Euler(-Mathf.Atan2(upperHeight - lowerHeight, length) * Mathf.Rad2Deg, 0f, 0f);
         }
 
         private static GameObject AddPrimitiveChild(Transform parent, string name, PrimitiveType primitiveType, Vector3 scale, Vector3 localPosition)

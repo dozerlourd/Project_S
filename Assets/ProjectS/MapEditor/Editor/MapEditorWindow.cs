@@ -180,22 +180,81 @@ namespace ProjectS.Maps.Editor
                     return;
                 }
 
+                if (activeLayer == PlacedMapObjectType.Terrain)
+                {
+                    DrawPaletteGroup("Ground", tileSet.TerrainTiles);
+                    DrawPaletteGroup("Ramps", tileSet.RampTiles);
+                    DrawPaletteGroup("Cliffs", tileSet.CliffTiles);
+                    DrawSelectedEntryInfo();
+                    return;
+                }
+
                 foreach (var entry in tileSet.GetEntries(activeLayer))
                 {
-                    if (entry == null)
-                    {
-                        continue;
-                    }
+                    DrawPaletteEntry(entry);
+                }
 
-                    var selected = selectedEntry == entry;
-                    var label = string.IsNullOrEmpty(entry.displayName) ? entry.id : entry.displayName;
-                    if (GUILayout.Toggle(selected, $"{label} ({entry.terrainType})", "Button"))
-                    {
-                        selectedEntry = entry;
-                        SceneView.RepaintAll();
-                    }
+                DrawSelectedEntryInfo();
+            }
+        }
+
+        private void DrawPaletteGroup(string title, IReadOnlyList<TilePrefabEntry> entries)
+        {
+            if (entries == null || entries.Count == 0)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space(3f);
+            EditorGUILayout.LabelField(title, EditorStyles.miniBoldLabel);
+            foreach (var entry in entries)
+            {
+                DrawPaletteEntry(entry);
+            }
+        }
+
+        private void DrawPaletteEntry(TilePrefabEntry entry)
+        {
+            if (entry == null)
+            {
+                return;
+            }
+
+            var selected = selectedEntry == entry;
+            var label = string.IsNullOrEmpty(entry.displayName) ? entry.id : entry.displayName;
+            var content = new GUIContent(label, GetPaletteTooltip(entry));
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                var buttonStyle = selected ? EditorStyles.miniButtonMid : EditorStyles.miniButton;
+                if (GUILayout.Toggle(selected, content, buttonStyle))
+                {
+                    selectedEntry = entry;
+                    SceneView.RepaintAll();
                 }
             }
+        }
+
+        private void DrawSelectedEntryInfo()
+        {
+            if (selectedEntry == null)
+            {
+                return;
+            }
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(GetPaletteTooltip(selectedEntry), EditorStyles.miniLabel);
+        }
+
+        private static string GetPaletteTooltip(TilePrefabEntry entry)
+        {
+            if (entry == null)
+            {
+                return string.Empty;
+            }
+
+            var size = new Vector2Int(Mathf.Max(1, entry.size.x), Mathf.Max(1, entry.size.y));
+            return $"{size.x}x{size.y} | Height {entry.heightLevel} | {(entry.defaultWalkable ? "Walkable" : "Blocked")} | {(entry.defaultBuildable ? "Buildable" : "No Build")}";
         }
 
         private void DrawOverlaySection()
@@ -407,8 +466,14 @@ namespace ProjectS.Maps.Editor
                 return;
             }
 
+            var footprint = GetRotatedFootprint(selectedEntry);
             if (activeLayer == PlacedMapObjectType.Terrain)
             {
+                if (!CanPlaceObject(position, footprint))
+                {
+                    return;
+                }
+
                 map.SetTerrainCell(position, selectedEntry, rotationY);
                 var cell = map.GetCell(position);
                 if (cell != null)
@@ -418,7 +483,7 @@ namespace ProjectS.Maps.Editor
                 return;
             }
 
-            if (!CanPlaceObject(position, selectedEntry.size))
+            if (!CanPlaceObject(position, footprint))
             {
                 return;
             }
@@ -435,7 +500,7 @@ namespace ProjectS.Maps.Editor
                 {
                     id = selectedEntry.id,
                     gridPosition = position,
-                    size = selectedEntry.size,
+                    size = footprint,
                     heightLevel = paintHeightLevel,
                     prefab = selectedEntry.prefab
                 });
@@ -461,12 +526,38 @@ namespace ProjectS.Maps.Editor
                 prefab = entry.prefab,
                 objectType = activeLayer,
                 gridPosition = position,
-                size = entry.size,
+                size = GetRotatedFootprint(entry),
                 heightLevel = paintHeightLevel,
                 rotationY = entry.allowRotation ? rotationY : 0f,
                 blocksMovement = entry.blocksMovement,
                 blocksConstruction = entry.blocksConstruction
             };
+        }
+
+        private Vector2Int GetRotatedFootprint(TilePrefabEntry entry)
+        {
+            if (entry == null)
+            {
+                return Vector2Int.one;
+            }
+
+            var size = new Vector2Int(Mathf.Max(1, entry.size.x), Mathf.Max(1, entry.size.y));
+            var normalizedRotation = Mathf.RoundToInt(Mathf.Repeat(rotationY, 360f));
+            if (entry.allowRotation && (normalizedRotation == 90 || normalizedRotation == 270))
+            {
+                return new Vector2Int(size.y, size.x);
+            }
+
+            return size;
+        }
+
+        private Vector3 GetPlacementWorldPosition(Vector2Int gridPosition, int heightLevel, Vector2Int footprint)
+        {
+            var offset = new Vector3(
+                (Mathf.Max(1, footprint.x) - 1) * map.TileSize * 0.5f,
+                0f,
+                (Mathf.Max(1, footprint.y) - 1) * map.TileSize * 0.5f);
+            return map.GridToWorld(gridPosition, heightLevel) + offset;
         }
 
         private bool CanPlaceObject(Vector2Int position, Vector2Int size)
@@ -550,7 +641,8 @@ namespace ProjectS.Maps.Editor
 
         private void DrawHoverPreview()
         {
-            var valid = selectedEntry == null || activeLayer == PlacedMapObjectType.Terrain || CanPlaceObject(hoverGrid, selectedEntry.size);
+            var footprint = GetRotatedFootprint(selectedEntry);
+            var valid = selectedEntry == null || CanPlaceObject(hoverGrid, footprint);
             DrawCellOverlay(hoverGrid, valid ? new Color(1f, 1f, 0f, 0.25f) : new Color(1f, 0f, 0f, 0.35f));
             DrawPlacementPreview(valid);
         }
@@ -563,7 +655,8 @@ namespace ProjectS.Maps.Editor
             }
 
             var color = valid ? new Color(0.2f, 0.85f, 1f, 0.38f) : new Color(1f, 0.15f, 0.1f, 0.38f);
-            var worldPosition = map.GridToWorld(hoverGrid, paintHeightLevel);
+            var footprint = GetRotatedFootprint(selectedEntry);
+            var worldPosition = GetPlacementWorldPosition(hoverGrid, paintHeightLevel, footprint);
             var worldRotation = Quaternion.Euler(0f, selectedEntry.allowRotation ? rotationY : 0f, 0f);
             var rootMatrix = Matrix4x4.TRS(worldPosition, worldRotation, Vector3.one);
             var prefabRoot = selectedEntry.prefab.transform;

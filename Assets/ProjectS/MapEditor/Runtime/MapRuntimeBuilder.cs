@@ -37,6 +37,7 @@ namespace ProjectS.Maps
             root.transform.SetParent(transform, false);
 
             BuildTerrain(root.transform);
+            MapAutoWallBuilder.BuildHeightWalls(mapDefinition, root.transform);
             BuildPlacedObjects(root.transform);
             BuildResources(root.transform);
             BuildSpawns(root.transform);
@@ -87,7 +88,8 @@ namespace ProjectS.Maps
                 }
 
                 var entry = mapDefinition.TileSet.FindEntry(cell.tileId, PlacedMapObjectType.Terrain);
-                CreateInstance(entry?.prefab, terrainRoot, mapDefinition.GridToWorld(cell.Position, cell.heightLevel), cell.rotationY, entry?.displayName ?? cell.tileId);
+                var position = GetPlacementWorldPosition(cell.Position, cell.heightLevel, GetRotatedFootprint(entry, cell.rotationY));
+                CreateInstance(entry?.prefab, terrainRoot, position, cell.rotationY, entry?.displayName ?? cell.tileId);
             }
         }
 
@@ -164,6 +166,32 @@ namespace ProjectS.Maps
             instance.name = string.IsNullOrEmpty(fallbackName) ? "Map Object" : fallbackName;
             instance.transform.position = position;
             instance.transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
+        }
+
+        private static Vector2Int GetRotatedFootprint(TilePrefabEntry entry, float rotationY)
+        {
+            if (entry == null)
+            {
+                return Vector2Int.one;
+            }
+
+            var size = new Vector2Int(Mathf.Max(1, entry.size.x), Mathf.Max(1, entry.size.y));
+            var normalizedRotation = Mathf.RoundToInt(Mathf.Repeat(rotationY, 360f));
+            if (entry.allowRotation && (normalizedRotation == 90 || normalizedRotation == 270))
+            {
+                return new Vector2Int(size.y, size.x);
+            }
+
+            return size;
+        }
+
+        private Vector3 GetPlacementWorldPosition(Vector2Int gridPosition, int heightLevel, Vector2Int footprint)
+        {
+            var offset = new Vector3(
+                (Mathf.Max(1, footprint.x) - 1) * mapDefinition.TileSize * 0.5f,
+                0f,
+                (Mathf.Max(1, footprint.y) - 1) * mapDefinition.TileSize * 0.5f);
+            return mapDefinition.GridToWorld(gridPosition, heightLevel) + offset;
         }
     }
 }

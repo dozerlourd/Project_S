@@ -20,6 +20,7 @@ namespace ProjectS.Maps.Editor
             map.EnsureCells();
             var root = new GameObject(PreviewRootName);
             BuildTerrain(map, root.transform);
+            MapAutoWallBuilder.BuildHeightWalls(map, root.transform);
             BuildPlacedObjects(map, root.transform);
             BuildResources(map, root.transform);
             BuildSpawns(map, root.transform);
@@ -54,7 +55,8 @@ namespace ProjectS.Maps.Editor
                 }
 
                 var entry = map.TileSet.FindEntry(cell.tileId, PlacedMapObjectType.Terrain);
-                InstantiatePreview(entry?.prefab, terrainRoot, map.GridToWorld(cell.Position, cell.heightLevel), cell.rotationY, entry?.displayName ?? cell.tileId);
+                var position = GetPlacementWorldPosition(map, cell.Position, cell.heightLevel, GetRotatedFootprint(entry, cell.rotationY));
+                InstantiatePreview(entry?.prefab, terrainRoot, position, cell.rotationY, entry?.displayName ?? cell.tileId);
             }
         }
 
@@ -137,6 +139,32 @@ namespace ProjectS.Maps.Editor
             instance.transform.position = position;
             instance.transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
             return instance;
+        }
+
+        private static Vector2Int GetRotatedFootprint(TilePrefabEntry entry, float rotationY)
+        {
+            if (entry == null)
+            {
+                return Vector2Int.one;
+            }
+
+            var size = new Vector2Int(Mathf.Max(1, entry.size.x), Mathf.Max(1, entry.size.y));
+            var normalizedRotation = Mathf.RoundToInt(Mathf.Repeat(rotationY, 360f));
+            if (entry.allowRotation && (normalizedRotation == 90 || normalizedRotation == 270))
+            {
+                return new Vector2Int(size.y, size.x);
+            }
+
+            return size;
+        }
+
+        private static Vector3 GetPlacementWorldPosition(MapDefinition map, Vector2Int gridPosition, int heightLevel, Vector2Int footprint)
+        {
+            var offset = new Vector3(
+                (Mathf.Max(1, footprint.x) - 1) * map.TileSize * 0.5f,
+                0f,
+                (Mathf.Max(1, footprint.y) - 1) * map.TileSize * 0.5f);
+            return map.GridToWorld(gridPosition, heightLevel) + offset;
         }
     }
 }

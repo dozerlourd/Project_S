@@ -61,8 +61,16 @@ Scene View에서 타일을 배치하기 전에는 마우스가 올라간 칸에 
 - `High Ground`: 높은 땅
 - `Base Ground`: 기본 땅
 - `Base To High Ramp`: 기본 땅에서 높은 땅으로 올라가는 경사진 땅
+- `Base To High Ramp - 2 Cells`: 기본 땅에서 높은 땅으로 올라가는 2칸짜리 경사진 땅
+- `Base To High Ramp - 3 Cells`: 기본 땅에서 높은 땅으로 올라가는 3칸짜리 경사진 땅
 - `Lower Blocked Ground`: 더 낮아서 갈 수 없는 땅
 - `Low Ground - Straight End`: 낮은 땅 일직선 끝
 - `Low Ground - Corner Edge`: 낮은 땅 가장자리
 
 일직선 끝과 가장자리 프리팹은 한쪽 면 기준으로 만들어지며, Map Editor의 `Rotate 90` 버튼으로 회전해서 다른 방향에 배치한다.
+
+2칸/3칸 오르막길은 배치 시작 셀에서 선택한 회전 방향으로 긴 footprint를 가진다. 배치 전 프리뷰와 배치 가능 판정도 회전된 footprint를 기준으로 계산한다.
+
+`High Ground`, `Base Ground`, `Lower Blocked Ground`는 인접한 비-오르막 지형과 높이 차이가 있을 때 프리뷰/런타임 생성 과정에서 자동 벽면을 만든다. 오르막길과 맞닿은 면은 진입로가 막히지 않도록 자동 벽면 생성 대상에서 제외한다.
+
+Palette는 `Ground`, `Ramps`, `Cliffs` 그룹으로 나뉘며, 각 항목에는 footprint 크기, 높이, 이동 가능 여부, 건설 가능 여부가 표시된다.

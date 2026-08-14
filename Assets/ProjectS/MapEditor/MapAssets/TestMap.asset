@@ -26,7 +26,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: high_ground
-    rotationY: 180
+    rotationY: 0
   - x: 1
     y: 0
     heightLevel: 0
@@ -773,7 +773,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 180
   - x: 20
     y: 2
     heightLevel: 0
@@ -1025,7 +1025,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 16
     y: 3
     heightLevel: 0
@@ -1340,7 +1340,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 180
   - x: 19
     y: 4
     heightLevel: 0
@@ -1358,7 +1358,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 21
     y: 4
     heightLevel: 0
@@ -1871,7 +1871,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 14
     y: 6
     heightLevel: 0
@@ -1898,7 +1898,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 17
     y: 6
     heightLevel: 0
@@ -1925,7 +1925,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 20
     y: 6
     heightLevel: 0
@@ -2150,7 +2150,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 13
     y: 7
     heightLevel: 0
@@ -2186,7 +2186,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 17
     y: 7
     heightLevel: 0
@@ -2195,7 +2195,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 18
     y: 7
     heightLevel: 0
@@ -2411,7 +2411,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: high_ground
-    rotationY: 180
+    rotationY: 270
   - x: 10
     y: 8
     heightLevel: 0
@@ -2474,7 +2474,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 17
     y: 8
     heightLevel: 0
@@ -2708,7 +2708,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: high_ground
-    rotationY: 180
+    rotationY: 270
   - x: 11
     y: 9
     heightLevel: 0
@@ -3563,7 +3563,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 10
     y: 12
     heightLevel: 0
@@ -3572,7 +3572,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 270
   - x: 11
     y: 12
     heightLevel: 0
@@ -3581,7 +3581,7 @@ MonoBehaviour:
     buildable: 1
     occupied: 0
     tileId: base_ground
-    rotationY: 0
+    rotationY: 180
   - x: 12
     y: 12
     heightLevel: 0
@@ -4062,38 +4062,38 @@ MonoBehaviour:
   - x: 1
     y: 14
     heightLevel: 0
-    terrainType: 11
+    terrainType: 13
     walkable: 1
     buildable: 0
     occupied: 0
-    tileId: base_to_high_ramp
+    tileId: base_to_high_ramp_3_cells
     rotationY: 180
   - x: 2
     y: 14
     heightLevel: 0
-    terrainType: 11
+    terrainType: 13
     walkable: 1
     buildable: 0
     occupied: 0
-    tileId: base_to_high_ramp
+    tileId: base_to_high_ramp_3_cells
     rotationY: 180
   - x: 3
     y: 14
     heightLevel: 0
-    terrainType: 11
+    terrainType: 13
     walkable: 1
     buildable: 0
     occupied: 0
-    tileId: base_to_high_ramp
+    tileId: base_to_high_ramp_3_cells
     rotationY: 180
   - x: 4
     y: 14
     heightLevel: 0
-    terrainType: 11
+    terrainType: 13
     walkable: 1
     buildable: 0
     occupied: 0
-    tileId: base_to_high_ramp
+    tileId: base_to_high_ramp_3_cells
     rotationY: 180
   - x: 5
     y: 14
@@ -4584,38 +4584,38 @@ MonoBehaviour:
   - x: 27
     y: 15
     heightLevel: 0
-    terrainType: 5
+    terrainType: 13
     walkable: 1
-    buildable: 1
+    buildable: 0
     occupied: 0
-    tileId: base_ground
+    tileId: base_to_high_ramp_3_cells
     rotationY: 0
   - x: 28
     y: 15
     heightLevel: 0
-    terrainType: 5
+    terrainType: 13
     walkable: 1
-    buildable: 1
+    buildable: 0
     occupied: 0
-    tileId: base_ground
+    tileId: base_to_high_ramp_3_cells
     rotationY: 0
   - x: 29
     y: 15
     heightLevel: 0
-    terrainType: 5
+    terrainType: 13
     walkable: 1
-    buildable: 1
+    buildable: 0
     occupied: 0
-    tileId: base_ground
+    tileId: base_to_high_ramp_3_cells
     rotationY: 0
   - x: 30
     y: 15
     heightLevel: 0
-    terrainType: 5
+    terrainType: 13
     walkable: 1
-    buildable: 1
+    buildable: 0
     occupied: 0
-    tileId: base_ground
+    tileId: base_to_high_ramp_3_cells
     rotationY: 0
   - x: 31
     y: 15
@@ -4872,38 +4872,38 @@ MonoBehaviour:
   - x: 27
     y: 16
     heightLevel: 0
-    terrainType: 5
+    terrainType: 12
     walkable: 1
-    buildable: 1
+    buildable: 0
     occupied: 0
-    tileId: base_ground
+    tileId: base_to_high_ramp_2_cells
     rotationY: 0
   - x: 28
     y: 16
     heightLevel: 0
-    terrainType: 5
+    terrainType: 12
     walkable: 1
-    buildable: 1
+    buildable: 0
     occupied: 0
-    tileId: base_ground
+    tileId: base_to_high_ramp_2_cells
     rotationY: 0
   - x: 29
     y: 16
     heightLevel: 0
-    terrainType: 5
+    terrainType: 12
     walkable: 1
-    buildable: 1
+    buildable: 0
     occupied: 0
-    tileId: base_ground
+    tileId: base_to_high_ramp_2_cells
     rotationY: 0
   - x: 30
     y: 16
     heightLevel: 0
-    terrainType: 5
+    terrainType: 12
     walkable: 1
-    buildable: 1
+    buildable: 0
     occupied: 0
-    tileId: base_ground
+    tileId: base_to_high_ramp_2_cells
     rotationY: 0
   - x: 31
     y: 16
@@ -5160,38 +5160,38 @@ MonoBehaviour:
   - x: 27
     y: 17
     heightLevel: 0
-    terrainType: 11
-    walkable: 1
+    terrainType: 0
+    walkable: 0
     buildable: 0
     occupied: 0
-    tileId: base_to_high_ramp
+    tileId: 
     rotationY: 0
   - x: 28
     y: 17
     heightLevel: 0
-    terrainType: 11
-    walkable: 1
+    terrainType: 0
+    walkable: 0
     buildable: 0
     occupied: 0
-    tileId: base_to_high_ramp
+    tileId: 
     rotationY: 0
   - x: 29
     y: 17
     heightLevel: 0
-    terrainType: 11
-    walkable: 1
+    terrainType: 0
+    walkable: 0
     buildable: 0
     occupied: 0
-    tileId: base_to_high_ramp
+    tileId: 
     rotationY: 0
   - x: 30
     y: 17
     heightLevel: 0
-    terrainType: 11
-    walkable: 1
+    terrainType: 0
+    walkable: 0
     buildable: 0
     occupied: 0
-    tileId: base_to_high_ramp
+    tileId: 
     rotationY: 0
   - x: 31
     y: 17

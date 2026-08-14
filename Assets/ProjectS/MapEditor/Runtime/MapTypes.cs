@@ -16,7 +16,27 @@ namespace ProjectS.Maps
         LowerBlockedGround,
         LowGroundStraightEnd,
         LowGroundCornerEdge,
-        BaseToHighRamp
+        BaseToHighRamp,
+        BaseToHighRampTwoCell,
+        BaseToHighRampThreeCell
+    }
+
+    public static class MapTerrainRules
+    {
+        public static bool IsRamp(MapTerrainType terrainType)
+        {
+            return terrainType == MapTerrainType.Ramp
+                || terrainType == MapTerrainType.BaseToHighRamp
+                || terrainType == MapTerrainType.BaseToHighRampTwoCell
+                || terrainType == MapTerrainType.BaseToHighRampThreeCell;
+        }
+
+        public static bool UsesAutoHeightWalls(MapTerrainType terrainType)
+        {
+            return terrainType == MapTerrainType.HighGround
+                || terrainType == MapTerrainType.BaseGround
+                || terrainType == MapTerrainType.LowerBlockedGround;
+        }
     }
 
     public enum PlacedMapObjectType

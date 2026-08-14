@@ -93,7 +93,7 @@ namespace ProjectS.Maps
         {
             foreach (var cell in map.Cells)
             {
-                if (cell == null || (cell.terrainType != MapTerrainType.Ramp && cell.terrainType != MapTerrainType.BaseToHighRamp))
+                if (cell == null || !MapTerrainRules.IsRamp(cell.terrainType))
                 {
                     continue;
                 }

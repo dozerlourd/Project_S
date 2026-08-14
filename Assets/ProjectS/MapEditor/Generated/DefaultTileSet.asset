@@ -15,7 +15,7 @@ MonoBehaviour:
   terrainTiles:
   - id: high_ground_straight_end
     displayName: High Ground - Straight End
-    prefab: {fileID: 7110832272028693641, guid: c6c9d34bd24e73d45b33ae6845702344, type: 3}
+    prefab: {fileID: 2260270195189577557, guid: c6c9d34bd24e73d45b33ae6845702344, type: 3}
     objectType: 0
     terrainType: 6
     size: {x: 1, y: 1}
@@ -27,7 +27,7 @@ MonoBehaviour:
     blocksConstruction: 0
   - id: high_ground_corner_edge
     displayName: High Ground - Corner Edge
-    prefab: {fileID: 3200153707689669375, guid: e09adc70e578eb247b649e88d871b338, type: 3}
+    prefab: {fileID: 1906297292110860349, guid: e09adc70e578eb247b649e88d871b338, type: 3}
     objectType: 0
     terrainType: 7
     size: {x: 1, y: 1}
@@ -39,7 +39,7 @@ MonoBehaviour:
     blocksConstruction: 0
   - id: high_ground
     displayName: High Ground
-    prefab: {fileID: 6229285722745452536, guid: f38745ec131d85347a75e313ed168aba, type: 3}
+    prefab: {fileID: 1158087524847520891, guid: f38745ec131d85347a75e313ed168aba, type: 3}
     objectType: 0
     terrainType: 2
     size: {x: 1, y: 1}
@@ -51,7 +51,7 @@ MonoBehaviour:
     blocksConstruction: 0
   - id: base_ground
     displayName: Base Ground
-    prefab: {fileID: 2209199582851455741, guid: 1f0017f5df053bf428e3810dd22e1359, type: 3}
+    prefab: {fileID: 7574415944303675369, guid: 1f0017f5df053bf428e3810dd22e1359, type: 3}
     objectType: 0
     terrainType: 5
     size: {x: 1, y: 1}
@@ -63,7 +63,7 @@ MonoBehaviour:
     blocksConstruction: 0
   - id: lower_blocked_ground
     displayName: Lower Blocked Ground
-    prefab: {fileID: 5927649427732331999, guid: 8b490c1b2c14572409e663cafff9dd6f, type: 3}
+    prefab: {fileID: 7006255538986462248, guid: 8b490c1b2c14572409e663cafff9dd6f, type: 3}
     objectType: 0
     terrainType: 8
     size: {x: 1, y: 1}
@@ -75,7 +75,7 @@ MonoBehaviour:
     blocksConstruction: 0
   - id: low_ground_straight_end
     displayName: Low Ground - Straight End
-    prefab: {fileID: 3541067649121761972, guid: 5c8c06096daed7b4e93cbf94be985495, type: 3}
+    prefab: {fileID: 1075746207527607436, guid: 5c8c06096daed7b4e93cbf94be985495, type: 3}
     objectType: 0
     terrainType: 9
     size: {x: 1, y: 1}
@@ -87,7 +87,7 @@ MonoBehaviour:
     blocksConstruction: 0
   - id: low_ground_corner_edge
     displayName: Low Ground - Corner Edge
-    prefab: {fileID: 486774100877923288, guid: 41d6de85b5b706f47a46c1f317b09087, type: 3}
+    prefab: {fileID: 1390533468658672220, guid: 41d6de85b5b706f47a46c1f317b09087, type: 3}
     objectType: 0
     terrainType: 10
     size: {x: 1, y: 1}
@@ -100,10 +100,34 @@ MonoBehaviour:
   rampTiles:
   - id: base_to_high_ramp
     displayName: Base To High Ramp
-    prefab: {fileID: 5973590399164986182, guid: 6c0666e433c57f24dac52fa7e6f24129, type: 3}
+    prefab: {fileID: 1363076809841403526, guid: 6c0666e433c57f24dac52fa7e6f24129, type: 3}
     objectType: 0
     terrainType: 11
     size: {x: 1, y: 1}
+    heightLevel: 0
+    defaultWalkable: 1
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  - id: base_to_high_ramp_2_cells
+    displayName: Base To High Ramp - 2 Cells
+    prefab: {fileID: 6603158496575745331, guid: f6d27715a7f268e4eb54f128e41f8e77, type: 3}
+    objectType: 0
+    terrainType: 12
+    size: {x: 1, y: 2}
+    heightLevel: 0
+    defaultWalkable: 1
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  - id: base_to_high_ramp_3_cells
+    displayName: Base To High Ramp - 3 Cells
+    prefab: {fileID: 4852684210300818494, guid: ad8b6d168a1a8744db729e3ba5dfb6ed, type: 3}
+    objectType: 0
+    terrainType: 13
+    size: {x: 1, y: 3}
     heightLevel: 0
     defaultWalkable: 1
     defaultBuildable: 0
@@ -114,7 +138,7 @@ MonoBehaviour:
   propPrefabs:
   - id: rock
     displayName: Rock
-    prefab: {fileID: 6469465027630704248, guid: d33a6044569c9b14f957299ecd09f0ab, type: 3}
+    prefab: {fileID: 2062434961028827664, guid: d33a6044569c9b14f957299ecd09f0ab, type: 3}
     objectType: 1
     terrainType: 0
     size: {x: 1, y: 1}
@@ -127,7 +151,7 @@ MonoBehaviour:
   resourcePrefabs:
   - id: resource
     displayName: Resource
-    prefab: {fileID: 6067133132755265224, guid: 596a316b50060c146946b442a665032f, type: 3}
+    prefab: {fileID: 6111785400232723102, guid: 596a316b50060c146946b442a665032f, type: 3}
     objectType: 2
     terrainType: 0
     size: {x: 1, y: 1}
@@ -140,7 +164,7 @@ MonoBehaviour:
   spawnPrefabs:
   - id: spawn
     displayName: Spawn
-    prefab: {fileID: 9185296286761316466, guid: d802d4f8acf9b594389851623c6fed27, type: 3}
+    prefab: {fileID: 1374852209910622828, guid: d802d4f8acf9b594389851623c6fed27, type: 3}
     objectType: 3
     terrainType: 0
     size: {x: 1, y: 1}
