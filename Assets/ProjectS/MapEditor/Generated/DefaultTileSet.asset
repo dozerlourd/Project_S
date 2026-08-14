@@ -1,0 +1,152 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a558ded01290185408fe53519897679c, type: 3}
+  m_Name: DefaultTileSet
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectS.Maps.TileSetDefinition
+  terrainTiles:
+  - id: high_ground_straight_end
+    displayName: High Ground - Straight End
+    prefab: {fileID: 7110832272028693641, guid: c6c9d34bd24e73d45b33ae6845702344, type: 3}
+    objectType: 0
+    terrainType: 6
+    size: {x: 1, y: 1}
+    heightLevel: 1
+    defaultWalkable: 1
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  - id: high_ground_corner_edge
+    displayName: High Ground - Corner Edge
+    prefab: {fileID: 3200153707689669375, guid: e09adc70e578eb247b649e88d871b338, type: 3}
+    objectType: 0
+    terrainType: 7
+    size: {x: 1, y: 1}
+    heightLevel: 1
+    defaultWalkable: 1
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  - id: high_ground
+    displayName: High Ground
+    prefab: {fileID: 6229285722745452536, guid: f38745ec131d85347a75e313ed168aba, type: 3}
+    objectType: 0
+    terrainType: 2
+    size: {x: 1, y: 1}
+    heightLevel: 1
+    defaultWalkable: 1
+    defaultBuildable: 1
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  - id: base_ground
+    displayName: Base Ground
+    prefab: {fileID: 2209199582851455741, guid: 1f0017f5df053bf428e3810dd22e1359, type: 3}
+    objectType: 0
+    terrainType: 5
+    size: {x: 1, y: 1}
+    heightLevel: 0
+    defaultWalkable: 1
+    defaultBuildable: 1
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  - id: lower_blocked_ground
+    displayName: Lower Blocked Ground
+    prefab: {fileID: 5927649427732331999, guid: 8b490c1b2c14572409e663cafff9dd6f, type: 3}
+    objectType: 0
+    terrainType: 8
+    size: {x: 1, y: 1}
+    heightLevel: -1
+    defaultWalkable: 0
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  - id: low_ground_straight_end
+    displayName: Low Ground - Straight End
+    prefab: {fileID: 3541067649121761972, guid: 5c8c06096daed7b4e93cbf94be985495, type: 3}
+    objectType: 0
+    terrainType: 9
+    size: {x: 1, y: 1}
+    heightLevel: -1
+    defaultWalkable: 0
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  - id: low_ground_corner_edge
+    displayName: Low Ground - Corner Edge
+    prefab: {fileID: 486774100877923288, guid: 41d6de85b5b706f47a46c1f317b09087, type: 3}
+    objectType: 0
+    terrainType: 10
+    size: {x: 1, y: 1}
+    heightLevel: -1
+    defaultWalkable: 0
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  rampTiles:
+  - id: base_to_high_ramp
+    displayName: Base To High Ramp
+    prefab: {fileID: 5973590399164986182, guid: 6c0666e433c57f24dac52fa7e6f24129, type: 3}
+    objectType: 0
+    terrainType: 11
+    size: {x: 1, y: 1}
+    heightLevel: 0
+    defaultWalkable: 1
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
+  cliffTiles: []
+  propPrefabs:
+  - id: rock
+    displayName: Rock
+    prefab: {fileID: 6469465027630704248, guid: d33a6044569c9b14f957299ecd09f0ab, type: 3}
+    objectType: 1
+    terrainType: 0
+    size: {x: 1, y: 1}
+    heightLevel: 0
+    defaultWalkable: 0
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 1
+    blocksConstruction: 1
+  resourcePrefabs:
+  - id: resource
+    displayName: Resource
+    prefab: {fileID: 6067133132755265224, guid: 596a316b50060c146946b442a665032f, type: 3}
+    objectType: 2
+    terrainType: 0
+    size: {x: 1, y: 1}
+    heightLevel: 0
+    defaultWalkable: 0
+    defaultBuildable: 0
+    allowRotation: 1
+    blocksMovement: 1
+    blocksConstruction: 1
+  spawnPrefabs:
+  - id: spawn
+    displayName: Spawn
+    prefab: {fileID: 9185296286761316466, guid: d802d4f8acf9b594389851623c6fed27, type: 3}
+    objectType: 3
+    terrainType: 0
+    size: {x: 1, y: 1}
+    heightLevel: 0
+    defaultWalkable: 1
+    defaultBuildable: 1
+    allowRotation: 1
+    blocksMovement: 0
+    blocksConstruction: 0
