@@ -17,14 +17,25 @@ namespace ProjectS.Maps.Editor
                 return null;
             }
 
+            var root = BuildMapRoot(map, PreviewRootName);
+            Selection.activeGameObject = root;
+            return root;
+        }
+
+        public static GameObject BuildMapRoot(MapDefinition map, string rootName)
+        {
+            if (map == null)
+            {
+                return null;
+            }
+
             map.EnsureCells();
-            var root = new GameObject(PreviewRootName);
+            var root = new GameObject(string.IsNullOrEmpty(rootName) ? map.MapName : rootName);
             BuildTerrain(map, root.transform);
             MapAutoWallBuilder.BuildHeightWalls(map, root.transform);
             BuildPlacedObjects(map, root.transform);
             BuildResources(map, root.transform);
             BuildSpawns(map, root.transform);
-            Selection.activeGameObject = root;
             return root;
         }
 

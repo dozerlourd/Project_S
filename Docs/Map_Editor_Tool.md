@@ -25,6 +25,7 @@ Tools/Project S/Create Default Map Tool Assets
 5. Layer와 Brush Mode를 선택해 Scene View에서 타일을 배치한다.
 6. `Rebuild Preview`로 현재 맵 프리뷰를 재생성한다.
 7. `Validate Map`으로 시작 위치, 자원 접근성, 램프 연결, 연결성, 오브젝트 겹침을 확인한다.
+8. `Baked Prefab` 섹션의 `Save Map Prefab`으로 현재 맵을 하나의 프리팹으로 저장한다.
 
 Scene View에서 타일을 배치하기 전에는 마우스가 올라간 칸에 선택한 프리팹이 반투명 프리뷰로 표시된다. 배치 가능한 위치는 푸른색, 배치 불가능한 위치는 붉은색으로 보인다.
 
@@ -74,3 +75,21 @@ Scene View에서 타일을 배치하기 전에는 마우스가 올라간 칸에 
 `High Ground`, `Base Ground`, `Lower Blocked Ground`는 인접한 비-오르막 지형과 높이 차이가 있을 때 프리뷰/런타임 생성 과정에서 자동 벽면을 만든다. 오르막길과 맞닿은 면은 진입로가 막히지 않도록 자동 벽면 생성 대상에서 제외한다.
 
 Palette는 `Ground`, `Ramps`, `Cliffs` 그룹으로 나뉘며, 각 항목에는 footprint 크기, 높이, 이동 가능 여부, 건설 가능 여부가 표시된다.
+
+## 프리팹 저장과 런타임 사용
+
+`Baked Prefab` 섹션은 `MapDefinition`으로 만든 현재 맵을 하나의 프리팹 에셋으로 저장한다. 저장된 프리팹은 기본적으로 `MapDefinition`의 `Baked Map Prefab`에 자동 연결되고, `Runtime Build Mode`가 `Prefer Baked Prefab`으로 설정되어 실제 게임에서 먼저 프리팹을 인스턴스화한다.
+
+최적화 옵션:
+
+- `Validate Before Save`: 저장 전에 `MapValidator`를 실행한다.
+- `Stop On Errors`: 검증 오류가 있으면 저장을 중단한다.
+- `Mark Static`: 지형, 자동 벽, 장식물을 static으로 지정한다. 자원과 스폰 그룹은 게임 로직 연결을 위해 제외한다.
+- `Remove Empty Groups`: 비어 있는 루트 그룹을 제거한다.
+- `Remove Generated Colliders`: 지형과 자동 벽의 생성 collider를 제거한다.
+- `Assign To Map`: 저장된 프리팹을 현재 `MapDefinition`에 기록한다.
+- `Use At Runtime`: 런타임에서 저장된 프리팹을 우선 사용하도록 설정한다.
+
+`Optimize Preview`는 Scene View에 생성된 현재 프리뷰 오브젝트에 같은 최적화 옵션을 즉시 적용한다. 프리팹 저장 전 결과를 눈으로 확인할 때 사용한다.
+
+실제 게임에서는 `MapRuntimeBuilder`가 `MapDefinition`을 읽는다. 저장된 프리팹이 있고 런타임 모드가 프리팹 사용으로 설정되어 있으면 프리팹을 생성하고, 그렇지 않으면 기존처럼 `MapDefinition` 데이터에서 맵을 직접 생성한다. 이동 가능/건설 가능 판정은 프리팹 저장 여부와 관계없이 `MapDefinition`의 셀 데이터를 사용한다.

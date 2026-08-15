@@ -54,6 +54,13 @@ namespace ProjectS.Maps
         Error
     }
 
+    public enum MapRuntimeBuildMode
+    {
+        BuildFromDefinition,
+        UseBakedPrefab,
+        PreferBakedPrefab
+    }
+
     [Serializable]
     public sealed class MapCellData
     {

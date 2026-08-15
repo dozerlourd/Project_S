@@ -1,5 +1,11 @@
 # Project S Agent Instructions
 
+## 기획 기준 문서
+
+- Project_S에서 기능 구현, 수정, 리팩터링, 테스트 맵 제작을 진행하기 전 `Docs/Project_S_Working_Game_Plan.md`를 우선 참조한다.
+- 세부 기획이 더 필요하면 `Docs/Game_Planning_Overview.md`, MVP 범위 판단이 필요하면 `Docs/MVP_Essential_Elements.md`, 맵 에디터 관련 작업은 `Docs/Map_Editor_Tool.md`를 함께 참조한다.
+- 새 기능이 기획 기준과 충돌하거나 MVP 범위를 크게 벗어나면, 구현 전에 범위와 우선순위를 다시 확인한다.
+
 ## 공통 작업 방식
 
 - 모든 수정/구현 요청은 가능한 한 난이도와 작업량을 기준으로 나누어 처리한다.

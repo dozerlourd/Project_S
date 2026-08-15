@@ -11,6 +11,8 @@ namespace ProjectS.Maps
         [SerializeField] private int height = 32;
         [SerializeField] private float tileSize = 2f;
         [SerializeField] private TileSetDefinition tileSet;
+        [SerializeField] private GameObject bakedMapPrefab;
+        [SerializeField] private MapRuntimeBuildMode runtimeBuildMode = MapRuntimeBuildMode.PreferBakedPrefab;
         [SerializeField] private List<MapCellData> cells = new List<MapCellData>();
         [SerializeField] private List<PlacedMapObject> placedObjects = new List<PlacedMapObject>();
         [SerializeField] private List<SpawnPointData> spawnPoints = new List<SpawnPointData>();
@@ -21,6 +23,8 @@ namespace ProjectS.Maps
         public int Height => height;
         public float TileSize => tileSize;
         public TileSetDefinition TileSet { get => tileSet; set => tileSet = value; }
+        public GameObject BakedMapPrefab { get => bakedMapPrefab; set => bakedMapPrefab = value; }
+        public MapRuntimeBuildMode RuntimeBuildMode { get => runtimeBuildMode; set => runtimeBuildMode = value; }
         public IReadOnlyList<MapCellData> Cells => cells;
         public List<PlacedMapObject> PlacedObjects => placedObjects;
         public List<SpawnPointData> SpawnPoints => spawnPoints;

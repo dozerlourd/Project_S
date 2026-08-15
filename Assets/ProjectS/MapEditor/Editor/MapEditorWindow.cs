@@ -37,6 +37,13 @@ namespace ProjectS.Maps.Editor
         private bool showHeightOverlay = true;
         private bool showWalkableOverlay;
         private bool showBuildableOverlay;
+        private bool validateBeforePrefabSave = true;
+        private bool stopPrefabSaveOnErrors = true;
+        private bool markBakedStatic = true;
+        private bool removeEmptyPrefabGroups = true;
+        private bool removeGeneratedPrefabColliders;
+        private bool assignBakedPrefabToMap = true;
+        private bool useBakedPrefabAtRuntime = true;
         private bool isDraggingRect;
         private Vector2Int rectStart;
         private Vector2Int hoverGrid;
@@ -70,6 +77,7 @@ namespace ProjectS.Maps.Editor
             DrawBrushSection();
             DrawPaletteSection();
             DrawOverlaySection();
+            DrawBakedPrefabSection();
             DrawValidationSection();
             EditorGUILayout.EndScrollView();
         }
@@ -267,6 +275,67 @@ namespace ProjectS.Maps.Editor
                 showWalkableOverlay = EditorGUILayout.Toggle("Walkable", showWalkableOverlay);
                 showBuildableOverlay = EditorGUILayout.Toggle("Buildable", showBuildableOverlay);
             }
+        }
+
+        private void DrawBakedPrefabSection()
+        {
+            EditorGUILayout.LabelField("Baked Prefab", EditorStyles.boldLabel);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                if (map != null)
+                {
+                    using (new EditorGUI.DisabledScope(true))
+                    {
+                        EditorGUILayout.ObjectField("Saved Prefab", map.BakedMapPrefab, typeof(GameObject), false);
+                        EditorGUILayout.EnumPopup("Runtime Mode", map.RuntimeBuildMode);
+                    }
+                }
+
+                validateBeforePrefabSave = EditorGUILayout.Toggle("Validate Before Save", validateBeforePrefabSave);
+                using (new EditorGUI.DisabledScope(!validateBeforePrefabSave))
+                {
+                    stopPrefabSaveOnErrors = EditorGUILayout.Toggle("Stop On Errors", stopPrefabSaveOnErrors);
+                }
+
+                markBakedStatic = EditorGUILayout.Toggle("Mark Static", markBakedStatic);
+                removeEmptyPrefabGroups = EditorGUILayout.Toggle("Remove Empty Groups", removeEmptyPrefabGroups);
+                removeGeneratedPrefabColliders = EditorGUILayout.Toggle("Remove Generated Colliders", removeGeneratedPrefabColliders);
+                assignBakedPrefabToMap = EditorGUILayout.Toggle("Assign To Map", assignBakedPrefabToMap);
+                using (new EditorGUI.DisabledScope(!assignBakedPrefabToMap))
+                {
+                    useBakedPrefabAtRuntime = EditorGUILayout.Toggle("Use At Runtime", useBakedPrefabAtRuntime);
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    using (new EditorGUI.DisabledScope(map == null))
+                    {
+                        if (GUILayout.Button("Save Map Prefab"))
+                        {
+                            SaveBakedMapPrefab();
+                        }
+
+                        if (GUILayout.Button("Optimize Preview"))
+                        {
+                            OptimizeCurrentPreview();
+                        }
+                    }
+                }
+            }
+        }
+
+        private MapPrefabBakeOptions CreateBakeOptions()
+        {
+            return new MapPrefabBakeOptions
+            {
+                validateBeforeSave = validateBeforePrefabSave,
+                stopOnValidationErrors = stopPrefabSaveOnErrors,
+                markStatic = markBakedStatic,
+                removeEmptyGroups = removeEmptyPrefabGroups,
+                removeGeneratedColliders = removeGeneratedPrefabColliders,
+                assignToMapDefinition = assignBakedPrefabToMap,
+                useBakedPrefabAtRuntime = useBakedPrefabAtRuntime
+            };
         }
 
         private void DrawValidationSection()
@@ -764,6 +833,27 @@ namespace ProjectS.Maps.Editor
             map.TileSet = tileSet;
             EditorUtility.SetDirty(map);
             AssetDatabase.SaveAssets();
+        }
+
+        private void SaveBakedMapPrefab()
+        {
+            SaveMap();
+            var prefab = MapPrefabBaker.SaveAsPrefab(map, CreateBakeOptions());
+            if (prefab != null)
+            {
+                Repaint();
+            }
+        }
+
+        private void OptimizeCurrentPreview()
+        {
+            var previewRoot = GameObject.Find(MapEditorPreviewBuilder.PreviewRootName);
+            if (previewRoot == null)
+            {
+                previewRoot = MapEditorPreviewBuilder.RebuildPreview(map);
+            }
+
+            MapPrefabBaker.OptimizeScenePreview(previewRoot, CreateBakeOptions());
         }
     }
 }

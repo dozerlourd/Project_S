@@ -5,6 +5,7 @@ namespace ProjectS.Maps
     public sealed class MapRuntimeBuilder : MonoBehaviour
     {
         [SerializeField] private MapDefinition mapDefinition;
+        [SerializeField] private MapRuntimeBuildMode buildModeOverride = MapRuntimeBuildMode.PreferBakedPrefab;
         [SerializeField] private bool buildOnStart = true;
         [SerializeField] private bool clearBeforeBuild = true;
 
@@ -33,6 +34,12 @@ namespace ProjectS.Maps
             }
 
             mapDefinition.EnsureCells();
+            if (ShouldUseBakedPrefab())
+            {
+                BuildFromBakedPrefab();
+                return;
+            }
+
             var root = new GameObject($"{mapDefinition.MapName}_Runtime");
             root.transform.SetParent(transform, false);
 
@@ -41,6 +48,27 @@ namespace ProjectS.Maps
             BuildPlacedObjects(root.transform);
             BuildResources(root.transform);
             BuildSpawns(root.transform);
+        }
+
+        private bool ShouldUseBakedPrefab()
+        {
+            if (mapDefinition.BakedMapPrefab == null)
+            {
+                return false;
+            }
+
+            var mode = buildModeOverride == MapRuntimeBuildMode.PreferBakedPrefab
+                ? mapDefinition.RuntimeBuildMode
+                : buildModeOverride;
+
+            return mode == MapRuntimeBuildMode.UseBakedPrefab
+                || mode == MapRuntimeBuildMode.PreferBakedPrefab;
+        }
+
+        private void BuildFromBakedPrefab()
+        {
+            var instance = Instantiate(mapDefinition.BakedMapPrefab, transform);
+            instance.name = $"{mapDefinition.MapName}_Runtime";
         }
 
         [ContextMenu("Clear Built Map")]

@@ -17,6 +17,8 @@ MonoBehaviour:
   height: 32
   tileSize: 2
   tileSet: {fileID: 11400000, guid: a3e9e012115dcc5428349c10c71d823f, type: 2}
+  bakedMapPrefab: {fileID: 2080273768169546935, guid: 61d238e2d57166d44a76bb7a29f7f757, type: 3}
+  runtimeBuildMode: 2
   cells:
   - x: 0
     y: 0
