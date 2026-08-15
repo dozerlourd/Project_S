@@ -20,7 +20,7 @@ namespace ProjectS.Maps.Editor
 
     public static class MapPrefabBaker
     {
-        private const string DefaultPrefabFolder = "Assets/ProjectS/MapEditor/BakedMaps";
+        private const string DefaultPrefabFolder = "Assets/Assets/MapEditor/BakedMaps";
 
         public static GameObject SaveAsPrefab(MapDefinition map, MapPrefabBakeOptions options)
         {
@@ -222,10 +222,10 @@ namespace ProjectS.Maps.Editor
                 return;
             }
 
-            const string root = "Assets/ProjectS/MapEditor";
+            const string root = "Assets/Assets/MapEditor";
             if (!AssetDatabase.IsValidFolder(root))
             {
-                AssetDatabase.CreateFolder("Assets/ProjectS", "MapEditor");
+                AssetDatabase.CreateFolder("Assets/Assets", "MapEditor");
             }
 
             AssetDatabase.CreateFolder(root, "BakedMaps");

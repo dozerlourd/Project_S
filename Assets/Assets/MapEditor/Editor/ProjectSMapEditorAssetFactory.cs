@@ -7,14 +7,14 @@ namespace ProjectS.Maps.Editor
 {
     public static class ProjectSMapEditorAssetFactory
     {
-        private const string RootFolder = "Assets/ProjectS/MapEditor/Generated";
+        private const string RootFolder = "Assets/Assets/MapEditor/Generated";
         private const string PrefabFolder = RootFolder + "/Prefabs";
 
         [MenuItem("Tools/Project S/Create Default Map Tool Assets")]
         public static void CreateDefaultTileSet()
         {
-            EnsureFolder("Assets/ProjectS", "MapEditor");
-            EnsureFolder("Assets/ProjectS/MapEditor", "Generated");
+            EnsureFolder("Assets/Assets", "MapEditor");
+            EnsureFolder("Assets/Assets/MapEditor", "Generated");
             EnsureFolder(RootFolder, "Prefabs");
 
             var highGroundStraightEnd = CreateEdgePrefab("HighGround_Straight_End", 1f, true);
