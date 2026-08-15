@@ -7,6 +7,13 @@ namespace ProjectS.Units.Editor
 {
     public static class PrototypeUnitAssetFactory
     {
+        private enum UnitColorFaction
+        {
+            Red,
+            Blue,
+            Green
+        }
+
         private const string MaterialFolder = "Assets/02.Materials/Units";
         private const string PrefabFolder = "Assets/03.Prefabs/Units";
 
@@ -16,19 +23,19 @@ namespace ProjectS.Units.Editor
             EnsureFolder("Assets/02.Materials", "Units");
             EnsureFolder("Assets/03.Prefabs", "Units");
 
-            var red = CreateOrUpdateMaterial(UnitFaction.Red, new Color(0.86f, 0.18f, 0.16f));
-            var blue = CreateOrUpdateMaterial(UnitFaction.Blue, new Color(0.16f, 0.35f, 0.9f));
-            var green = CreateOrUpdateMaterial(UnitFaction.Green, new Color(0.18f, 0.68f, 0.28f));
+            var red = CreateOrUpdateMaterial(UnitColorFaction.Red, new Color(0.86f, 0.18f, 0.16f));
+            var blue = CreateOrUpdateMaterial(UnitColorFaction.Blue, new Color(0.16f, 0.35f, 0.9f));
+            var green = CreateOrUpdateMaterial(UnitColorFaction.Green, new Color(0.18f, 0.68f, 0.28f));
 
-            CreateOrUpdateFactionUnits(UnitFaction.Red, red);
-            CreateOrUpdateFactionUnits(UnitFaction.Blue, blue);
-            CreateOrUpdateFactionUnits(UnitFaction.Green, green);
+            CreateOrUpdateFactionUnits(UnitColorFaction.Red, red);
+            CreateOrUpdateFactionUnits(UnitColorFaction.Blue, blue);
+            CreateOrUpdateFactionUnits(UnitColorFaction.Green, green);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
 
-        private static void CreateOrUpdateFactionUnits(UnitFaction faction, Material material)
+        private static void CreateOrUpdateFactionUnits(UnitColorFaction faction, Material material)
         {
             CreateOrUpdateUnitPrefab(faction, PrototypeUnitType.Worker, material);
             CreateOrUpdateUnitPrefab(faction, PrototypeUnitType.Soldier, material);
@@ -36,7 +43,7 @@ namespace ProjectS.Units.Editor
             CreateOrUpdateUnitPrefab(faction, PrototypeUnitType.Ranger, material);
         }
 
-        private static Material CreateOrUpdateMaterial(UnitFaction faction, Color color)
+        private static Material CreateOrUpdateMaterial(UnitColorFaction faction, Color color)
         {
             var path = $"{MaterialFolder}/{faction}_Unit.mat";
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -54,7 +61,7 @@ namespace ProjectS.Units.Editor
             return material;
         }
 
-        private static void CreateOrUpdateUnitPrefab(UnitFaction faction, PrototypeUnitType unitType, Material material)
+        private static void CreateOrUpdateUnitPrefab(UnitColorFaction faction, PrototypeUnitType unitType, Material material)
         {
             var unitName = $"{faction}_{unitType}";
             var path = $"{PrefabFolder}/{unitName}.prefab";
@@ -85,7 +92,7 @@ namespace ProjectS.Units.Editor
                 selectionRing.SetActive(false);
 
                 var status = root.AddComponent<PrototypeUnitStatus>();
-                ApplyStatus(status, faction, unitType);
+                ApplyStatus(status, GetTeam(faction), unitType);
 
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
@@ -95,13 +102,29 @@ namespace ProjectS.Units.Editor
             }
         }
 
-        private static void ApplyStatus(PrototypeUnitStatus status, UnitFaction faction, PrototypeUnitType unitType)
+        private static UnitTeam GetTeam(UnitColorFaction faction)
+        {
+            switch (faction)
+            {
+                case UnitColorFaction.Red:
+                    return UnitTeam.Team1;
+                case UnitColorFaction.Blue:
+                    return UnitTeam.Team2;
+                case UnitColorFaction.Green:
+                    return UnitTeam.Team3;
+                default:
+                    return UnitTeam.Team1;
+            }
+        }
+
+        private static void ApplyStatus(PrototypeUnitStatus status, UnitTeam team, PrototypeUnitType unitType)
         {
             switch (unitType)
             {
                 case PrototypeUnitType.Worker:
                     status.Initialize(
-                        faction,
+                        UnitTrial.Human,
+                        team,
                         unitType,
                         MovementDomain.Ground,
                         UnitRole.Resource | UnitRole.Builder,
@@ -124,7 +147,8 @@ namespace ProjectS.Units.Editor
 
                 case PrototypeUnitType.Soldier:
                     status.Initialize(
-                        faction,
+                        UnitTrial.Human,
+                        team,
                         unitType,
                         MovementDomain.Ground,
                         UnitRole.Combat,
@@ -147,7 +171,8 @@ namespace ProjectS.Units.Editor
 
                 case PrototypeUnitType.Spliter:
                     status.Initialize(
-                        faction,
+                        UnitTrial.Human,
+                        team,
                         unitType,
                         MovementDomain.Ground,
                         UnitRole.Combat,
@@ -170,7 +195,8 @@ namespace ProjectS.Units.Editor
 
                 case PrototypeUnitType.Ranger:
                     status.Initialize(
-                        faction,
+                        UnitTrial.Human,
+                        team,
                         unitType,
                         MovementDomain.Ground,
                         UnitRole.Combat,

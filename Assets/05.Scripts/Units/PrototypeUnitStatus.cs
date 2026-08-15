@@ -3,11 +3,21 @@ using UnityEngine;
 
 namespace ProjectS.Units
 {
-    public enum UnitFaction
+    public enum UnitTrial
     {
-        Red,
-        Blue,
-        Green
+        Human
+    }
+
+    public enum UnitTeam
+    {
+        Team1,
+        Team2,
+        Team3,
+        Team4,
+        Team5,
+        Team6,
+        Team7,
+        Team8
     }
 
     public enum PrototypeUnitType
@@ -70,7 +80,8 @@ namespace ProjectS.Units
     public sealed class PrototypeUnitStatus : MonoBehaviour
     {
         [Header("Classification")]
-        [SerializeField] private UnitFaction faction;
+        [SerializeField] private UnitTrial trial;
+        [SerializeField] private UnitTeam team;
         [SerializeField] private PrototypeUnitType unitType;
         [SerializeField] private MovementDomain movementDomain;
         [SerializeField] private UnitRole roles;
@@ -104,7 +115,8 @@ namespace ProjectS.Units
         [SerializeField] private bool hasAreaAttack;
         [SerializeField] private float attackArea;
 
-        public UnitFaction Faction => faction;
+        public UnitTrial Trial => trial;
+        public UnitTeam Team => team;
         public PrototypeUnitType UnitType => unitType;
         public MovementDomain MovementDomain => movementDomain;
         public UnitRole Roles => roles;
@@ -135,7 +147,8 @@ namespace ProjectS.Units
         public float AttackArea => attackArea;
 
         public void Initialize(
-            UnitFaction faction,
+            UnitTrial trial,
+            UnitTeam team,
             PrototypeUnitType unitType,
             MovementDomain movementDomain,
             UnitRole roles,
@@ -155,7 +168,8 @@ namespace ProjectS.Units
             bool hasAreaAttack,
             float attackArea)
         {
-            this.faction = faction;
+            this.trial = trial;
+            this.team = team;
             this.unitType = unitType;
             this.movementDomain = movementDomain;
             this.roles = roles;
