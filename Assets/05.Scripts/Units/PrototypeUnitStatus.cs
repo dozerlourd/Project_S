@@ -146,6 +146,12 @@ namespace ProjectS.Units
         public bool HasAreaAttack => hasAreaAttack;
         public float AttackArea => attackArea;
 
+        private void Awake()
+        {
+            EnsureGroundPathAgent();
+            EnsureCommandAgent();
+        }
+
         public void Initialize(
             UnitTrial trial,
             UnitTeam team,
@@ -188,6 +194,32 @@ namespace ProjectS.Units
             this.canGatherResources = canGatherResources;
             this.hasAreaAttack = hasAreaAttack;
             this.attackArea = attackArea;
+        }
+
+        private void EnsureGroundPathAgent()
+        {
+            if (movementDomain != MovementDomain.Ground || placementType != PlacementType.Movable)
+            {
+                return;
+            }
+
+            if (GetComponent<UnitPathAgent>() == null)
+            {
+                gameObject.AddComponent<UnitPathAgent>();
+            }
+        }
+
+        private void EnsureCommandAgent()
+        {
+            if (placementType != PlacementType.Movable)
+            {
+                return;
+            }
+
+            if (GetComponent<UnitCommandAgent>() == null)
+            {
+                gameObject.AddComponent<UnitCommandAgent>();
+            }
         }
     }
 }

@@ -11,6 +11,8 @@ GameObject:
   - component: {fileID: 2022255842683827632}
   - component: {fileID: 5975378399861427871}
   - component: {fileID: 8480280956845204650}
+  - component: {fileID: -4003359855256833914}
+  - component: {fileID: -2077277880852184783}
   m_Layer: 0
   m_Name: B_Worker
   m_TagString: Untagged
@@ -70,7 +72,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f03a05260d009eb4f9c7f0ff55787878, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProjectS.Units.PrototypeUnitStatus
-  faction: 1
+  trial: 0
+  team: 0
   unitType: 0
   movementDomain: 0
   roles: 3
@@ -99,6 +102,48 @@ MonoBehaviour:
   canGatherResources: 1
   hasAreaAttack: 0
   attackArea: 0
+--- !u!54 &-4003359855256833914
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3265239871482611370}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &-2077277880852184783
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3265239871482611370}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1373594269f29d4d8977b662cdaf8d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectS.Units.UnitPathAgent
+  pathfinder: {fileID: 0}
+  stoppingDistance: 0.08
+  rotationSpeed: 720
 --- !u!1 &4101390448776416726
 GameObject:
   m_ObjectHideFlags: 0

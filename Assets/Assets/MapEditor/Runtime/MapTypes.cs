@@ -37,6 +37,33 @@ namespace ProjectS.Maps
                 || terrainType == MapTerrainType.BaseGround
                 || terrainType == MapTerrainType.LowerBlockedGround;
         }
+
+        public static float GetUnitSurfaceOffset(MapTerrainType terrainType)
+        {
+            switch (terrainType)
+            {
+                case MapTerrainType.HighGround:
+                case MapTerrainType.HighGroundStraightEnd:
+                case MapTerrainType.HighGroundCornerEdge:
+                    return 1f;
+                case MapTerrainType.LowGroundStraightEnd:
+                case MapTerrainType.LowGroundCornerEdge:
+                case MapTerrainType.LowerBlockedGround:
+                    return -1f;
+                case MapTerrainType.Ramp:
+                case MapTerrainType.BaseToHighRamp:
+                case MapTerrainType.BaseToHighRampTwoCell:
+                case MapTerrainType.BaseToHighRampThreeCell:
+                    return 0.5f;
+                default:
+                    return 0f;
+            }
+        }
+
+        public static float GetUnitSurfaceY(MapCellData cell)
+        {
+            return cell == null ? 0f : cell.heightLevel + GetUnitSurfaceOffset(cell.terrainType);
+        }
     }
 
     public enum PlacedMapObjectType

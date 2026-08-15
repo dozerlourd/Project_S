@@ -74,6 +74,10 @@ namespace ProjectS.Units.Editor
                 collider.height = 2f;
                 collider.radius = 0.5f;
 
+                var rigidbody = root.AddComponent<Rigidbody>();
+                rigidbody.isKinematic = true;
+                rigidbody.useGravity = false;
+
                 var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 visual.name = "Visual";
                 visual.transform.SetParent(root.transform, false);
@@ -93,6 +97,8 @@ namespace ProjectS.Units.Editor
 
                 var status = root.AddComponent<PrototypeUnitStatus>();
                 ApplyStatus(status, GetTeam(faction), unitType);
+                root.AddComponent<UnitPathAgent>();
+                root.AddComponent<UnitCommandAgent>();
 
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }

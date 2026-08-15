@@ -11,6 +11,14 @@ namespace ProjectS.Maps
 
         public MapDefinition MapDefinition { get => mapDefinition; set => mapDefinition = value; }
 
+        private void OnEnable()
+        {
+            if (Application.isPlaying && mapDefinition != null)
+            {
+                ConfigurePathfinder();
+            }
+        }
+
         private void Start()
         {
             if (buildOnStart)
@@ -34,6 +42,7 @@ namespace ProjectS.Maps
             }
 
             mapDefinition.EnsureCells();
+            ConfigurePathfinder();
             if (ShouldUseBakedPrefab())
             {
                 BuildFromBakedPrefab();
@@ -96,6 +105,17 @@ namespace ProjectS.Maps
         public bool IsBuildable(Vector2Int gridPosition)
         {
             return mapDefinition != null && mapDefinition.GetCell(gridPosition)?.buildable == true;
+        }
+
+        private void ConfigurePathfinder()
+        {
+            var pathfinder = GetComponent<MapPathfinder>();
+            if (pathfinder == null)
+            {
+                pathfinder = gameObject.AddComponent<MapPathfinder>();
+            }
+
+            pathfinder.MapDefinition = mapDefinition;
         }
 
         private void BuildTerrain(Transform root)
