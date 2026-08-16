@@ -128,8 +128,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1446921485}
+  - component: {fileID: 1446921486}
   m_Layer: 0
-  m_Name: Camera_Pivot
+  m_Name: PlayerCamera
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -144,13 +145,43 @@ Transform:
   m_GameObject: {fileID: 1446921484}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 59.46, y: 18.2, z: 58.7}
+  m_LocalPosition: {x: 59.46, y: 50, z: 58.7}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1597288405}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1446921486
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1446921484}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e3775ecf4d542048a44d04d17cc5b20, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetCamera: {fileID: 1597288404}
+  mapDefinition: {fileID: 11400000, guid: 954a6a462f00037459200f4cffd06423, type: 2}
+  enableEdgeMovement: 1
+  edgeMoveSpeed: 120
+  edgeThickness: 120
+  enableKeyboardMovement: 1
+  keyboardMoveSpeed: 24
+  minOrthographicSize: 8
+  maxOrthographicSize: 36
+  zoomSpeed: 40
+  zoomSmoothing: 120
+  useMovementBounds: 1
+  autoResolveMapBounds: 1
+  mapRoot: {fileID: 0}
+  mapWorldOrigin: {x: 41.81131, y: 39.21791}
+  minBounds: {x: 0, y: 0}
+  maxBounds: {x: 120, y: 120}
+  groundPlaneHeight: 0
 --- !u!1 &1597288402
 GameObject:
   m_ObjectHideFlags: 0
