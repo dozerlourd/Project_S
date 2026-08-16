@@ -99,12 +99,14 @@ namespace ProjectS.Maps
 
         public bool IsWalkable(Vector2Int gridPosition)
         {
-            return mapDefinition != null && mapDefinition.GetCell(gridPosition)?.walkable == true;
+            return mapDefinition != null && new MapTerrainQuery(mapDefinition).IsGroundWalkable(gridPosition);
         }
 
         public bool IsBuildable(Vector2Int gridPosition)
         {
-            return mapDefinition != null && mapDefinition.GetCell(gridPosition)?.buildable == true;
+            return mapDefinition != null
+                && new MapTerrainQuery(mapDefinition).TryGetCell(gridPosition, out var cell)
+                && cell.Buildable;
         }
 
         private void ConfigurePathfinder()

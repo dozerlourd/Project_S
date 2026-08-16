@@ -5,6 +5,8 @@ namespace ProjectS.Maps
 {
     public static class MapValidator
     {
+        private const float DefaultMaxGroundHeightStep = 0.6f;
+
         private static readonly Vector2Int[] CardinalDirections =
         {
             new Vector2Int(1, 0),
@@ -23,10 +25,11 @@ namespace ProjectS.Maps
             }
 
             map.EnsureCells();
+            var terrainQuery = new MapTerrainQuery(map);
             ValidateSpawns(map, issues);
-            ValidateResources(map, issues);
-            ValidateRamps(map, issues);
-            ValidateConnectivity(map, issues);
+            ValidateResources(map, terrainQuery, issues);
+            ValidateRamps(map, terrainQuery, issues);
+            ValidateConnectivity(map, terrainQuery, issues);
             ValidateObjectOverlap(map, issues);
 
             if (issues.Count == 0)
@@ -72,7 +75,7 @@ namespace ProjectS.Maps
             }
         }
 
-        private static void ValidateResources(MapDefinition map, List<MapValidationIssue> issues)
+        private static void ValidateResources(MapDefinition map, MapTerrainQuery terrainQuery, List<MapValidationIssue> issues)
         {
             foreach (var resource in map.ResourceNodes)
             {
@@ -82,65 +85,85 @@ namespace ProjectS.Maps
                     continue;
                 }
 
-                if (!HasAdjacentWalkableCell(map, resource.gridPosition))
+                if (!HasAdjacentWalkableCell(terrainQuery, resource.gridPosition))
                 {
                     issues.Add(new MapValidationIssue(MapValidationSeverity.Error, "Resource node has no adjacent walkable cell.", resource.gridPosition));
                 }
             }
         }
 
-        private static void ValidateRamps(MapDefinition map, List<MapValidationIssue> issues)
+        private static void ValidateRamps(MapDefinition map, MapTerrainQuery terrainQuery, List<MapValidationIssue> issues)
         {
-            foreach (var cell in map.Cells)
+            for (var y = 0; y < map.Height; y++)
             {
-                if (cell == null || !MapTerrainRules.IsRamp(cell.terrainType))
+                for (var x = 0; x < map.Width; x++)
                 {
-                    continue;
-                }
-
-                var hasLower = false;
-                var hasHigher = false;
-                foreach (var direction in CardinalDirections)
-                {
-                    var neighbor = map.GetCell(cell.Position + direction);
-                    if (neighbor == null || !neighbor.walkable)
+                    var position = new Vector2Int(x, y);
+                    if (!terrainQuery.TryGetCell(position, out var cell) || !cell.IsRamp)
                     {
                         continue;
                     }
 
-                    if (neighbor.heightLevel < cell.heightLevel) hasLower = true;
-                    if (neighbor.heightLevel > cell.heightLevel) hasHigher = true;
-                }
+                    var centerY = terrainQuery.GetUnitSurfaceY(position, map.GridToWorld(position));
+                    var hasLower = false;
+                    var hasHigher = false;
+                    foreach (var direction in CardinalDirections)
+                    {
+                        var neighborPosition = position + direction;
+                        if (!terrainQuery.TryGetCell(neighborPosition, out var neighbor)
+                            || !neighbor.Walkable
+                            || !terrainQuery.CanMoveBetween(position, neighborPosition, DefaultMaxGroundHeightStep))
+                        {
+                            continue;
+                        }
 
-                if (!hasLower || !hasHigher)
-                {
-                    issues.Add(new MapValidationIssue(MapValidationSeverity.Warning, "Ramp should connect lower and higher walkable terrain.", cell.Position));
+                        var neighborY = terrainQuery.GetUnitSurfaceYAtEdge(neighborPosition, neighbor, -direction);
+                        if (neighborY < centerY - 0.01f)
+                        {
+                            hasLower = true;
+                        }
+
+                        if (neighborY > centerY + 0.01f)
+                        {
+                            hasHigher = true;
+                        }
+                    }
+
+                    if (!hasLower || !hasHigher)
+                    {
+                        issues.Add(new MapValidationIssue(MapValidationSeverity.Warning, "Ramp should connect lower and higher walkable terrain.", position));
+                    }
+
                 }
             }
         }
 
-        private static void ValidateConnectivity(MapDefinition map, List<MapValidationIssue> issues)
+        private static void ValidateConnectivity(MapDefinition map, MapTerrainQuery terrainQuery, List<MapValidationIssue> issues)
         {
-            var start = FindFirstWalkable(map);
+            var start = FindFirstWalkable(map, terrainQuery);
             if (!start.HasValue)
             {
                 issues.Add(new MapValidationIssue(MapValidationSeverity.Error, "Map has no walkable cells.", Vector2Int.zero));
                 return;
             }
 
-            var reachable = FloodFillWalkable(map, start.Value);
-            foreach (var cell in map.Cells)
+            var reachable = FloodFillWalkable(map, terrainQuery, start.Value);
+            for (var y = 0; y < map.Height; y++)
             {
-                if (cell?.walkable == true && !reachable.Contains(cell.Position))
+                for (var x = 0; x < map.Width; x++)
                 {
-                    issues.Add(new MapValidationIssue(MapValidationSeverity.Warning, "Walkable area is disconnected from the main area.", cell.Position));
-                    return;
+                    var position = new Vector2Int(x, y);
+                    if (terrainQuery.IsGroundWalkable(position) && !reachable.Contains(position))
+                    {
+                        issues.Add(new MapValidationIssue(MapValidationSeverity.Warning, "Walkable area is disconnected from the main area.", position));
+                        return;
+                    }
                 }
             }
 
             foreach (var resource in map.ResourceNodes)
             {
-                if (resource != null && !HasReachableAdjacentCell(map, reachable, resource.gridPosition))
+                if (resource != null && !HasReachableAdjacentCell(map, terrainQuery, reachable, resource.gridPosition))
                 {
                     issues.Add(new MapValidationIssue(MapValidationSeverity.Error, "Resource node is not reachable from the main walkable area.", resource.gridPosition));
                 }
@@ -229,11 +252,11 @@ namespace ProjectS.Maps
             }
         }
 
-        private static bool HasAdjacentWalkableCell(MapDefinition map, Vector2Int position)
+        private static bool HasAdjacentWalkableCell(MapTerrainQuery terrainQuery, Vector2Int position)
         {
             foreach (var direction in CardinalDirections)
             {
-                if (map.GetCell(position + direction)?.walkable == true)
+                if (terrainQuery.IsGroundWalkable(position + direction))
                 {
                     return true;
                 }
@@ -242,12 +265,12 @@ namespace ProjectS.Maps
             return false;
         }
 
-        private static bool HasReachableAdjacentCell(MapDefinition map, HashSet<Vector2Int> reachable, Vector2Int position)
+        private static bool HasReachableAdjacentCell(MapDefinition map, MapTerrainQuery terrainQuery, HashSet<Vector2Int> reachable, Vector2Int position)
         {
             foreach (var direction in CardinalDirections)
             {
                 var adjacent = position + direction;
-                if (map.InBounds(adjacent) && reachable.Contains(adjacent))
+                if (map.InBounds(adjacent) && terrainQuery.IsGroundWalkable(adjacent) && reachable.Contains(adjacent))
                 {
                     return true;
                 }
@@ -256,29 +279,33 @@ namespace ProjectS.Maps
             return false;
         }
 
-        private static Vector2Int? FindFirstWalkable(MapDefinition map)
+        private static Vector2Int? FindFirstWalkable(MapDefinition map, MapTerrainQuery terrainQuery)
         {
             if (map.SpawnPoints.Count > 0)
             {
                 var spawnPosition = map.SpawnPoints[0].gridPosition;
-                if (map.GetCell(spawnPosition)?.walkable == true)
+                if (terrainQuery.IsGroundWalkable(spawnPosition))
                 {
                     return spawnPosition;
                 }
             }
 
-            foreach (var cell in map.Cells)
+            for (var y = 0; y < map.Height; y++)
             {
-                if (cell?.walkable == true)
+                for (var x = 0; x < map.Width; x++)
                 {
-                    return cell.Position;
+                    var position = new Vector2Int(x, y);
+                    if (terrainQuery.IsGroundWalkable(position))
+                    {
+                        return position;
+                    }
                 }
             }
 
             return null;
         }
 
-        private static HashSet<Vector2Int> FloodFillWalkable(MapDefinition map, Vector2Int start)
+        private static HashSet<Vector2Int> FloodFillWalkable(MapDefinition map, MapTerrainQuery terrainQuery, Vector2Int start)
         {
             var visited = new HashSet<Vector2Int>();
             var queue = new Queue<Vector2Int>();
@@ -291,7 +318,9 @@ namespace ProjectS.Maps
                 foreach (var direction in CardinalDirections)
                 {
                     var next = current + direction;
-                    if (visited.Contains(next) || map.GetCell(next)?.walkable != true)
+                    if (visited.Contains(next)
+                        || !map.InBounds(next)
+                        || !terrainQuery.CanMoveBetween(current, next, DefaultMaxGroundHeightStep))
                     {
                         continue;
                     }

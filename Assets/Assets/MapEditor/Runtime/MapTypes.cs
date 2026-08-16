@@ -64,6 +64,41 @@ namespace ProjectS.Maps
         {
             return cell == null ? 0f : cell.heightLevel + GetUnitSurfaceOffset(cell.terrainType);
         }
+
+        public static float GetUnitSurfaceY(MapCellData cell, Vector3 worldPosition, float tileSize)
+        {
+            if (cell == null)
+            {
+                return 0f;
+            }
+
+            if (!IsRamp(cell.terrainType))
+            {
+                return GetUnitSurfaceY(cell);
+            }
+
+            var normalizedX = Mathf.Clamp01((worldPosition.x - cell.x * tileSize) / tileSize);
+            var normalizedZ = Mathf.Clamp01((worldPosition.z - cell.y * tileSize) / tileSize);
+            var rotation = Mathf.RoundToInt(Mathf.Repeat(cell.rotationY, 360f));
+            float rampT;
+            switch (rotation)
+            {
+                case 90:
+                    rampT = normalizedX;
+                    break;
+                case 180:
+                    rampT = 1f - normalizedZ;
+                    break;
+                case 270:
+                    rampT = 1f - normalizedX;
+                    break;
+                default:
+                    rampT = normalizedZ;
+                    break;
+            }
+
+            return cell.heightLevel + Mathf.Lerp(0f, 1f, rampT);
+        }
     }
 
     public enum PlacedMapObjectType

@@ -88,12 +88,11 @@ namespace ProjectS.Units
         private void MoveAlongPath()
         {
             var target = path[waypointIndex];
-            var current = new Vector3(transform.position.x, target.y, transform.position.z);
+            var current = transform.position;
             var flatDelta = new Vector3(target.x - current.x, 0f, target.z - current.z);
             if (flatDelta.magnitude <= stoppingDistance)
             {
-                SnapToWaypointHeight(target);
-                transform.position = new Vector3(target.x, target.y, target.z);
+                transform.position = GetSurfaceAlignedPosition(target);
                 waypointIndex++;
                 if (!HasPath)
                 {
@@ -105,8 +104,9 @@ namespace ProjectS.Units
 
             var direction = flatDelta.normalized;
             var speed = status != null ? status.MovementSpeed : 3f;
-            var nextPosition = Vector3.MoveTowards(current, target, speed * Time.deltaTime);
-            transform.position = new Vector3(nextPosition.x, target.y, nextPosition.z);
+            var flatTarget = new Vector3(target.x, current.y, target.z);
+            var nextPosition = Vector3.MoveTowards(current, flatTarget, speed * Time.deltaTime);
+            transform.position = GetSurfaceAlignedPosition(nextPosition);
 
             if (direction.sqrMagnitude > 0.001f)
             {
@@ -157,7 +157,7 @@ namespace ProjectS.Units
             var nextPosition = transform.position + push.normalized * (separationStrength * deltaTime);
             if (pathfinder != null && pathfinder.IsSegmentWalkable(transform.position, nextPosition))
             {
-                transform.position = new Vector3(nextPosition.x, transform.position.y, nextPosition.z);
+                transform.position = GetSurfaceAlignedPosition(nextPosition);
             }
         }
 
@@ -177,7 +177,17 @@ namespace ProjectS.Units
 
         private void SnapToWaypointHeight(Vector3 waypoint)
         {
-            transform.position = new Vector3(transform.position.x, waypoint.y, transform.position.z);
+            transform.position = GetSurfaceAlignedPosition(new Vector3(transform.position.x, waypoint.y, transform.position.z));
+        }
+
+        private Vector3 GetSurfaceAlignedPosition(Vector3 position)
+        {
+            if (pathfinder != null && pathfinder.TryGetUnitSurfacePoint(position, out var surfacePosition))
+            {
+                return surfacePosition;
+            }
+
+            return position;
         }
     }
 }

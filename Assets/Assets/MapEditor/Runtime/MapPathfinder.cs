@@ -18,10 +18,13 @@ namespace ProjectS.Maps
 
         [SerializeField] private MapDefinition mapDefinition;
         [SerializeField] private bool allowDiagonalMovement;
+        [SerializeField, Min(0f)] private float maxGroundHeightStep = 0.6f;
 
         private readonly HashSet<Vector2Int> blockedCells = new HashSet<Vector2Int>();
+        private MapTerrainQuery terrainQuery;
 
         public bool HasMapDefinition => mapDefinition != null;
+        public float MaxGroundHeightStep { get => maxGroundHeightStep; set => maxGroundHeightStep = Mathf.Max(0f, value); }
 
         public MapDefinition MapDefinition
         {
@@ -29,6 +32,7 @@ namespace ProjectS.Maps
             set
             {
                 mapDefinition = value;
+                terrainQuery = null;
                 RebuildBlockCache();
             }
         }
@@ -99,6 +103,7 @@ namespace ProjectS.Maps
             }
 
             mapDefinition.EnsureCells();
+            terrainQuery = new MapTerrainQuery(mapDefinition);
             foreach (var placedObject in mapDefinition.PlacedObjects)
             {
                 if (placedObject == null || !placedObject.blocksMovement)
@@ -137,8 +142,7 @@ namespace ProjectS.Maps
 
             if (worldPath.Count > 0)
             {
-                var goalCell = mapDefinition.GetCell(goal);
-                worldPath[worldPath.Count - 1] = GetUnitWorldPosition(goalWorld, goalCell);
+                worldPath[worldPath.Count - 1] = GetUnitWorldPosition(goalWorld);
             }
 
             SmoothWorldPath(worldPath);
@@ -167,8 +171,7 @@ namespace ProjectS.Maps
 
             foreach (var cellPosition in gridPath)
             {
-                var cell = mapDefinition.GetCell(cellPosition);
-                worldPath.Add(GetUnitWorldPosition(cellPosition, cell));
+                worldPath.Add(GetUnitWorldPosition(cellPosition));
             }
 
             return true;
@@ -181,8 +184,7 @@ namespace ProjectS.Maps
                 return false;
             }
 
-            var cell = mapDefinition.GetCell(position);
-            return cell != null && cell.walkable && !cell.occupied;
+            return EnsureTerrainQuery().IsGroundWalkable(position);
         }
 
         public bool TryGetMapPoint(Ray ray, out Vector3 worldPosition)
@@ -201,26 +203,44 @@ namespace ProjectS.Maps
 
             var point = ray.GetPoint(enter);
             var gridPosition = mapDefinition.WorldToGrid(point);
-            var cell = mapDefinition.GetCell(gridPosition);
-            if (cell == null)
+            if (!EnsureTerrainQuery().TryGetCell(gridPosition, out _))
             {
                 return false;
             }
 
-            worldPosition = GetUnitWorldPosition(point, cell);
+            worldPosition = GetUnitWorldPosition(point);
             return true;
         }
 
-        private Vector3 GetUnitWorldPosition(Vector2Int gridPosition, MapCellData cell)
+        private Vector3 GetUnitWorldPosition(Vector2Int gridPosition)
         {
-            var worldPosition = mapDefinition.GridToWorld(gridPosition, cell?.heightLevel ?? 0);
-            worldPosition.y = MapTerrainRules.GetUnitSurfaceY(cell);
+            var heightLevel = EnsureTerrainQuery().TryGetCell(gridPosition, out var cell) ? cell.HeightLevel : 0;
+            var worldPosition = mapDefinition.GridToWorld(gridPosition, heightLevel);
+            worldPosition.y = EnsureTerrainQuery().GetUnitSurfaceY(gridPosition, worldPosition);
             return worldPosition;
         }
 
-        private Vector3 GetUnitWorldPosition(Vector3 worldPosition, MapCellData cell)
+        private Vector3 GetUnitWorldPosition(Vector3 worldPosition)
         {
-            return new Vector3(worldPosition.x, MapTerrainRules.GetUnitSurfaceY(cell), worldPosition.z);
+            return new Vector3(worldPosition.x, EnsureTerrainQuery().GetUnitSurfaceY(mapDefinition.WorldToGrid(worldPosition), worldPosition), worldPosition.z);
+        }
+
+        public bool TryGetUnitSurfacePoint(Vector3 worldPosition, out Vector3 surfacePosition)
+        {
+            surfacePosition = default;
+            if (mapDefinition == null && !ResolveMapDefinition())
+            {
+                return false;
+            }
+
+            var gridPosition = mapDefinition.WorldToGrid(worldPosition);
+            if (!EnsureTerrainQuery().TryGetCell(gridPosition, out _))
+            {
+                return false;
+            }
+
+            surfacePosition = GetUnitWorldPosition(worldPosition);
+            return true;
         }
 
         public bool IsSegmentWalkable(Vector3 fromWorld, Vector3 toWorld)
@@ -413,26 +433,22 @@ namespace ProjectS.Maps
 
         private bool CanMoveBetween(Vector2Int from, Vector2Int to)
         {
-            if (!IsGroundWalkable(to))
+            if (!IsGroundWalkable(from) || !IsGroundWalkable(to))
             {
                 return false;
             }
 
-            var fromCell = mapDefinition.GetCell(from);
-            var toCell = mapDefinition.GetCell(to);
-            if (fromCell == null || toCell == null)
+            return EnsureTerrainQuery().CanMoveBetween(from, to, maxGroundHeightStep);
+        }
+
+        private MapTerrainQuery EnsureTerrainQuery()
+        {
+            if (terrainQuery == null)
             {
-                return false;
+                terrainQuery = new MapTerrainQuery(mapDefinition);
             }
 
-            if (fromCell.heightLevel == toCell.heightLevel)
-            {
-                return true;
-            }
-
-            var heightDelta = Mathf.Abs(fromCell.heightLevel - toCell.heightLevel);
-            return heightDelta <= 1
-                && (MapTerrainRules.IsRamp(fromCell.terrainType) || MapTerrainRules.IsRamp(toCell.terrainType));
+            return terrainQuery;
         }
 
         private static int GetBestOpenNodeIndex(List<PathNode> open)
