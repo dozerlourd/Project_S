@@ -13,11 +13,15 @@ namespace ProjectS
         [Header("Edge Movement")]
         [SerializeField] private bool enableEdgeMovement = true;
         [SerializeField] private float edgeMoveSpeed = 24f;
-        [SerializeField] private float edgeThickness = 24f;
+        [SerializeField] private float edgeThickness = 1f;
 
         [Header("Keyboard Movement")]
         [SerializeField] private bool enableKeyboardMovement = true;
         [SerializeField] private float keyboardMoveSpeed = 24f;
+
+        [Header("Rotation")]
+        [SerializeField] private bool enableKeyboardRotation = true;
+        [SerializeField] private float keyboardRotationSpeed = 90f;
 
         [Header("Zoom")]
         [SerializeField] private float minOrthographicSize = 8f;
@@ -49,6 +53,7 @@ namespace ProjectS
         {
             edgeMoveSpeed = Mathf.Max(0f, edgeMoveSpeed);
             keyboardMoveSpeed = Mathf.Max(0f, keyboardMoveSpeed);
+            keyboardRotationSpeed = Mathf.Max(0f, keyboardRotationSpeed);
             edgeThickness = Mathf.Max(1f, edgeThickness);
             minOrthographicSize = Mathf.Max(0.1f, minOrthographicSize);
             maxOrthographicSize = Mathf.Max(minOrthographicSize, maxOrthographicSize);
@@ -77,6 +82,7 @@ namespace ProjectS
                 return;
             }
 
+            RotateCamera();
             MoveCamera();
             UpdateZoomTarget();
             ApplyZoom();
@@ -114,6 +120,21 @@ namespace ProjectS
             var right = Vector3.ProjectOnPlane(targetCamera.transform.right, Vector3.up).normalized;
             var moveDirection = (right * moveInput.x) + (forward * moveInput.y);
             transform.position += moveDirection * GetMoveSpeed() * Time.deltaTime;
+        }
+
+        private void RotateCamera()
+        {
+            var rotationInput = GetKeyboardRotationInput();
+            if (Mathf.Approximately(rotationInput, 0f))
+            {
+                return;
+            }
+
+            var lookPointBeforeRotation = GetCameraCenterGroundPoint();
+            transform.Rotate(Vector3.up, rotationInput * keyboardRotationSpeed * Time.deltaTime, Space.World);
+            var lookPointAfterRotation = GetCameraCenterGroundPoint();
+            var correction = lookPointBeforeRotation - lookPointAfterRotation;
+            transform.position += new Vector3(correction.x, 0f, correction.z);
         }
 
         private void ResolveMapDefinition()
@@ -211,6 +232,29 @@ namespace ProjectS
             if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed)
             {
                 input.y += 1f;
+            }
+
+            return input;
+        }
+
+        private float GetKeyboardRotationInput()
+        {
+            if (!enableKeyboardRotation || Keyboard.current == null)
+            {
+                return 0f;
+            }
+
+            var keyboard = Keyboard.current;
+            var input = 0f;
+
+            if (keyboard.qKey.isPressed)
+            {
+                input -= 1f;
+            }
+
+            if (keyboard.eKey.isPressed)
+            {
+                input += 1f;
             }
 
             return input;
