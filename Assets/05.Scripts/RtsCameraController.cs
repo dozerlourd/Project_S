@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using ProjectS.Maps;
+using ProjectS.Tilemaps;
 
 namespace ProjectS
 {
@@ -8,7 +8,6 @@ namespace ProjectS
     {
         [Header("References")]
         [SerializeField] private Camera targetCamera;
-        [SerializeField] private MapDefinition mapDefinition;
 
         [Header("Edge Movement")]
         [SerializeField] private bool enableEdgeMovement = true;
@@ -20,7 +19,7 @@ namespace ProjectS
         [SerializeField] private float keyboardMoveSpeed = 24f;
 
         [Header("Rotation")]
-        [SerializeField] private bool enableKeyboardRotation = true;
+        [SerializeField] private bool enableKeyboardRotation;
         [SerializeField] private float keyboardRotationSpeed = 90f;
 
         [Header("Zoom")]
@@ -32,18 +31,19 @@ namespace ProjectS
         [Header("Movement Bounds")]
         [SerializeField] private bool useMovementBounds = true;
         [SerializeField] private bool autoResolveMapBounds = true;
+        [SerializeField] private ProjectSTilemapWorld tilemapWorld;
         [SerializeField] private Transform mapRoot;
         [SerializeField] private Vector2 mapWorldOrigin;
+        [SerializeField] private float boundsPadding;
         [SerializeField] private Vector2 minBounds = new Vector2(0f, 0f);
         [SerializeField] private Vector2 maxBounds = new Vector2(120f, 120f);
-        [SerializeField] private float groundPlaneHeight;
+        [SerializeField] private float mapPlaneZ;
 
         private float targetOrthographicSize;
 
         private void Awake()
         {
             ResolveCamera();
-            ResolveMapDefinition();
             ResolveMapRoot();
             targetOrthographicSize = targetCamera != null ? targetCamera.orthographicSize : maxOrthographicSize;
             ClampPositionToBounds();
@@ -59,6 +59,7 @@ namespace ProjectS
             maxOrthographicSize = Mathf.Max(minOrthographicSize, maxOrthographicSize);
             zoomSpeed = Mathf.Max(0f, zoomSpeed);
             zoomSmoothing = Mathf.Max(0f, zoomSmoothing);
+            boundsPadding = Mathf.Max(0f, boundsPadding);
 
             if (maxBounds.x < minBounds.x)
             {
@@ -74,7 +75,6 @@ namespace ProjectS
         private void Update()
         {
             ResolveCamera();
-            ResolveMapDefinition();
             ResolveMapRoot();
 
             if (targetCamera == null)
@@ -116,9 +116,7 @@ namespace ProjectS
 
             moveInput = Vector2.ClampMagnitude(moveInput, 1f);
 
-            var forward = Vector3.ProjectOnPlane(targetCamera.transform.forward, Vector3.up).normalized;
-            var right = Vector3.ProjectOnPlane(targetCamera.transform.right, Vector3.up).normalized;
-            var moveDirection = (right * moveInput.x) + (forward * moveInput.y);
+            var moveDirection = new Vector3(moveInput.x, moveInput.y, 0f);
             transform.position += moveDirection * GetMoveSpeed() * Time.deltaTime;
         }
 
@@ -131,45 +129,32 @@ namespace ProjectS
             }
 
             var lookPointBeforeRotation = GetCameraCenterGroundPoint();
-            transform.Rotate(Vector3.up, rotationInput * keyboardRotationSpeed * Time.deltaTime, Space.World);
+            transform.Rotate(Vector3.forward, rotationInput * keyboardRotationSpeed * Time.deltaTime, Space.World);
             var lookPointAfterRotation = GetCameraCenterGroundPoint();
             var correction = lookPointBeforeRotation - lookPointAfterRotation;
-            transform.position += new Vector3(correction.x, 0f, correction.z);
-        }
-
-        private void ResolveMapDefinition()
-        {
-            if (!autoResolveMapBounds || mapDefinition != null)
-            {
-                return;
-            }
-
-            var runtimeBuilder = FindFirstObjectByType<MapRuntimeBuilder>();
-            if (runtimeBuilder != null)
-            {
-                mapDefinition = runtimeBuilder.MapDefinition;
-                mapRoot = runtimeBuilder.transform;
-                return;
-            }
-
-            var pathfinder = FindFirstObjectByType<MapPathfinder>();
-            if (pathfinder != null && pathfinder.ResolveMapDefinition())
-            {
-                mapDefinition = pathfinder.MapDefinition;
-            }
+            transform.position += new Vector3(correction.x, correction.y, 0f);
         }
 
         private void ResolveMapRoot()
         {
-            if (!autoResolveMapBounds || mapRoot != null || mapDefinition == null || mapDefinition.BakedMapPrefab == null)
+            if (!autoResolveMapBounds || mapRoot != null)
             {
                 return;
             }
 
-            var mapObject = GameObject.Find(mapDefinition.BakedMapPrefab.name);
-            if (mapObject != null)
+            if (tilemapWorld == null)
             {
-                mapRoot = mapObject.transform;
+                tilemapWorld = ProjectSTilemapWorld.ActiveInstance;
+            }
+
+            if (tilemapWorld == null)
+            {
+                tilemapWorld = FindFirstObjectByType<ProjectSTilemapWorld>();
+            }
+
+            if (tilemapWorld != null)
+            {
+                mapRoot = tilemapWorld.transform;
             }
         }
 
@@ -311,24 +296,30 @@ namespace ProjectS
             var boundsMin = minBounds;
             var boundsMax = maxBounds;
 
-            if (mapDefinition != null)
+            if (tilemapWorld != null)
             {
-                boundsMin = GetMapWorldOrigin();
-                boundsMax = boundsMin + new Vector2(
-                    mapDefinition.Width * mapDefinition.TileSize,
-                    mapDefinition.Height * mapDefinition.TileSize);
+                var bounds = tilemapWorld.CellBounds;
+                var worldMin = tilemapWorld.GetCellCenterWorld(new Vector3Int(bounds.xMin, bounds.yMin, 0));
+                var worldMax = tilemapWorld.GetCellCenterWorld(new Vector3Int(bounds.xMax - 1, bounds.yMax - 1, 0));
+                boundsMin = new Vector2(Mathf.Min(worldMin.x, worldMax.x), Mathf.Min(worldMin.y, worldMax.y)) - Vector2.one * boundsPadding;
+                boundsMax = new Vector2(Mathf.Max(worldMin.x, worldMax.x), Mathf.Max(worldMin.y, worldMax.y)) + Vector2.one * boundsPadding;
+            }
+            else if (boundsPadding > 0f)
+            {
+                boundsMin -= Vector2.one * boundsPadding;
+                boundsMax += Vector2.one * boundsPadding;
             }
 
             var lookPoint = GetCameraCenterGroundPoint();
             var clampedLookPoint = new Vector3(
                 Mathf.Clamp(lookPoint.x, boundsMin.x, boundsMax.x),
-                lookPoint.y,
-                Mathf.Clamp(lookPoint.z, boundsMin.y, boundsMax.y));
+                Mathf.Clamp(lookPoint.y, boundsMin.y, boundsMax.y),
+                lookPoint.z);
             var correction = clampedLookPoint - lookPoint;
 
             if (correction.sqrMagnitude > 0f)
             {
-                transform.position += new Vector3(correction.x, 0f, correction.z);
+                transform.position += new Vector3(correction.x, correction.y, 0f);
             }
         }
 
@@ -340,7 +331,7 @@ namespace ProjectS
             }
 
             var ray = targetCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-            var groundPlane = new Plane(Vector3.up, new Vector3(0f, groundPlaneHeight, 0f));
+            var groundPlane = new Plane(Vector3.forward, new Vector3(0f, 0f, mapPlaneZ));
 
             return groundPlane.Raycast(ray, out var enter)
                 ? ray.GetPoint(enter)
@@ -352,7 +343,7 @@ namespace ProjectS
             if (mapRoot != null)
             {
                 var position = mapRoot.position;
-                return new Vector2(position.x, position.z);
+                return new Vector2(position.x, position.y);
             }
 
             return mapWorldOrigin;

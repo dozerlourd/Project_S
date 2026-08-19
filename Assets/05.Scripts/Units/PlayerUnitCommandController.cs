@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using ProjectS.Maps;
+using ProjectS.Tilemaps;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
@@ -10,9 +10,10 @@ namespace ProjectS.Units
     {
         [SerializeField] private UnitTeam playerTeam = UnitTeam.Team1;
         [SerializeField] private Camera commandCamera;
-        [SerializeField] private MapPathfinder pathfinder;
+        [SerializeField] private ProjectSTilemapNavigator navigator;
         [SerializeField] private LayerMask unitSelectionMask = ~0;
         [SerializeField] private bool logCommandWarnings = true;
+        [SerializeField] private float commandPlaneZ;
         [SerializeField] private float dragSelectThreshold = 8f;
         [SerializeField] private Color dragFillColor = new Color(0.2f, 0.6f, 1f, 0.18f);
         [SerializeField] private Color dragOutlineColor = new Color(0.2f, 0.65f, 1f, 0.85f);
@@ -25,8 +26,6 @@ namespace ProjectS.Units
         private bool isLeftMousePressed;
         private bool isDraggingSelection;
         private bool warnedMissingCamera;
-        private bool warnedMissingPathfinder;
-        private bool warnedMissingMapDefinition;
         private bool warnedNoSelectedUnits;
 
         private enum PendingPointCommand
@@ -109,31 +108,14 @@ namespace ProjectS.Units
                 commandCamera = Camera.main;
             }
 
-            if (pathfinder == null)
+            if (navigator == null)
             {
-                pathfinder = FindFirstObjectByType<MapPathfinder>();
+                navigator = ProjectSTilemapNavigator.ActiveInstance;
             }
 
-            if (pathfinder == null)
+            if (navigator == null)
             {
-                var runtimeBuilder = FindFirstObjectByType<MapRuntimeBuilder>();
-                if (runtimeBuilder != null)
-                {
-                    pathfinder = runtimeBuilder.GetComponent<MapPathfinder>();
-                    if (pathfinder == null)
-                    {
-                        pathfinder = runtimeBuilder.gameObject.AddComponent<MapPathfinder>();
-                    }
-
-                    pathfinder.MapDefinition = runtimeBuilder.MapDefinition;
-                }
-            }
-
-            if (pathfinder == null)
-            {
-                var pathfinderObject = new GameObject("MapPathfinder_Runtime");
-                pathfinder = pathfinderObject.AddComponent<MapPathfinder>();
-                pathfinder.ResolveMapDefinition();
+                navigator = FindFirstObjectByType<ProjectSTilemapNavigator>();
             }
         }
 
@@ -274,23 +256,16 @@ namespace ProjectS.Units
 
         private void CommandPointFromCursor(PendingPointCommand pointCommand)
         {
-            if (commandCamera == null || pathfinder == null || selectedUnits.Count == 0)
+            if (commandCamera == null || selectedUnits.Count == 0)
             {
                 WarnCommandBlockedReason();
                 return;
             }
 
-            if (!pathfinder.HasMapDefinition && !pathfinder.ResolveMapDefinition())
-            {
-                WarnOnce(ref warnedMissingMapDefinition, "Player move command ignored because MapPathfinder has no MapDefinition. Add a MapRuntimeBuilder with a MapDefinition, or assign the MapDefinition on MapPathfinder.");
-                return;
-            }
-
             var queue = IsCommandQueuePressed();
-            var ray = commandCamera.ScreenPointToRay(GetMousePosition());
-            if (!pathfinder.TryGetMapPoint(ray, out var destination))
+            if (!TryGetCommandPoint(out var destination))
             {
-                Debug.Log("Player move command ignored because the clicked point is outside the map grid.", this);
+                Debug.Log("Player move command ignored because the clicked point did not hit the command plane.", this);
                 return;
             }
 
@@ -429,14 +404,40 @@ namespace ProjectS.Units
             {
                 WarnOnce(ref warnedMissingCamera, "Player move command ignored because no command camera was found.");
             }
-            else if (pathfinder == null)
-            {
-                WarnOnce(ref warnedMissingPathfinder, "Player move command ignored because no MapPathfinder or MapRuntimeBuilder was found in the scene.");
-            }
             else if (selectedUnits.Count == 0)
             {
                 WarnOnce(ref warnedNoSelectedUnits, "Player move command ignored because no player ground unit is selected.");
             }
+        }
+
+        private bool TryGetCommandPoint(out Vector3 destination)
+        {
+            destination = Vector3.zero;
+            if (commandCamera == null)
+            {
+                return false;
+            }
+
+            var ray = commandCamera.ScreenPointToRay(GetMousePosition());
+            var plane = new Plane(Vector3.forward, new Vector3(0f, 0f, commandPlaneZ));
+            if (!plane.Raycast(ray, out var enter))
+            {
+                return false;
+            }
+
+            destination = ray.GetPoint(enter);
+            destination.z = commandPlaneZ;
+            if (navigator != null)
+            {
+                if (!navigator.TryGetCommandPoint(destination, out var tilemapDestination))
+                {
+                    return false;
+                }
+
+                destination = tilemapDestination;
+            }
+
+            return true;
         }
 
         private void WarnOnce(ref bool warned, string message)
@@ -458,13 +459,14 @@ namespace ProjectS.Units
                 return false;
             }
 
-            var ray = commandCamera.ScreenPointToRay(GetMousePosition());
-            if (!Physics.Raycast(ray, out var hit, float.PositiveInfinity, unitSelectionMask, QueryTriggerInteraction.Ignore))
+            var worldPosition = commandCamera.ScreenToWorldPoint(GetMousePosition());
+            var hit = Physics2D.OverlapPoint(worldPosition, unitSelectionMask);
+            if (hit == null)
             {
                 return false;
             }
 
-            status = hit.collider.GetComponentInParent<PrototypeUnitStatus>();
+            status = hit.GetComponentInParent<PrototypeUnitStatus>();
             return status != null;
         }
 
@@ -579,28 +581,28 @@ namespace ProjectS.Units
             var sideOffset = sideLength == 0 ? 0 : offsetInRing % sideLength;
 
             var x = 0;
-            var z = 0;
+            var y = 0;
             switch (side)
             {
                 case 0:
                     x = -ring + sideOffset;
-                    z = ring;
+                    y = ring;
                     break;
                 case 1:
                     x = ring;
-                    z = ring - sideOffset;
+                    y = ring - sideOffset;
                     break;
                 case 2:
                     x = ring - sideOffset;
-                    z = -ring;
+                    y = -ring;
                     break;
                 default:
                     x = -ring;
-                    z = -ring + sideOffset;
+                    y = -ring + sideOffset;
                     break;
             }
 
-            return new Vector3(x * spacing, 0f, z * spacing);
+            return new Vector3(x * spacing, y * spacing, 0f);
         }
 
         private static Rect GetScreenSelectionRect(Vector2 start, Vector2 end)

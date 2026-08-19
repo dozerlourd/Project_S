@@ -26,7 +26,7 @@ Transform:
   m_GameObject: {fileID: 6787407894391390665}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 50, z: 0}
+  m_LocalPosition: {x: 64, y: 64, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -46,7 +46,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   targetCamera: {fileID: 6032674253077248864}
-  mapDefinition: {fileID: 11400000, guid: 954a6a462f00037459200f4cffd06423, type: 2}
+  mapDefinition: {fileID: 11400000, guid: 3703102a19653a54cb9aade6c3aa9f5f, type: 2}
   enableEdgeMovement: 1
   edgeMoveSpeed: 120
   edgeThickness: 1
@@ -61,10 +61,11 @@ MonoBehaviour:
   useMovementBounds: 1
   autoResolveMapBounds: 1
   mapRoot: {fileID: 0}
-  mapWorldOrigin: {x: 41.81131, y: 39.21791}
+  mapWorldOrigin: {x: 0, y: 0}
+  boundsPadding: 0
   minBounds: {x: 0, y: 0}
   maxBounds: {x: 120, y: 120}
-  groundPlaneHeight: 0
+  mapPlaneZ: 0
 --- !u!1 &8456991499755426697
 GameObject:
   m_ObjectHideFlags: 0
@@ -92,13 +93,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8456991499755426697}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.26041883, y: 0.4768585, z: -0.15035288, w: 0.8259431}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1459445771908198669}
-  m_LocalEulerAnglesHint: {x: 35, y: 60, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!20 &6032674253077248864
 Camera:
   m_ObjectHideFlags: 0

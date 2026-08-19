@@ -12,9 +12,9 @@
 |---|---|
 | PlayerUnitCommandController | 플레이어 입력을 해석하고 선택 유닛에 명령을 전달한다. |
 | UnitCommandAgent | 유닛의 현재 명령 상태를 관리한다. |
-| UnitPathAgent | 맵 기반 A* 경로를 따라 유닛을 이동시킨다. |
+| UnitPathAgent | Tilemap 경로가 있으면 셀 기반 경로를 따라가고, 없으면 지정된 월드 좌표까지 이동한다. |
 | PrototypeUnitStatus | 팀, 이동 타입, 공격 사거리, 이동 속도 등 유닛 판정 데이터를 제공한다. |
-| MapPathfinder | 맵 셀과 이동 가능 여부를 기준으로 경로와 클릭 좌표를 계산한다. |
+| ProjectSTilemapNavigator | Unity Tilemap 셀과 이동 가능 여부를 기준으로 경로와 클릭 좌표를 계산한다. |
 
 ## 기본 상호작용
 

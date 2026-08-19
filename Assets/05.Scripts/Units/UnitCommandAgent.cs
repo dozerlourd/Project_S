@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using ProjectS.Maps;
 using UnityEngine;
 
 namespace ProjectS.Units
@@ -12,7 +11,8 @@ namespace ProjectS.Units
         [SerializeField] private float targetScanInterval = 0.2f;
 
         private readonly Queue<UnitCommand> queuedCommands = new Queue<UnitCommand>();
-        private readonly Collider[] targetBuffer = new Collider[32];
+        private readonly Collider2D[] targetBuffer = new Collider2D[32];
+        private ContactFilter2D targetFilter;
         private PrototypeUnitStatus status;
         private UnitPathAgent pathAgent;
         private UnitCommandMode mode = UnitCommandMode.Idle;
@@ -29,6 +29,12 @@ namespace ProjectS.Units
         {
             status = GetComponent<PrototypeUnitStatus>();
             pathAgent = GetComponent<UnitPathAgent>();
+            targetFilter = new ContactFilter2D
+            {
+                useLayerMask = true,
+                layerMask = targetMask,
+                useTriggers = false
+            };
         }
 
         private void Update()
@@ -147,7 +153,8 @@ namespace ProjectS.Units
                 return;
             }
 
-            var hitCount = Physics.OverlapSphereNonAlloc(transform.position, status.AttackRange, targetBuffer, targetMask, QueryTriggerInteraction.Ignore);
+            targetFilter.layerMask = targetMask;
+            var hitCount = Physics2D.OverlapCircle(transform.position, status.AttackRange, targetFilter, targetBuffer);
             for (var i = 0; i < hitCount; i++)
             {
                 var target = targetBuffer[i].GetComponentInParent<PrototypeUnitStatus>();
@@ -187,10 +194,11 @@ namespace ProjectS.Units
         private void FaceTarget(Vector3 targetPosition)
         {
             var direction = targetPosition - transform.position;
-            direction.y = 0f;
+            direction.z = 0f;
             if (direction.sqrMagnitude > 0.001f)
             {
-                transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+                var angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+                transform.rotation = Quaternion.Euler(0f, 0f, angle);
             }
         }
 

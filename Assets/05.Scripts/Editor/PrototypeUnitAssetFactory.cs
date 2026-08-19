@@ -69,30 +69,28 @@ namespace ProjectS.Units.Editor
 
             try
             {
-                var collider = root.AddComponent<CapsuleCollider>();
-                collider.center = new Vector3(0f, 1f, 0f);
-                collider.height = 2f;
+                var collider = root.AddComponent<CircleCollider2D>();
                 collider.radius = 0.5f;
 
-                var rigidbody = root.AddComponent<Rigidbody>();
-                rigidbody.isKinematic = true;
-                rigidbody.useGravity = false;
+                var rigidbody = root.AddComponent<Rigidbody2D>();
+                rigidbody.bodyType = RigidbodyType2D.Kinematic;
+                rigidbody.gravityScale = 0f;
 
-                var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                var visual = new GameObject("Visual");
                 visual.name = "Visual";
                 visual.transform.SetParent(root.transform, false);
-                visual.transform.localPosition = new Vector3(0f, 1f, 0f);
-                Object.DestroyImmediate(visual.GetComponent<Collider>());
+                visual.transform.localPosition = Vector3.zero;
+                var spriteRenderer = visual.AddComponent<SpriteRenderer>();
+                spriteRenderer.sprite = CreateUnitSprite(unitType);
+                spriteRenderer.color = material.color;
 
-                var renderer = visual.GetComponent<Renderer>();
-                renderer.sharedMaterial = material;
-
-                var selectionRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                selectionRing.name = "SelectionRing";
+                var selectionRing = new GameObject("SelectionRing");
                 selectionRing.transform.SetParent(root.transform, false);
-                selectionRing.transform.localPosition = new Vector3(0f, 0.03f, 0f);
-                selectionRing.transform.localScale = new Vector3(1.4f, 0.02f, 1.4f);
-                Object.DestroyImmediate(selectionRing.GetComponent<Collider>());
+                selectionRing.transform.localPosition = Vector3.zero;
+                var ringRenderer = selectionRing.AddComponent<SpriteRenderer>();
+                ringRenderer.sprite = CreateSelectionSprite();
+                ringRenderer.color = new Color(0.2f, 0.8f, 1f, 0.75f);
+                ringRenderer.sortingOrder = -1;
                 selectionRing.SetActive(false);
 
                 var status = root.AddComponent<PrototypeUnitStatus>();
@@ -228,6 +226,53 @@ namespace ProjectS.Units.Editor
         private static Shader FindDefaultShader()
         {
             return Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        }
+
+        private static Sprite CreateUnitSprite(PrototypeUnitType unitType)
+        {
+            var texture = new Texture2D(32, 32, TextureFormat.RGBA32, false)
+            {
+                name = $"{unitType}_PrototypeSprite",
+                filterMode = FilterMode.Point
+            };
+
+            var center = new Vector2(15.5f, 15.5f);
+            for (var y = 0; y < texture.height; y++)
+            {
+                for (var x = 0; x < texture.width; x++)
+                {
+                    var delta = new Vector2(x, y) - center;
+                    var inside = unitType == PrototypeUnitType.Ranger
+                        ? Mathf.Abs(delta.x) + Mathf.Abs(delta.y) < 17f
+                        : delta.magnitude < 13f;
+                    texture.SetPixel(x, y, inside ? Color.white : Color.clear);
+                }
+            }
+
+            texture.Apply();
+            return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f), 32f);
+        }
+
+        private static Sprite CreateSelectionSprite()
+        {
+            var texture = new Texture2D(48, 48, TextureFormat.RGBA32, false)
+            {
+                name = "SelectionRing_PrototypeSprite",
+                filterMode = FilterMode.Point
+            };
+
+            var center = new Vector2(23.5f, 23.5f);
+            for (var y = 0; y < texture.height; y++)
+            {
+                for (var x = 0; x < texture.width; x++)
+                {
+                    var radius = (new Vector2(x, y) - center).magnitude;
+                    texture.SetPixel(x, y, radius > 18f && radius < 22f ? Color.white : Color.clear);
+                }
+            }
+
+            texture.Apply();
+            return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f), 32f);
         }
 
         private static void EnsureFolder(string parent, string child)

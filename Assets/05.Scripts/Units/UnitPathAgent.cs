@@ -1,14 +1,13 @@
 using System.Collections.Generic;
-using ProjectS.Maps;
+using ProjectS.Tilemaps;
 using UnityEngine;
 
 namespace ProjectS.Units
 {
     [RequireComponent(typeof(PrototypeUnitStatus))]
-    [RequireComponent(typeof(Rigidbody))]
     public sealed class UnitPathAgent : MonoBehaviour
     {
-        [SerializeField] private MapPathfinder pathfinder;
+        [SerializeField] private ProjectSTilemapNavigator navigator;
         [SerializeField] private float stoppingDistance = 0.08f;
         [SerializeField] private float rotationSpeed = 720f;
         [SerializeField] private float personalSpaceRadius = 0.72f;
@@ -16,7 +15,8 @@ namespace ProjectS.Units
         [SerializeField] private LayerMask unitSeparationMask = ~0;
 
         private readonly List<Vector3> path = new List<Vector3>();
-        private readonly Collider[] separationBuffer = new Collider[16];
+        private readonly Collider2D[] separationBuffer = new Collider2D[16];
+        private ContactFilter2D separationFilter;
         private PrototypeUnitStatus status;
         private int waypointIndex;
 
@@ -26,16 +26,28 @@ namespace ProjectS.Units
         private void Awake()
         {
             status = GetComponent<PrototypeUnitStatus>();
-            var unitRigidbody = GetComponent<Rigidbody>();
-            unitRigidbody.isKinematic = true;
-            unitRigidbody.useGravity = false;
-
-            if (pathfinder == null)
+            var unitRigidbody = GetComponent<Rigidbody2D>();
+            if (unitRigidbody == null)
             {
-                pathfinder = FindFirstObjectByType<MapPathfinder>();
+                unitRigidbody = gameObject.AddComponent<Rigidbody2D>();
             }
 
-            SnapToGround();
+            unitRigidbody.bodyType = RigidbodyType2D.Kinematic;
+            unitRigidbody.gravityScale = 0f;
+
+            if (GetComponent<Collider2D>() == null)
+            {
+                var collider = gameObject.AddComponent<CircleCollider2D>();
+                collider.radius = 0.5f;
+            }
+            separationFilter = new ContactFilter2D
+            {
+                useLayerMask = true,
+                layerMask = unitSeparationMask,
+                useTriggers = false
+            };
+
+            ResolveNavigator();
         }
 
         private void Update()
@@ -63,19 +75,20 @@ namespace ProjectS.Units
                 return false;
             }
 
-            if (pathfinder == null)
-            {
-                pathfinder = FindFirstObjectByType<MapPathfinder>();
-            }
-
-            if (pathfinder == null || !pathfinder.TryFindPath(transform.position, destination, path))
+            ResolveNavigator();
+            if (navigator != null && !navigator.TryFindPath(transform.position, destination, path))
             {
                 ClearPath();
                 return false;
             }
 
-            SnapToWaypointHeight(path[0]);
-            waypointIndex = path.Count > 1 ? 1 : 0;
+            if (navigator == null)
+            {
+                path.Clear();
+                path.Add(destination);
+            }
+
+            waypointIndex = 0;
             return true;
         }
 
@@ -89,10 +102,10 @@ namespace ProjectS.Units
         {
             var target = path[waypointIndex];
             var current = transform.position;
-            var flatDelta = new Vector3(target.x - current.x, 0f, target.z - current.z);
+            var flatDelta = new Vector3(target.x - current.x, target.y - current.y, 0f);
             if (flatDelta.magnitude <= stoppingDistance)
             {
-                transform.position = GetSurfaceAlignedPosition(target);
+                transform.position = target;
                 waypointIndex++;
                 if (!HasPath)
                 {
@@ -104,13 +117,14 @@ namespace ProjectS.Units
 
             var direction = flatDelta.normalized;
             var speed = status != null ? status.MovementSpeed : 3f;
-            var flatTarget = new Vector3(target.x, current.y, target.z);
+            var flatTarget = new Vector3(target.x, target.y, current.z);
             var nextPosition = Vector3.MoveTowards(current, flatTarget, speed * Time.deltaTime);
-            transform.position = GetSurfaceAlignedPosition(nextPosition);
+            transform.position = nextPosition;
 
             if (direction.sqrMagnitude > 0.001f)
             {
-                var targetRotation = Quaternion.LookRotation(direction, Vector3.up);
+                var angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+                var targetRotation = Quaternion.Euler(0f, 0f, angle);
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
             }
         }
@@ -122,12 +136,8 @@ namespace ProjectS.Units
                 return;
             }
 
-            var hitCount = Physics.OverlapSphereNonAlloc(
-                transform.position,
-                personalSpaceRadius,
-                separationBuffer,
-                unitSeparationMask,
-                QueryTriggerInteraction.Ignore);
+            separationFilter.layerMask = unitSeparationMask;
+            var hitCount = Physics2D.OverlapCircle(transform.position, personalSpaceRadius, separationFilter, separationBuffer);
 
             var push = Vector3.zero;
             for (var i = 0; i < hitCount; i++)
@@ -139,7 +149,7 @@ namespace ProjectS.Units
                 }
 
                 var delta = transform.position - otherAgent.transform.position;
-                delta.y = 0f;
+                delta.z = 0f;
                 var distance = delta.magnitude;
                 if (distance <= 0.001f || distance >= personalSpaceRadius)
                 {
@@ -155,39 +165,23 @@ namespace ProjectS.Units
             }
 
             var nextPosition = transform.position + push.normalized * (separationStrength * deltaTime);
-            if (pathfinder != null && pathfinder.IsSegmentWalkable(transform.position, nextPosition))
+            if (navigator == null || navigator.IsSegmentWalkable(transform.position, nextPosition))
             {
-                transform.position = GetSurfaceAlignedPosition(nextPosition);
+                transform.position = nextPosition;
             }
         }
 
-        private void SnapToGround()
+        private void ResolveNavigator()
         {
-            if (pathfinder == null)
+            if (navigator == null)
             {
-                return;
+                navigator = ProjectSTilemapNavigator.ActiveInstance;
             }
 
-            if (pathfinder.TryFindPath(transform.position, transform.position, path) && path.Count > 0)
+            if (navigator == null)
             {
-                SnapToWaypointHeight(path[0]);
-                ClearPath();
+                navigator = FindFirstObjectByType<ProjectSTilemapNavigator>();
             }
-        }
-
-        private void SnapToWaypointHeight(Vector3 waypoint)
-        {
-            transform.position = GetSurfaceAlignedPosition(new Vector3(transform.position.x, waypoint.y, transform.position.z));
-        }
-
-        private Vector3 GetSurfaceAlignedPosition(Vector3 position)
-        {
-            if (pathfinder != null && pathfinder.TryGetUnitSurfacePoint(position, out var surfacePosition))
-            {
-                return surfacePosition;
-            }
-
-            return position;
         }
     }
 }
