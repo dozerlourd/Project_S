@@ -10,6 +10,7 @@ namespace ProjectS.Tilemaps
         [SerializeField] private Tilemap groundTilemap;
         [SerializeField] private Tilemap overlayTilemap;
         [SerializeField] private Tilemap obstacleTilemap;
+        [SerializeField] private Tilemap stairTilemap;
         [SerializeField] private bool useExplicitBounds;
         [SerializeField] private BoundsInt explicitBounds = new BoundsInt(0, 0, 0, 64, 64, 1);
         [SerializeField] private ProjectSTerrainType fallbackTerrainType = ProjectSTerrainType.Ground;
@@ -22,6 +23,7 @@ namespace ProjectS.Tilemaps
 
         public Grid Grid => grid;
         public Tilemap GroundTilemap => groundTilemap;
+        public Tilemap StairTilemap => stairTilemap;
         public BoundsInt CellBounds => useExplicitBounds ? explicitBounds : CalculateTilemapBounds();
 
         private void Awake()
@@ -193,6 +195,7 @@ namespace ProjectS.Tilemaps
         {
             queryTilemaps.Clear();
             AddTilemap(groundTilemap);
+            AddTilemap(stairTilemap);
             AddTilemap(overlayTilemap);
             AddTilemap(obstacleTilemap);
         }

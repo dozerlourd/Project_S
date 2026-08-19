@@ -47,7 +47,7 @@ Assets/Assets/Tilemaps/Tiles
 ## 씬 구성
 
 1. 씬에 Unity `Grid`를 만든다.
-2. 하위에 `Ground`, `Overlay`, `Obstacle` 용 `Tilemap`을 만든다.
+2. 하위에 `Ground`, `Stair`, `Overlay`, `Obstacle` 용 `Tilemap`을 만든다.
 3. 같은 GameObject 또는 부모 GameObject에 `ProjectSTilemapWorld`를 추가한다.
 4. 필요한 Tilemap 참조를 할당한다.
 5. 같은 GameObject에 `ProjectSTilemapNavigator`를 추가한다.
