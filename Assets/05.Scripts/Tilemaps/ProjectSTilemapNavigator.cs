@@ -103,6 +103,11 @@ namespace ProjectS.Tilemaps
                         continue;
                     }
 
+                    if (!IsCellStepWalkable(current, neighbor))
+                    {
+                        continue;
+                    }
+
                     var tentativeScore = gScore[current] + GetStepCost(current, neighbor);
                     if (gScore.TryGetValue(neighbor, out var knownScore) && tentativeScore >= knownScore)
                     {
@@ -150,8 +155,31 @@ namespace ProjectS.Tilemaps
                 return true;
             }
 
-            return tilemapWorld.IsWalkable(tilemapWorld.WorldToCell(from))
-                && tilemapWorld.IsWalkable(tilemapWorld.WorldToCell(to));
+            var fromCell = tilemapWorld.WorldToCell(from);
+            var toCell = tilemapWorld.WorldToCell(to);
+            if (!tilemapWorld.IsWalkable(fromCell) || !tilemapWorld.IsWalkable(toCell))
+            {
+                return false;
+            }
+
+            if (fromCell == toCell)
+            {
+                return true;
+            }
+
+            var distance = Vector3.Distance(from, to);
+            var sampleDistance = GetSegmentSampleDistance();
+            var sampleCount = Mathf.Max(1, Mathf.CeilToInt(distance / sampleDistance));
+            for (var i = 1; i < sampleCount; i++)
+            {
+                var point = Vector3.Lerp(from, to, i / (float)sampleCount);
+                if (!tilemapWorld.IsWalkable(tilemapWorld.WorldToCell(point)))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private void ResolveReferences()
@@ -186,6 +214,20 @@ namespace ProjectS.Tilemaps
             var horizontal = from + new Vector3Int(delta.x, 0, 0);
             var vertical = from + new Vector3Int(0, delta.y, 0);
             return tilemapWorld.IsWalkable(horizontal) && tilemapWorld.IsWalkable(vertical);
+        }
+
+        private bool IsCellStepWalkable(Vector3Int from, Vector3Int to)
+        {
+            return IsSegmentWalkable(
+                tilemapWorld.GetCellCenterWorld(from),
+                tilemapWorld.GetCellCenterWorld(to));
+        }
+
+        private float GetSegmentSampleDistance()
+        {
+            var cellSize = tilemapWorld.Grid != null ? tilemapWorld.Grid.cellSize : Vector3.one;
+            var shortestAxis = Mathf.Min(Mathf.Abs(cellSize.x), Mathf.Abs(cellSize.y));
+            return Mathf.Max(0.05f, shortestAxis * 0.25f);
         }
 
         private float GetStepCost(Vector3Int from, Vector3Int to)

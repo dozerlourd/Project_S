@@ -14,12 +14,16 @@ namespace ProjectS.Units
         [SerializeField] private LayerMask unitSelectionMask = ~0;
         [SerializeField] private bool logCommandWarnings = true;
         [SerializeField] private float commandPlaneZ;
+        [SerializeField] private float clickSelectionRadius = 0.35f;
         [SerializeField] private float dragSelectThreshold = 8f;
         [SerializeField] private Color dragFillColor = new Color(0.2f, 0.6f, 1f, 0.18f);
         [SerializeField] private Color dragOutlineColor = new Color(0.2f, 0.65f, 1f, 0.85f);
 
         private readonly List<UnitCommandAgent> selectedUnits = new List<UnitCommandAgent>();
         private readonly List<UnitCommandAgent>[] controlGroups = new List<UnitCommandAgent>[10];
+        private readonly Collider2D[] unitHitBuffer = new Collider2D[16];
+        private readonly HashSet<Vector3Int> reservedCommandCells = new HashSet<Vector3Int>();
+        private readonly HashSet<Vector3Int> occupiedCommandCells = new HashSet<Vector3Int>();
         private PendingPointCommand pendingPointCommand = PendingPointCommand.None;
         private Vector2 dragStartScreenPosition;
         private Vector2 dragCurrentScreenPosition;
@@ -297,6 +301,10 @@ namespace ProjectS.Units
                     || command.Mode == UnitCommandMode.Patrol);
             var destinationIndex = 0;
             var destinationCount = CountLiveSelectedUnits();
+            if (pointCommand)
+            {
+                RebuildOccupiedCommandCells();
+            }
 
             for (var i = selectedUnits.Count - 1; i >= 0; i--)
             {
@@ -309,7 +317,9 @@ namespace ProjectS.Units
 
                 if (pointCommand)
                 {
-                    var offsetDestination = command.Destination + GetFormationOffset(destinationIndex, destinationCount);
+                    var status = unit.GetComponent<PrototypeUnitStatus>();
+                    var footprint = status != null ? status.OccupiedCells : Vector2Int.one;
+                    var offsetDestination = GetUniqueTileDestination(command.Destination, destinationIndex, destinationCount, footprint);
                     unit.Issue(new UnitCommand(command.Mode, offsetDestination, null, command.Queue));
                     destinationIndex++;
                 }
@@ -317,6 +327,12 @@ namespace ProjectS.Units
                 {
                     unit.Issue(command);
                 }
+            }
+
+            if (pointCommand)
+            {
+                reservedCommandCells.Clear();
+                occupiedCommandCells.Clear();
             }
         }
 
@@ -460,13 +476,36 @@ namespace ProjectS.Units
             }
 
             var worldPosition = commandCamera.ScreenToWorldPoint(GetMousePosition());
-            var hit = Physics2D.OverlapPoint(worldPosition, unitSelectionMask);
-            if (hit == null)
+            var filter = new ContactFilter2D
+            {
+                useLayerMask = true,
+                layerMask = unitSelectionMask,
+                useTriggers = true
+            };
+
+            var hitCount = Physics2D.OverlapCircle(worldPosition, Mathf.Max(0.01f, clickSelectionRadius), filter, unitHitBuffer);
+            if (hitCount <= 0)
             {
                 return false;
             }
 
-            status = hit.GetComponentInParent<PrototypeUnitStatus>();
+            var closestDistance = float.PositiveInfinity;
+            for (var i = 0; i < hitCount; i++)
+            {
+                var candidate = unitHitBuffer[i].GetComponentInParent<PrototypeUnitStatus>();
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                var distance = Vector2.SqrMagnitude((Vector2)candidate.transform.position - (Vector2)worldPosition);
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    status = candidate;
+                }
+            }
+
             return status != null;
         }
 
@@ -565,7 +604,128 @@ namespace ProjectS.Units
                 && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
         }
 
-        private static Vector3 GetFormationOffset(int index, int count)
+        private Vector3 GetUniqueTileDestination(Vector3 destination, int index, int count, Vector2Int footprint)
+        {
+            footprint = SanitizeFootprint(footprint);
+            var tilemapWorld = navigator != null ? navigator.TilemapWorld : null;
+            if (tilemapWorld == null)
+            {
+                return destination + GetFallbackFormationOffset(index, count);
+            }
+
+            var origin = tilemapWorld.WorldToCell(destination);
+            if (TryReserveCommandFootprint(tilemapWorld, origin, footprint, out var assignedCell))
+            {
+                return tilemapWorld.GetCellCenterWorld(assignedCell);
+            }
+
+            return destination + GetFallbackFormationOffset(index, count);
+        }
+
+        private bool TryReserveCommandFootprint(ProjectSTilemapWorld tilemapWorld, Vector3Int origin, Vector2Int footprint, out Vector3Int assignedCell)
+        {
+            const int maxSearchRadius = 12;
+            for (var radius = 0; radius <= maxSearchRadius; radius++)
+            {
+                for (var y = -radius; y <= radius; y++)
+                {
+                    for (var x = -radius; x <= radius; x++)
+                    {
+                        if (Mathf.Max(Mathf.Abs(x), Mathf.Abs(y)) != radius)
+                        {
+                            continue;
+                        }
+
+                        var candidate = origin + new Vector3Int(x, y, 0);
+                        if (!CanReserveFootprint(tilemapWorld, candidate, footprint))
+                        {
+                            continue;
+                        }
+
+                        ReserveFootprint(candidate, footprint);
+                        assignedCell = candidate;
+                        return true;
+                    }
+                }
+            }
+
+            assignedCell = origin;
+            return false;
+        }
+
+        private bool CanReserveFootprint(ProjectSTilemapWorld tilemapWorld, Vector3Int centerCell, Vector2Int footprint)
+        {
+            foreach (var cell in EnumerateFootprintCells(centerCell, footprint))
+            {
+                if (occupiedCommandCells.Contains(cell)
+                    || reservedCommandCells.Contains(cell)
+                    || !tilemapWorld.IsWalkable(cell))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void ReserveFootprint(Vector3Int centerCell, Vector2Int footprint)
+        {
+            foreach (var cell in EnumerateFootprintCells(centerCell, footprint))
+            {
+                reservedCommandCells.Add(cell);
+            }
+        }
+
+        private void RebuildOccupiedCommandCells()
+        {
+            reservedCommandCells.Clear();
+            occupiedCommandCells.Clear();
+
+            var tilemapWorld = navigator != null ? navigator.TilemapWorld : null;
+            if (tilemapWorld == null)
+            {
+                return;
+            }
+
+            var units = FindObjectsByType<UnitCommandAgent>(FindObjectsSortMode.None);
+            foreach (var unit in units)
+            {
+                if (unit == null || selectedUnits.Contains(unit))
+                {
+                    continue;
+                }
+
+                var status = unit.GetComponent<PrototypeUnitStatus>();
+                var footprint = status != null ? status.OccupiedCells : Vector2Int.one;
+                var centerCell = tilemapWorld.WorldToCell(unit.transform.position);
+                foreach (var cell in EnumerateFootprintCells(centerCell, footprint))
+                {
+                    occupiedCommandCells.Add(cell);
+                }
+            }
+        }
+
+        private static IEnumerable<Vector3Int> EnumerateFootprintCells(Vector3Int centerCell, Vector2Int footprint)
+        {
+            footprint = SanitizeFootprint(footprint);
+            var startX = centerCell.x - (footprint.x - 1) / 2;
+            var startY = centerCell.y - (footprint.y - 1) / 2;
+
+            for (var y = 0; y < footprint.y; y++)
+            {
+                for (var x = 0; x < footprint.x; x++)
+                {
+                    yield return new Vector3Int(startX + x, startY + y, centerCell.z);
+                }
+            }
+        }
+
+        private static Vector2Int SanitizeFootprint(Vector2Int footprint)
+        {
+            return new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
+        }
+
+        private static Vector3 GetFallbackFormationOffset(int index, int count)
         {
             if (count <= 1 || index == 0)
             {

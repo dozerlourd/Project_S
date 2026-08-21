@@ -7,9 +7,12 @@ namespace ProjectS.Units
     [RequireComponent(typeof(PrototypeUnitStatus))]
     public sealed class UnitPathAgent : MonoBehaviour
     {
+        private static readonly Vector2 UnitColliderOffset = new Vector2(0f, 0.1f);
+        private static readonly Vector2 UnitColliderSize = new Vector2(0.77f, 1f);
+
         [SerializeField] private ProjectSTilemapNavigator navigator;
         [SerializeField] private float stoppingDistance = 0.08f;
-        [SerializeField] private float rotationSpeed = 720f;
+        [SerializeField] private float startWaypointSkipDistance = 0.35f;
         [SerializeField] private float personalSpaceRadius = 0.72f;
         [SerializeField] private float separationStrength = 2.6f;
         [SerializeField] private LayerMask unitSeparationMask = ~0;
@@ -19,6 +22,9 @@ namespace ProjectS.Units
         private ContactFilter2D separationFilter;
         private PrototypeUnitStatus status;
         private int waypointIndex;
+        private Vector3 lastMoveDirection;
+        private Vector3 requestedDestination;
+        private bool hasRequestedDestination;
 
         public bool HasPath => waypointIndex < path.Count;
         public IReadOnlyList<Vector3> CurrentPath => path;
@@ -35,16 +41,13 @@ namespace ProjectS.Units
             unitRigidbody.bodyType = RigidbodyType2D.Kinematic;
             unitRigidbody.gravityScale = 0f;
 
-            if (GetComponent<Collider2D>() == null)
-            {
-                var collider = gameObject.AddComponent<CircleCollider2D>();
-                collider.radius = 0.5f;
-            }
+            ConfigureUnitCollider();
+
             separationFilter = new ContactFilter2D
             {
                 useLayerMask = true,
                 layerMask = unitSeparationMask,
-                useTriggers = false
+                useTriggers = true
             };
 
             ResolveNavigator();
@@ -54,7 +57,7 @@ namespace ProjectS.Units
         {
             if (!HasPath)
             {
-                ApplyUnitSeparation(Time.deltaTime);
+                lastMoveDirection = Vector3.zero;
                 return;
             }
 
@@ -76,6 +79,8 @@ namespace ProjectS.Units
             }
 
             ResolveNavigator();
+            requestedDestination = destination;
+            hasRequestedDestination = true;
             if (navigator != null && !navigator.TryFindPath(transform.position, destination, path))
             {
                 ClearPath();
@@ -89,6 +94,7 @@ namespace ProjectS.Units
             }
 
             waypointIndex = 0;
+            NormalizePathStart();
             return true;
         }
 
@@ -96,6 +102,8 @@ namespace ProjectS.Units
         {
             path.Clear();
             waypointIndex = 0;
+            lastMoveDirection = Vector3.zero;
+            hasRequestedDestination = false;
         }
 
         private void MoveAlongPath()
@@ -105,11 +113,25 @@ namespace ProjectS.Units
             var flatDelta = new Vector3(target.x - current.x, target.y - current.y, 0f);
             if (flatDelta.magnitude <= stoppingDistance)
             {
+                if (navigator != null && !navigator.IsSegmentWalkable(current, target))
+                {
+                    if (!TryRepathToRequestedDestination())
+                    {
+                        ClearPath();
+                    }
+
+                    return;
+                }
+
                 transform.position = target;
                 waypointIndex++;
                 if (!HasPath)
                 {
                     ClearPath();
+                }
+                else
+                {
+                    NormalizePathStart();
                 }
 
                 return;
@@ -119,14 +141,18 @@ namespace ProjectS.Units
             var speed = status != null ? status.MovementSpeed : 3f;
             var flatTarget = new Vector3(target.x, target.y, current.z);
             var nextPosition = Vector3.MoveTowards(current, flatTarget, speed * Time.deltaTime);
-            transform.position = nextPosition;
-
-            if (direction.sqrMagnitude > 0.001f)
+            if (navigator != null && !navigator.IsSegmentWalkable(current, nextPosition))
             {
-                var angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
-                var targetRotation = Quaternion.Euler(0f, 0f, angle);
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+                if (!TryRepathToRequestedDestination())
+                {
+                    ClearPath();
+                }
+
+                return;
             }
+
+            transform.position = nextPosition;
+            lastMoveDirection = direction;
         }
 
         private void ApplyUnitSeparation(float deltaTime)
@@ -159,6 +185,11 @@ namespace ProjectS.Units
                 push += delta.normalized * ((personalSpaceRadius - distance) / personalSpaceRadius);
             }
 
+            if (HasPath && lastMoveDirection.sqrMagnitude > 0.0001f)
+            {
+                push = Vector3.ProjectOnPlane(push, lastMoveDirection);
+            }
+
             if (push.sqrMagnitude <= 0.0001f)
             {
                 return;
@@ -169,6 +200,58 @@ namespace ProjectS.Units
             {
                 transform.position = nextPosition;
             }
+        }
+
+        private void NormalizePathStart()
+        {
+            var current = transform.position;
+            while (HasPath)
+            {
+                var target = path[waypointIndex];
+                var toTarget = new Vector3(target.x - current.x, target.y - current.y, 0f);
+                var isNearCurrent = toTarget.magnitude <= Mathf.Max(stoppingDistance, startWaypointSkipDistance);
+                var isBehindNextWaypoint = false;
+                if (waypointIndex + 1 < path.Count)
+                {
+                    var next = path[waypointIndex + 1];
+                    var currentToNext = new Vector3(next.x - current.x, next.y - current.y, 0f);
+                    var targetToNext = new Vector3(next.x - target.x, next.y - target.y, 0f);
+                    isBehindNextWaypoint = Vector3.Dot(toTarget, targetToNext) <= 0f
+                        && Vector3.Dot(currentToNext, targetToNext) > 0f;
+                }
+
+                if (!isNearCurrent && !isBehindNextWaypoint)
+                {
+                    break;
+                }
+
+                waypointIndex++;
+            }
+
+            if (!HasPath)
+            {
+                ClearPath();
+            }
+        }
+
+        private bool TryRepathToRequestedDestination()
+        {
+            if (!hasRequestedDestination || navigator == null)
+            {
+                return false;
+            }
+
+            var destination = requestedDestination;
+            if (!navigator.TryFindPath(transform.position, destination, path))
+            {
+                return false;
+            }
+
+            requestedDestination = destination;
+            hasRequestedDestination = true;
+            waypointIndex = 0;
+            NormalizePathStart();
+            return HasPath;
         }
 
         private void ResolveNavigator()
@@ -182,6 +265,30 @@ namespace ProjectS.Units
             {
                 navigator = FindFirstObjectByType<ProjectSTilemapNavigator>();
             }
+        }
+
+        private void ConfigureUnitCollider()
+        {
+            var boxCollider = GetComponent<BoxCollider2D>();
+            foreach (var collider in GetComponents<Collider2D>())
+            {
+                if (collider is BoxCollider2D candidate)
+                {
+                    boxCollider = candidate;
+                    continue;
+                }
+
+                Destroy(collider);
+            }
+
+            if (boxCollider == null)
+            {
+                boxCollider = gameObject.AddComponent<BoxCollider2D>();
+            }
+
+            boxCollider.isTrigger = true;
+            boxCollider.offset = UnitColliderOffset;
+            boxCollider.size = UnitColliderSize;
         }
     }
 }

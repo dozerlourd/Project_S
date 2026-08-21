@@ -46,7 +46,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   targetCamera: {fileID: 6032674253077248864}
-  mapDefinition: {fileID: 11400000, guid: 3703102a19653a54cb9aade6c3aa9f5f, type: 2}
   enableEdgeMovement: 1
   edgeMoveSpeed: 120
   edgeThickness: 1
@@ -60,11 +59,8 @@ MonoBehaviour:
   zoomSmoothing: 120
   useMovementBounds: 1
   autoResolveMapBounds: 1
-  mapRoot: {fileID: 0}
-  mapWorldOrigin: {x: 0, y: 0}
+  tilemapWorld: {fileID: 0}
   boundsPadding: 0
-  minBounds: {x: 0, y: 0}
-  maxBounds: {x: 120, y: 120}
   mapPlaneZ: 0
 --- !u!1 &8456991499755426697
 GameObject:

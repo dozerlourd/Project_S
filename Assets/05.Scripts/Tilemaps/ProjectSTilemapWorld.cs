@@ -6,6 +6,8 @@ namespace ProjectS.Tilemaps
 {
     public sealed class ProjectSTilemapWorld : MonoBehaviour
     {
+        private const string ObstacleLayerName = "Obstacle";
+
         [SerializeField] private Grid grid;
         [SerializeField] private Tilemap groundTilemap;
         [SerializeField] private Tilemap overlayTilemap;
@@ -127,6 +129,7 @@ namespace ProjectS.Tilemaps
             var buildable = emptyCellsBuildable;
             var blocksVision = false;
             var movementCost = 1f;
+            var hasObstacleTile = false;
             TileBase sourceTile = null;
 
             foreach (var tilemap in queryTilemaps)
@@ -144,6 +147,8 @@ namespace ProjectS.Tilemaps
 
                 hasTile = true;
                 sourceTile = tile;
+                var isObstacleTilemap = IsObstacleTilemap(tilemap);
+                hasObstacleTile |= isObstacleTilemap;
                 if (tile is ProjectSTile projectTile)
                 {
                     terrainType = projectTile.TerrainType;
@@ -157,6 +162,13 @@ namespace ProjectS.Tilemaps
                     walkable = true;
                     buildable = true;
                 }
+
+            }
+
+            if (hasObstacleTile)
+            {
+                walkable = false;
+                buildable = false;
             }
 
             if (!hasTile && !emptyCellsWalkable && !emptyCellsBuildable)
@@ -198,6 +210,7 @@ namespace ProjectS.Tilemaps
             AddTilemap(stairTilemap);
             AddTilemap(overlayTilemap);
             AddTilemap(obstacleTilemap);
+            AddObstacleLayerTilemaps();
         }
 
         private void AddTilemap(Tilemap tilemap)
@@ -206,6 +219,35 @@ namespace ProjectS.Tilemaps
             {
                 queryTilemaps.Add(tilemap);
             }
+        }
+
+        private void AddObstacleLayerTilemaps()
+        {
+            var obstacleLayer = LayerMask.NameToLayer(ObstacleLayerName);
+            if (obstacleLayer < 0)
+            {
+                return;
+            }
+
+            foreach (var tilemap in GetComponentsInChildren<Tilemap>(true))
+            {
+                if (tilemap != null && tilemap.gameObject.layer == obstacleLayer)
+                {
+                    AddTilemap(tilemap);
+                }
+            }
+        }
+
+        private bool IsObstacleTilemap(Tilemap tilemap)
+        {
+            if (tilemap == null)
+            {
+                return false;
+            }
+
+            var obstacleLayer = LayerMask.NameToLayer(ObstacleLayerName);
+            return tilemap == obstacleTilemap
+                || (obstacleLayer >= 0 && tilemap.gameObject.layer == obstacleLayer);
         }
 
         private BoundsInt CalculateTilemapBounds()

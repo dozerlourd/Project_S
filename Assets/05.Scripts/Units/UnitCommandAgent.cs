@@ -33,7 +33,7 @@ namespace ProjectS.Units
             {
                 useLayerMask = true,
                 layerMask = targetMask,
-                useTriggers = false
+                useTriggers = true
             };
         }
 
@@ -135,7 +135,6 @@ namespace ProjectS.Units
             }
 
             pathAgent.ClearPath();
-            FaceTarget(priorityTarget.transform.position);
         }
 
         private void ScanForTargets()
@@ -149,7 +148,6 @@ namespace ProjectS.Units
             if (priorityTarget != null && IsEnemy(priorityTarget) && IsInAttackRange(priorityTarget))
             {
                 pathAgent.ClearPath();
-                FaceTarget(priorityTarget.transform.position);
                 return;
             }
 
@@ -165,7 +163,6 @@ namespace ProjectS.Units
 
                 priorityTarget = target;
                 pathAgent.ClearPath();
-                FaceTarget(target.transform.position);
                 return;
             }
 
@@ -189,17 +186,6 @@ namespace ProjectS.Units
         private bool IsInAttackRange(PrototypeUnitStatus target)
         {
             return Vector3.Distance(transform.position, target.transform.position) <= status.AttackRange;
-        }
-
-        private void FaceTarget(Vector3 targetPosition)
-        {
-            var direction = targetPosition - transform.position;
-            direction.z = 0f;
-            if (direction.sqrMagnitude > 0.001f)
-            {
-                var angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
-                transform.rotation = Quaternion.Euler(0f, 0f, angle);
-            }
         }
 
         private void SwapPatrolEndpoint()

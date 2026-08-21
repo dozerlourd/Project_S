@@ -69,8 +69,10 @@ namespace ProjectS.Units.Editor
 
             try
             {
-                var collider = root.AddComponent<CircleCollider2D>();
-                collider.radius = 0.5f;
+                var collider = root.AddComponent<BoxCollider2D>();
+                collider.size = new Vector2(0.77f, 1f);
+                collider.offset = new Vector2(0f, 0.1f);
+                collider.isTrigger = true;
 
                 var rigidbody = root.AddComponent<Rigidbody2D>();
                 rigidbody.bodyType = RigidbodyType2D.Kinematic;
@@ -144,6 +146,7 @@ namespace ProjectS.Units.Editor
                         1f,
                         3f,
                         1,
+                        Vector2Int.one,
                         true,
                         false,
                         0f);
@@ -168,6 +171,7 @@ namespace ProjectS.Units.Editor
                         1f,
                         3.2f,
                         1,
+                        Vector2Int.one,
                         false,
                         false,
                         0f);
@@ -192,6 +196,7 @@ namespace ProjectS.Units.Editor
                         0.9f,
                         3f,
                         3,
+                        Vector2Int.one,
                         false,
                         true,
                         2f);
@@ -216,6 +221,7 @@ namespace ProjectS.Units.Editor
                         0.8f,
                         2.8f,
                         1,
+                        Vector2Int.one,
                         false,
                         false,
                         0f);

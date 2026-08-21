@@ -99,6 +99,7 @@ namespace ProjectS.Units
         [SerializeField] private float attackSpeed = 1f;
         [SerializeField] private float movementSpeed = 3f;
         [SerializeField] private int maxAttackTargets = 1;
+        [SerializeField] private Vector2Int occupiedCells = Vector2Int.one;
 
         [Header("Special Status")]
         [SerializeField] private bool hasHealthRegeneration;
@@ -132,6 +133,7 @@ namespace ProjectS.Units
         public float AttackSpeed => attackSpeed;
         public float MovementSpeed => movementSpeed;
         public int MaxAttackTargets => maxAttackTargets;
+        public Vector2Int OccupiedCells => new Vector2Int(Mathf.Max(1, occupiedCells.x), Mathf.Max(1, occupiedCells.y));
         public bool HasHealthRegeneration => hasHealthRegeneration;
         public float HealthRegenerationAmount => healthRegenerationAmount;
         public bool HasShield => hasShield;
@@ -170,6 +172,7 @@ namespace ProjectS.Units
             float attackSpeed,
             float movementSpeed,
             int maxAttackTargets,
+            Vector2Int occupiedCells,
             bool canGatherResources,
             bool hasAreaAttack,
             float attackArea)
@@ -191,6 +194,7 @@ namespace ProjectS.Units
             this.attackSpeed = attackSpeed;
             this.movementSpeed = movementSpeed;
             this.maxAttackTargets = maxAttackTargets;
+            this.occupiedCells = new Vector2Int(Mathf.Max(1, occupiedCells.x), Mathf.Max(1, occupiedCells.y));
             this.canGatherResources = canGatherResources;
             this.hasAreaAttack = hasAreaAttack;
             this.attackArea = attackArea;

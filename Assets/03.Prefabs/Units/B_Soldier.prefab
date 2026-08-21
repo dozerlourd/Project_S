@@ -90,8 +90,8 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!58 &100003
-CircleCollider2D:
+--- !u!61 &100003
+BoxCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -120,12 +120,23 @@ CircleCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: -0.15}
-  m_Radius: 0.32
+  m_Offset: {x: 0, y: 0.1}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0.03125, z: 0, w: 0.9375}
+    pivot: {x: 0, y: 0}
+    oldSize: {x: 0, y: 0}
+    newSize: {x: 0, y: 0}
+    adaptiveTilingThreshold: 0
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  serializedVersion: 3
+  m_Size: {x: 0.77, y: 1}
+  m_EdgeRadius: 0
 --- !u!50 &100004
 Rigidbody2D:
   serializedVersion: 5
@@ -176,6 +187,7 @@ MonoBehaviour:
   attackSpeed: 1
   movementSpeed: 3.2
   maxAttackTargets: 1
+  occupiedCells: {x: 1, y: 1}
   hasHealthRegeneration: 0
   healthRegenerationAmount: 0
   hasShield: 0
@@ -203,7 +215,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   navigator: {fileID: 0}
   stoppingDistance: 0.08
-  rotationSpeed: 720
   personalSpaceRadius: 0.72
   separationStrength: 2.6
   unitSeparationMask:

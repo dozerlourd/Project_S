@@ -12,6 +12,12 @@ TagManager:
   - Water
   - UI
   - 
+  - Ground
+  - Obstacle
+  - Prop
+  - Resource
+  - Structure
+  - Unit
   - 
   - 
   - 
@@ -22,12 +28,6 @@ TagManager:
   - 
   - 
   - 
-  - 
-  - 
-  - 
-  - Layer 1
-  - Layer 2
-  - Layer 3
   - 
   - 
   - 

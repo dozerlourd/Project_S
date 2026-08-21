@@ -32,11 +32,7 @@ namespace ProjectS
         [SerializeField] private bool useMovementBounds = true;
         [SerializeField] private bool autoResolveMapBounds = true;
         [SerializeField] private ProjectSTilemapWorld tilemapWorld;
-        [SerializeField] private Transform mapRoot;
-        [SerializeField] private Vector2 mapWorldOrigin;
         [SerializeField] private float boundsPadding;
-        [SerializeField] private Vector2 minBounds = new Vector2(0f, 0f);
-        [SerializeField] private Vector2 maxBounds = new Vector2(120f, 120f);
         [SerializeField] private float mapPlaneZ;
 
         private float targetOrthographicSize;
@@ -60,16 +56,6 @@ namespace ProjectS
             zoomSpeed = Mathf.Max(0f, zoomSpeed);
             zoomSmoothing = Mathf.Max(0f, zoomSmoothing);
             boundsPadding = Mathf.Max(0f, boundsPadding);
-
-            if (maxBounds.x < minBounds.x)
-            {
-                maxBounds.x = minBounds.x;
-            }
-
-            if (maxBounds.y < minBounds.y)
-            {
-                maxBounds.y = minBounds.y;
-            }
         }
 
         private void Update()
@@ -137,7 +123,7 @@ namespace ProjectS
 
         private void ResolveMapRoot()
         {
-            if (!autoResolveMapBounds || mapRoot != null)
+            if (!autoResolveMapBounds)
             {
                 return;
             }
@@ -152,10 +138,7 @@ namespace ProjectS
                 tilemapWorld = FindFirstObjectByType<ProjectSTilemapWorld>();
             }
 
-            if (tilemapWorld != null)
-            {
-                mapRoot = tilemapWorld.transform;
-            }
+            tilemapWorld?.ResolveReferences();
         }
 
         private Vector2 GetEdgeMoveInput()
@@ -293,22 +276,13 @@ namespace ProjectS
                 return;
             }
 
-            var boundsMin = minBounds;
-            var boundsMax = maxBounds;
+            if (!TryGetTilemapWorldBounds(out var boundsMin, out var boundsMax))
+            {
+                return;
+            }
 
-            if (tilemapWorld != null)
-            {
-                var bounds = tilemapWorld.CellBounds;
-                var worldMin = tilemapWorld.GetCellCenterWorld(new Vector3Int(bounds.xMin, bounds.yMin, 0));
-                var worldMax = tilemapWorld.GetCellCenterWorld(new Vector3Int(bounds.xMax - 1, bounds.yMax - 1, 0));
-                boundsMin = new Vector2(Mathf.Min(worldMin.x, worldMax.x), Mathf.Min(worldMin.y, worldMax.y)) - Vector2.one * boundsPadding;
-                boundsMax = new Vector2(Mathf.Max(worldMin.x, worldMax.x), Mathf.Max(worldMin.y, worldMax.y)) + Vector2.one * boundsPadding;
-            }
-            else if (boundsPadding > 0f)
-            {
-                boundsMin -= Vector2.one * boundsPadding;
-                boundsMax += Vector2.one * boundsPadding;
-            }
+            boundsMin -= Vector2.one * boundsPadding;
+            boundsMax += Vector2.one * boundsPadding;
 
             var lookPoint = GetCameraCenterGroundPoint();
             var clampedLookPoint = new Vector3(
@@ -338,15 +312,34 @@ namespace ProjectS
                 : transform.position;
         }
 
-        private Vector2 GetMapWorldOrigin()
+        private bool TryGetTilemapWorldBounds(out Vector2 boundsMin, out Vector2 boundsMax)
         {
-            if (mapRoot != null)
+            boundsMin = default;
+            boundsMax = default;
+
+            if (tilemapWorld == null)
             {
-                var position = mapRoot.position;
-                return new Vector2(position.x, position.y);
+                return false;
             }
 
-            return mapWorldOrigin;
+            var cellBounds = tilemapWorld.CellBounds;
+            var worldMin = CellToWorldCorner(new Vector3Int(cellBounds.xMin, cellBounds.yMin, 0));
+            var worldMax = CellToWorldCorner(new Vector3Int(cellBounds.xMax, cellBounds.yMax, 0));
+            boundsMin = new Vector2(Mathf.Min(worldMin.x, worldMax.x), Mathf.Min(worldMin.y, worldMax.y));
+            boundsMax = new Vector2(Mathf.Max(worldMin.x, worldMax.x), Mathf.Max(worldMin.y, worldMax.y));
+
+            return boundsMax.x > boundsMin.x && boundsMax.y > boundsMin.y;
         }
+
+        private Vector3 CellToWorldCorner(Vector3Int cell)
+        {
+            if (tilemapWorld.GroundTilemap != null)
+            {
+                return tilemapWorld.GroundTilemap.CellToWorld(cell);
+            }
+
+            return tilemapWorld.Grid != null ? tilemapWorld.Grid.CellToWorld(cell) : cell;
+        }
+
     }
 }
