@@ -1,0 +1,22 @@
+{
+    "name": "ProjectS.PlayModeTests",
+    "rootNamespace": "ProjectS.Tests.PlayMode",
+    "references": [
+        "ProjectS.Tilemaps",
+        "ProjectS.Units"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}
