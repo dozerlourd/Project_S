@@ -1,4 +1,7 @@
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace ProjectS.Units
 {
@@ -6,17 +9,21 @@ namespace ProjectS.Units
     [RequireComponent(typeof(UnitPathAgent))]
     public sealed class UnitCommandAgent : MonoBehaviour
     {
-        [SerializeField] private LayerMask targetMask = ~0;
         [SerializeField] private float targetScanInterval = 0.2f;
+        [SerializeField] private float targetScanJitter = 0.05f;
         [SerializeField] private float targetRepathDistance = 0.25f;
         [SerializeField] private float targetRepathInterval = 0.25f;
+        [SerializeField] private float targetRepathJitter = 0.08f;
         [SerializeField] private float attackRangeStopBuffer = 0.08f;
+        [SerializeField] private bool showActionStateGizmos = true;
+        [SerializeField] private Color detectionRangeGizmoColor = new Color(1f, 0.85f, 0.1f, 0.28f);
+        [SerializeField] private Color attackRangeGizmoColor = new Color(1f, 0.2f, 0.1f, 0.35f);
+        [SerializeField] private Color targetLineGizmoColor = new Color(1f, 0.1f, 0.1f, 0.8f);
 
-        private readonly Collider2D[] targetBuffer = new Collider2D[32];
-        private ContactFilter2D targetFilter;
         private PrototypeUnitStatus status;
         private UnitPathAgent pathAgent;
         private Collider2D attackCollider;
+        private bool isRegistered;
         private UnitCommandMode mode = UnitCommandMode.Idle;
         private UnitActionState actionState = UnitActionState.Idle;
         private Vector3 commandDestination;
@@ -32,18 +39,23 @@ namespace ProjectS.Units
         public UnitCommandMode Mode => mode;
         public UnitActionState ActionState => actionState;
         public PrototypeUnitStatus PriorityTarget => priorityTarget;
+        public PrototypeUnitStatus Status => status;
 
         private void Awake()
         {
-            status = GetComponent<PrototypeUnitStatus>();
-            pathAgent = GetComponent<UnitPathAgent>();
-            attackCollider = GetComponent<Collider2D>();
-            targetFilter = new ContactFilter2D
-            {
-                useLayerMask = true,
-                layerMask = targetMask,
-                useTriggers = true
-            };
+            ResolveReferences();
+        }
+
+        private void OnEnable()
+        {
+            ResolveReferences();
+            RegisterAgent();
+            ScheduleNextScan(true);
+        }
+
+        private void OnDisable()
+        {
+            UnregisterAgent();
         }
 
         private void Update()
@@ -69,6 +81,8 @@ namespace ProjectS.Units
             {
                 CompleteCurrentCommand();
             }
+
+            SyncPathOccupationOverride();
         }
 
         public void Issue(UnitCommand command)
@@ -160,11 +174,6 @@ namespace ProjectS.Units
         private void MoveTowardTarget(PrototypeUnitStatus target)
         {
             var targetPosition = target.transform.position;
-            if (Time.time < nextTargetRepathTime
-                && (!pathAgent.HasPath || !hasFocusPathTarget || Vector3.Distance(lastFocusPathTarget, targetPosition) >= targetRepathDistance))
-            {
-                return;
-            }
 
             if (pathAgent.HasPath
                 && hasFocusPathTarget
@@ -173,10 +182,17 @@ namespace ProjectS.Units
                 return;
             }
 
-            pathAgent.MoveTo(targetPosition);
-            lastFocusPathTarget = targetPosition;
-            hasFocusPathTarget = true;
-            nextTargetRepathTime = Time.time + targetRepathInterval;
+            if (Time.time < nextTargetRepathTime)
+            {
+                return;
+            }
+
+            if (pathAgent.MoveTo(targetPosition))
+            {
+                lastFocusPathTarget = targetPosition;
+                hasFocusPathTarget = true;
+                ScheduleNextTargetRepath();
+            }
         }
 
         private void ScanForTargets()
@@ -186,7 +202,7 @@ namespace ProjectS.Units
                 return;
             }
 
-            nextScanTime = Time.time + targetScanInterval;
+            ScheduleNextScan(false);
             var scanRange = actionState == UnitActionState.HoldingPosition
                 ? status.AttackRange
                 : status.DetectionRange;
@@ -204,26 +220,41 @@ namespace ProjectS.Units
         private bool TryAcquireTarget(float scanRange, out PrototypeUnitStatus target)
         {
             target = null;
-            targetFilter.layerMask = targetMask;
-            var hitCount = Physics2D.OverlapCircle(transform.position, scanRange, targetFilter, targetBuffer);
             var bestDistance = float.PositiveInfinity;
+            var teams = UnitRegistry.AllTeams;
 
-            for (var i = 0; i < hitCount; i++)
+            for (var teamIndex = 0; teamIndex < teams.Count; teamIndex++)
             {
-                var candidate = targetBuffer[i].GetComponentInParent<PrototypeUnitStatus>();
-                if (!IsAttackableTarget(candidate) || !IsInDetectionRange(candidate))
+                var team = teams[teamIndex];
+                if (status != null && team == status.Team)
                 {
                     continue;
                 }
 
-                var distance = GetTargetDistance(candidate);
-                if (distance >= bestDistance)
+                var agents = UnitRegistry.GetAgents(team);
+                for (var i = 0; i < agents.Count; i++)
                 {
-                    continue;
-                }
+                    var candidateAgent = agents[i];
+                    if (candidateAgent == null)
+                    {
+                        continue;
+                    }
 
-                bestDistance = distance;
-                target = candidate;
+                    var candidate = candidateAgent.Status;
+                    if (!IsAttackableTarget(candidate))
+                    {
+                        continue;
+                    }
+
+                    var distance = GetTargetDistance(candidate);
+                    if (distance > scanRange || distance >= bestDistance)
+                    {
+                        continue;
+                    }
+
+                    bestDistance = distance;
+                    target = candidate;
+                }
             }
 
             return target != null;
@@ -340,6 +371,99 @@ namespace ProjectS.Units
             hasFocusPathTarget = false;
             targetMustStayDetected = false;
             nextTargetRepathTime = 0f;
+            SyncPathOccupationOverride();
+        }
+
+        private void ResolveReferences()
+        {
+            if (status == null)
+            {
+                status = GetComponent<PrototypeUnitStatus>();
+            }
+
+            if (pathAgent == null)
+            {
+                pathAgent = GetComponent<UnitPathAgent>();
+            }
+
+            if (attackCollider == null)
+            {
+                attackCollider = GetComponent<Collider2D>();
+            }
+        }
+
+        private void RegisterAgent()
+        {
+            if (isRegistered)
+            {
+                return;
+            }
+
+            UnitRegistry.Register(this, status);
+            isRegistered = true;
+        }
+
+        private void UnregisterAgent()
+        {
+            if (!isRegistered)
+            {
+                return;
+            }
+
+            UnitRegistry.Unregister(this, status);
+            isRegistered = false;
+        }
+
+        private void ScheduleNextScan(bool initial)
+        {
+            var interval = Mathf.Max(0.02f, targetScanInterval);
+            var jitter = Mathf.Max(0f, targetScanJitter);
+            var randomOffset = jitter > 0f ? Random.Range(0f, jitter) : 0f;
+            nextScanTime = Time.time + (initial ? randomOffset : interval + randomOffset);
+        }
+
+        private void ScheduleNextTargetRepath()
+        {
+            var interval = Mathf.Max(0.02f, targetRepathInterval);
+            var jitter = Mathf.Max(0f, targetRepathJitter);
+            nextTargetRepathTime = Time.time + interval + (jitter > 0f ? Random.Range(0f, jitter) : 0f);
+        }
+
+        private void SyncPathOccupationOverride()
+        {
+            if (pathAgent != null)
+            {
+                pathAgent.SetForceOccupiedCell(actionState == UnitActionState.AttackingTarget);
+            }
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            if (!showActionStateGizmos)
+            {
+                return;
+            }
+
+            ResolveReferences();
+            if (status == null)
+            {
+                return;
+            }
+
+            Gizmos.color = detectionRangeGizmoColor;
+            Gizmos.DrawWireSphere(transform.position, status.DetectionRange);
+            Gizmos.color = attackRangeGizmoColor;
+            Gizmos.DrawWireSphere(transform.position, status.AttackRange);
+
+            if (priorityTarget != null)
+            {
+                Gizmos.color = targetLineGizmoColor;
+                Gizmos.DrawLine(transform.position, priorityTarget.transform.position);
+            }
+
+#if UNITY_EDITOR
+            Handles.Label(transform.position + Vector3.up * 0.8f, actionState.ToString());
+#endif
         }
     }
 }

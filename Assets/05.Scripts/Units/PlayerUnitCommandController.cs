@@ -60,7 +60,7 @@ namespace ProjectS.Units
                 controlGroups[i] = new List<UnitCommandAgent>();
             }
 
-            ResolveSceneReferences();
+            ResolveSceneReferences(true);
         }
 
         private void Update()
@@ -108,7 +108,7 @@ namespace ProjectS.Units
             DrawSelectionRect(selectionRect);
         }
 
-        private void ResolveSceneReferences()
+        private void ResolveSceneReferences(bool allowSceneSearch = false)
         {
             if (commandCamera == null)
             {
@@ -120,7 +120,7 @@ namespace ProjectS.Units
                 navigator = ProjectSTilemapNavigator.ActiveInstance;
             }
 
-            if (navigator == null)
+            if (navigator == null && allowSceneSearch)
             {
                 navigator = FindFirstObjectByType<ProjectSTilemapNavigator>();
             }
@@ -240,9 +240,10 @@ namespace ProjectS.Units
             }
 
             var screenRect = GetScreenSelectionRect(dragStartScreenPosition, dragCurrentScreenPosition);
-            var units = FindObjectsByType<UnitCommandAgent>(FindObjectsSortMode.None);
-            foreach (var unit in units)
+            var units = UnitRegistry.AllAgents;
+            for (var i = 0; i < units.Count; i++)
             {
+                var unit = units[i];
                 if (unit == null || !TryGetSelectableStatus(unit, out var status))
                 {
                     continue;
@@ -800,15 +801,16 @@ namespace ProjectS.Units
                 return;
             }
 
-            var units = FindObjectsByType<UnitCommandAgent>(FindObjectsSortMode.None);
-            foreach (var unit in units)
+            var units = UnitRegistry.AllAgents;
+            for (var i = 0; i < units.Count; i++)
             {
+                var unit = units[i];
                 if (unit == null || selectedUnits.Contains(unit))
                 {
                     continue;
                 }
 
-                var status = unit.GetComponent<PrototypeUnitStatus>();
+                var status = unit.Status;
                 var footprint = status != null ? status.OccupiedCells : Vector2Int.one;
                 var centerCell = tilemapWorld.WorldToCell(unit.transform.position);
                 foreach (var cell in EnumerateFootprintCells(centerCell, footprint))

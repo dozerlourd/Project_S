@@ -9,7 +9,9 @@ namespace ProjectS.Units
     {
         private static readonly Vector2 UnitColliderOffset = new Vector2(0f, 0.1f);
         private static readonly Vector2 UnitColliderSize = new Vector2(0.77f, 1f);
-        private static readonly Dictionary<Vector3Int, int> OccupiedCellCounts = new Dictionary<Vector3Int, int>();
+        private static readonly Dictionary<UnitTeam, Dictionary<Vector3Int, int>> OccupiedCellCountsByTeam =
+            new Dictionary<UnitTeam, Dictionary<Vector3Int, int>>();
+
         private static ProjectSTilemapWorld occupancyWorld;
 
         [SerializeField] private ProjectSTilemapNavigator navigator;
@@ -17,10 +19,10 @@ namespace ProjectS.Units
         [SerializeField] private float startWaypointSkipDistance = 0.35f;
         [SerializeField] private int occupiedDestinationSearchRadius = 4;
         [SerializeField] private int maxDestinationPathCandidates = 16;
-        [SerializeField] private float blockedRepathCooldown = 0.15f;
 
         private readonly List<Vector3> path = new List<Vector3>();
         private readonly List<Vector3> candidatePath = new List<Vector3>();
+        private readonly List<Vector3> scheduledDestinations = new List<Vector3>();
         private PrototypeUnitStatus status;
         private ProjectSTilemapWorld occupiedWorld;
         private Vector3Int occupiedCell;
@@ -29,10 +31,15 @@ namespace ProjectS.Units
         private Vector3 requestedDestination;
         private bool hasOccupiedCell;
         private bool hasRequestedDestination;
-        private float nextBlockedRepathTime;
+        private bool hasPendingPathRequest;
+        private bool forceOccupiedCell;
+        private int nextPathRequestId;
+        private int activePathRequestId;
 
-        public bool HasPath => waypointIndex < path.Count;
+        public bool HasPath => hasPendingPathRequest || HasActivePath;
         public IReadOnlyList<Vector3> CurrentPath => path;
+
+        private bool HasActivePath => waypointIndex < path.Count;
 
         private void Awake()
         {
@@ -64,7 +71,7 @@ namespace ProjectS.Units
 
         private void Update()
         {
-            if (!HasPath)
+            if (!HasActivePath)
             {
                 lastMoveDirection = Vector3.zero;
             }
@@ -92,15 +99,48 @@ namespace ProjectS.Units
             ResolveNavigator();
             requestedDestination = destination;
             hasRequestedDestination = true;
-            if (!TryBuildPath(destination))
+            if (navigator != null)
             {
-                ClearPath();
-                return false;
+                SchedulePathRequest(destination);
+                return true;
             }
 
+            path.Clear();
+            path.Add(destination);
             waypointIndex = 0;
             NormalizePathStart();
             return true;
+        }
+
+        public void ApplyScheduledPathResult(int requestId, bool success, IReadOnlyList<Vector3> result)
+        {
+            if (!IsPathRequestCurrent(requestId))
+            {
+                return;
+            }
+
+            hasPendingPathRequest = false;
+            if (!success || result == null || result.Count == 0)
+            {
+                ClearPath();
+                return;
+            }
+
+            path.Clear();
+            path.AddRange(result);
+            waypointIndex = 0;
+            NormalizePathStart();
+        }
+
+        public bool IsPathRequestCurrent(int requestId)
+        {
+            return hasPendingPathRequest && requestId == activePathRequestId;
+        }
+
+        public void SetForceOccupiedCell(bool forceOccupied)
+        {
+            forceOccupiedCell = forceOccupied;
+            UpdateOccupiedCell();
         }
 
         public void ClearPath()
@@ -109,6 +149,7 @@ namespace ProjectS.Units
             waypointIndex = 0;
             lastMoveDirection = Vector3.zero;
             hasRequestedDestination = false;
+            hasPendingPathRequest = false;
         }
 
         private void MoveAlongPath()
@@ -154,16 +195,6 @@ namespace ProjectS.Units
                 return;
             }
 
-            if (IsGroundUnitCellBlocked(nextPosition))
-            {
-                if (Time.time >= nextBlockedRepathTime && TryMoveAroundBlockingUnit(target))
-                {
-                    nextBlockedRepathTime = Time.time + blockedRepathCooldown;
-                }
-
-                return;
-            }
-
             transform.position = nextPosition;
             lastMoveDirection = direction;
         }
@@ -179,6 +210,60 @@ namespace ProjectS.Units
             path.Clear();
             path.Add(destination);
             return true;
+        }
+
+        private void SchedulePathRequest(Vector3 destination)
+        {
+            UpdateOccupiedCell();
+            path.Clear();
+            waypointIndex = 0;
+            lastMoveDirection = Vector3.zero;
+            activePathRequestId = ++nextPathRequestId;
+            hasPendingPathRequest = true;
+            BuildScheduledDestinations(destination);
+
+            UnitPathRequestScheduler.Instance.Enqueue(
+                this,
+                activePathRequestId,
+                navigator,
+                transform.position,
+                scheduledDestinations,
+                GetCurrentTeamOccupiedCells());
+        }
+
+        private void BuildScheduledDestinations(Vector3 destination)
+        {
+            scheduledDestinations.Clear();
+            if (navigator == null || navigator.TilemapWorld == null)
+            {
+                scheduledDestinations.Add(destination);
+                return;
+            }
+
+            var tilemapWorld = navigator.TilemapWorld;
+            var destinationCell = tilemapWorld.WorldToCell(destination);
+            var checkedCandidates = 0;
+
+            foreach (var candidate in EnumerateDestinationCandidates(destinationCell))
+            {
+                checkedCandidates++;
+                if (checkedCandidates > maxDestinationPathCandidates)
+                {
+                    break;
+                }
+
+                if (!IsCellAvailable(tilemapWorld, candidate))
+                {
+                    continue;
+                }
+
+                scheduledDestinations.Add(tilemapWorld.GetCellCenterWorld(candidate));
+            }
+
+            if (scheduledDestinations.Count == 0)
+            {
+                scheduledDestinations.Add(destination);
+            }
         }
 
         private bool TryBuildShortestPathToAvailableDestination(Vector3 destination)
@@ -209,7 +294,7 @@ namespace ProjectS.Units
                 }
 
                 var candidateWorld = tilemapWorld.GetCellCenterWorld(candidate);
-                if (!navigator.TryFindPath(transform.position, candidateWorld, candidatePath, OccupiedCellCounts.Keys))
+                if (!navigator.TryFindPath(transform.position, candidateWorld, candidatePath, GetCurrentTeamOccupiedCells()))
                 {
                     continue;
                 }
@@ -261,17 +346,6 @@ namespace ProjectS.Units
             }
         }
 
-        private bool TryMoveAroundBlockingUnit(Vector3 blockedWaypoint)
-        {
-            var destination = hasRequestedDestination ? requestedDestination : blockedWaypoint;
-            if (Vector3.Distance(destination, transform.position) <= stoppingDistance)
-            {
-                return false;
-            }
-
-            return TryBuildPath(destination);
-        }
-
         private bool IsCellAvailable(ProjectSTilemapWorld tilemapWorld, Vector3Int cell)
         {
             return tilemapWorld.IsWalkable(cell) && !IsCellOccupied(tilemapWorld, cell);
@@ -281,18 +355,7 @@ namespace ProjectS.Units
         {
             return !(hasOccupiedCell && occupiedCell == cell)
                 && occupancyWorld == tilemapWorld
-                && OccupiedCellCounts.ContainsKey(cell);
-        }
-
-        private bool IsGroundUnitCellBlocked(Vector3 worldPosition)
-        {
-            if (navigator == null || navigator.TilemapWorld == null)
-            {
-                return false;
-            }
-
-            var tilemapWorld = navigator.TilemapWorld;
-            return IsCellOccupied(tilemapWorld, tilemapWorld.WorldToCell(worldPosition));
+                && GetOccupiedCellCounts(status.Team).ContainsKey(cell);
         }
 
         private void UpdateOccupiedCell()
@@ -302,7 +365,10 @@ namespace ProjectS.Units
                 navigator = ProjectSTilemapNavigator.ActiveInstance;
             }
 
-            if (navigator == null || navigator.TilemapWorld == null || !CanBlockGroundMovement())
+            if (navigator == null
+                || navigator.TilemapWorld == null
+                || !CanBlockGroundMovement()
+                || (HasPath && !forceOccupiedCell))
             {
                 UnregisterOccupiedCell();
                 return;
@@ -329,8 +395,9 @@ namespace ProjectS.Units
         private void RegisterOccupiedCell(ProjectSTilemapWorld tilemapWorld, Vector3Int cell)
         {
             EnsureOccupancyWorld(tilemapWorld);
-            OccupiedCellCounts.TryGetValue(cell, out var count);
-            OccupiedCellCounts[cell] = count + 1;
+            var occupiedCellCounts = GetOccupiedCellCounts(status.Team);
+            occupiedCellCounts.TryGetValue(cell, out var count);
+            occupiedCellCounts[cell] = count + 1;
             occupiedWorld = tilemapWorld;
             occupiedCell = cell;
             hasOccupiedCell = true;
@@ -345,15 +412,16 @@ namespace ProjectS.Units
                 return;
             }
 
-            if (occupiedWorld == occupancyWorld && OccupiedCellCounts.TryGetValue(occupiedCell, out var count))
+            var occupiedCellCounts = GetOccupiedCellCounts(status.Team);
+            if (occupiedWorld == occupancyWorld && occupiedCellCounts.TryGetValue(occupiedCell, out var count))
             {
                 if (count <= 1)
                 {
-                    OccupiedCellCounts.Remove(occupiedCell);
+                    occupiedCellCounts.Remove(occupiedCell);
                 }
                 else
                 {
-                    OccupiedCellCounts[occupiedCell] = count - 1;
+                    occupiedCellCounts[occupiedCell] = count - 1;
                 }
             }
 
@@ -368,8 +436,24 @@ namespace ProjectS.Units
                 return;
             }
 
-            OccupiedCellCounts.Clear();
+            OccupiedCellCountsByTeam.Clear();
             occupancyWorld = tilemapWorld;
+        }
+
+        private ICollection<Vector3Int> GetCurrentTeamOccupiedCells()
+        {
+            return status != null ? GetOccupiedCellCounts(status.Team).Keys : null;
+        }
+
+        private static Dictionary<Vector3Int, int> GetOccupiedCellCounts(UnitTeam team)
+        {
+            if (!OccupiedCellCountsByTeam.TryGetValue(team, out var occupiedCellCounts))
+            {
+                occupiedCellCounts = new Dictionary<Vector3Int, int>();
+                OccupiedCellCountsByTeam[team] = occupiedCellCounts;
+            }
+
+            return occupiedCellCounts;
         }
 
         private static float GetPathLength(IReadOnlyList<Vector3> points)
@@ -430,6 +514,12 @@ namespace ProjectS.Units
             }
 
             var destination = requestedDestination;
+            if (navigator != null)
+            {
+                SchedulePathRequest(destination);
+                return true;
+            }
+
             if (!TryBuildPath(destination))
             {
                 return false;
