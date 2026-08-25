@@ -15,6 +15,11 @@ GameObject:
   - component: {fileID: 100005}
   - component: {fileID: 100006}
   - component: {fileID: 100007}
+  - component: {fileID: 100008}
+  - component: {fileID: 100009}
+  - component: {fileID: 100010}
+  - component: {fileID: 100011}
+  - component: {fileID: 100012}
   m_Layer: 0
   m_Name: B_Ranger
   m_TagString: Untagged
@@ -180,8 +185,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f03a05260d009eb4f9c7f0ff55787878, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   trial: 0
   team: 0
   unitType: 3
@@ -196,6 +201,7 @@ MonoBehaviour:
   physicalAttackPower: 8
   magicalAttackPower: 0
   attackRange: 6
+  detectionRange: 8
   attackSpeed: 1
   movementSpeed: 2.8
   maxAttackTargets: 1
@@ -223,13 +229,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f1373594269f29d4d8977b662cdaf8d3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   navigator: {fileID: 0}
   stoppingDistance: 0.08
   startWaypointSkipDistance: 0.35
-  personalSpaceRadius: 0.72
-  separationStrength: 2.6
+  occupiedDestinationSearchRadius: 4
+  maxDestinationPathCandidates: 16
+  blockedRepathCooldown: 0.15
+  overlapProbePadding: 0.02
   unitSeparationMask:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -243,12 +251,95 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 42810fc859d1ff540964330130eaa08e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   targetMask:
     serializedVersion: 2
     m_Bits: 4294967295
   targetScanInterval: 0.2
+  targetRepathDistance: 0.25
+  targetRepathInterval: 0.25
+  attackRangeStopBuffer: 0.08
+--- !u!114 &100008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d2c07f04d8b4e9eb4c4de0b4fb7aa61, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  effectColor: {r: 1, g: 0.85, b: 0.25, a: 0.9}
+  lineWidth: 0.08
+  effectDuration: 0.08
+  muzzleOffset: 0.25
+  sortingLayerName: Default
+  sortingOrder: 30
+--- !u!114 &100009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c356164c48242e6ab8e6df2c4933b86, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  playerTeam: 0
+  allyColor: {r: 0.1, g: 0.75, b: 1, a: 0.95}
+  enemyColor: {r: 1, g: 0.18, b: 0.12, a: 0.95}
+  neutralColor: {r: 1, g: 0.9, b: 0.2, a: 0.95}
+  localOffset: {x: 0, y: 0.9, z: 0}
+  size: {x: 0.62, y: 0.08}
+  sortingOrder: 40
+--- !u!114 &100010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63dd0ef8d5524c649937b7f90aa5f2e1, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+--- !u!114 &100011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4cb150d1a99e47babc5ec075404a3ef1, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+--- !u!114 &100012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b791e1be09794bd0bdfcbd5cd766f1e9, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  backgroundColor: {r: 0.08, g: 0.08, b: 0.08, a: 0.85}
+  fillColor: {r: 0.2, g: 1, b: 0.25, a: 0.95}
+  lowHealthColor: {r: 1, g: 0.2, b: 0.12, a: 0.95}
+  localOffset: {x: 0, y: 0.76, z: 0}
+  size: {x: 0.62, y: 0.075}
+  sortingOrder: 41
+  lowHealthThreshold: 0.35
 --- !u!1 &100100
 GameObject:
   m_ObjectHideFlags: 0

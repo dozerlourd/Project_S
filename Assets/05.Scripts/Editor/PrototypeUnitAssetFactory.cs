@@ -99,6 +99,11 @@ namespace ProjectS.Units.Editor
                 ApplyStatus(status, GetTeam(faction), unitType);
                 root.AddComponent<UnitPathAgent>();
                 root.AddComponent<UnitCommandAgent>();
+                root.AddComponent<TemporaryAttackEffect>();
+                root.AddComponent<UnitTeamIndicator>();
+                root.AddComponent<UnitHealth>();
+                root.AddComponent<UnitCombat>();
+                root.AddComponent<UnitHealthBar>();
 
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
@@ -143,6 +148,7 @@ namespace ProjectS.Units.Editor
                         3f,
                         0f,
                         1.2f,
+                        4f,
                         1f,
                         3f,
                         1,
@@ -168,6 +174,7 @@ namespace ProjectS.Units.Editor
                         10f,
                         0f,
                         1.5f,
+                        5f,
                         1f,
                         3.2f,
                         1,
@@ -193,6 +200,7 @@ namespace ProjectS.Units.Editor
                         8f,
                         0f,
                         1.4f,
+                        5f,
                         0.9f,
                         3f,
                         3,
@@ -218,6 +226,7 @@ namespace ProjectS.Units.Editor
                         8f,
                         0f,
                         6f,
+                        8f,
                         0.8f,
                         2.8f,
                         1,

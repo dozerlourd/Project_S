@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace ProjectS.Units
@@ -9,26 +8,36 @@ namespace ProjectS.Units
     {
         [SerializeField] private LayerMask targetMask = ~0;
         [SerializeField] private float targetScanInterval = 0.2f;
+        [SerializeField] private float targetRepathDistance = 0.25f;
+        [SerializeField] private float targetRepathInterval = 0.25f;
+        [SerializeField] private float attackRangeStopBuffer = 0.08f;
 
-        private readonly Queue<UnitCommand> queuedCommands = new Queue<UnitCommand>();
         private readonly Collider2D[] targetBuffer = new Collider2D[32];
         private ContactFilter2D targetFilter;
         private PrototypeUnitStatus status;
         private UnitPathAgent pathAgent;
+        private Collider2D attackCollider;
         private UnitCommandMode mode = UnitCommandMode.Idle;
+        private UnitActionState actionState = UnitActionState.Idle;
         private Vector3 commandDestination;
         private Vector3 patrolStart;
         private Vector3 patrolEnd;
         private PrototypeUnitStatus priorityTarget;
+        private Vector3 lastFocusPathTarget;
+        private bool hasFocusPathTarget;
+        private bool targetMustStayDetected;
         private float nextScanTime;
+        private float nextTargetRepathTime;
 
         public UnitCommandMode Mode => mode;
+        public UnitActionState ActionState => actionState;
         public PrototypeUnitStatus PriorityTarget => priorityTarget;
 
         private void Awake()
         {
             status = GetComponent<PrototypeUnitStatus>();
             pathAgent = GetComponent<UnitPathAgent>();
+            attackCollider = GetComponent<Collider2D>();
             targetFilter = new ContactFilter2D
             {
                 useLayerMask = true,
@@ -39,22 +48,24 @@ namespace ProjectS.Units
 
         private void Update()
         {
-            if (mode == UnitCommandMode.AttackMove || mode == UnitCommandMode.Patrol || mode == UnitCommandMode.HoldPosition)
+            if (CanAcquireTargetsForCurrentState())
             {
                 ScanForTargets();
             }
 
-            if (mode == UnitCommandMode.FocusAttack)
+            if (priorityTarget != null)
             {
-                UpdateFocusAttack();
+                UpdateTargetEngagement();
             }
 
-            if (mode == UnitCommandMode.Patrol && !pathAgent.HasPath && priorityTarget == null)
+            if (actionState == UnitActionState.Patrolling && !pathAgent.HasPath && priorityTarget == null)
             {
                 SwapPatrolEndpoint();
             }
 
-            if ((mode == UnitCommandMode.Move || mode == UnitCommandMode.AttackMove) && !pathAgent.HasPath && priorityTarget == null)
+            if ((actionState == UnitActionState.Moving || actionState == UnitActionState.AttackMoving)
+                && !pathAgent.HasPath
+                && priorityTarget == null)
             {
                 CompleteCurrentCommand();
             }
@@ -62,79 +73,110 @@ namespace ProjectS.Units
 
         public void Issue(UnitCommand command)
         {
-            if (command.Queue)
-            {
-                queuedCommands.Enqueue(command);
-                return;
-            }
-
-            queuedCommands.Clear();
             Execute(command);
         }
 
         public void Stop()
         {
-            queuedCommands.Clear();
-            priorityTarget = null;
+            ClearTarget();
             mode = UnitCommandMode.Idle;
+            actionState = UnitActionState.Idle;
             pathAgent.ClearPath();
         }
 
         public void HoldPosition()
         {
-            queuedCommands.Clear();
-            priorityTarget = null;
+            ClearTarget();
             mode = UnitCommandMode.HoldPosition;
+            actionState = UnitActionState.HoldingPosition;
             pathAgent.ClearPath();
         }
 
         private void Execute(UnitCommand command)
         {
-            priorityTarget = command.Target;
+            pathAgent.ClearPath();
+            ClearTarget();
             commandDestination = command.Destination;
             mode = command.Mode;
 
             switch (command.Mode)
             {
                 case UnitCommandMode.Move:
+                    actionState = UnitActionState.Moving;
                     pathAgent.MoveTo(command.Destination);
                     break;
                 case UnitCommandMode.AttackMove:
+                    actionState = UnitActionState.AttackMoving;
                     pathAgent.MoveTo(command.Destination);
                     break;
                 case UnitCommandMode.FocusAttack:
-                    UpdateFocusAttack();
+                    priorityTarget = command.Target;
+                    targetMustStayDetected = false;
+                    UpdateTargetEngagement();
                     break;
                 case UnitCommandMode.HoldPosition:
-                    pathAgent.ClearPath();
+                    actionState = UnitActionState.HoldingPosition;
                     break;
                 case UnitCommandMode.Patrol:
                     patrolStart = transform.position;
                     patrolEnd = command.Destination;
+                    actionState = UnitActionState.Patrolling;
                     pathAgent.MoveTo(patrolEnd);
                     break;
                 default:
-                    pathAgent.ClearPath();
+                    actionState = UnitActionState.Idle;
                     break;
             }
         }
 
-        private void UpdateFocusAttack()
+        private void UpdateTargetEngagement()
         {
-            if (priorityTarget == null)
+            if (!IsAttackableTarget(priorityTarget)
+                || (targetMustStayDetected && !IsInDetectionRange(priorityTarget)))
             {
-                CompleteCurrentCommand();
+                ClearTarget();
+                ResumeInterruptedCommand();
                 return;
             }
 
-            var distance = Vector3.Distance(transform.position, priorityTarget.transform.position);
-            if (distance > status.AttackRange)
+            if (actionState == UnitActionState.HoldingPosition && !IsInAttackRange(priorityTarget))
             {
-                pathAgent.MoveTo(priorityTarget.transform.position);
+                ClearTarget();
                 return;
             }
 
-            pathAgent.ClearPath();
+            if (IsInAttackRange(priorityTarget))
+            {
+                actionState = UnitActionState.AttackingTarget;
+                hasFocusPathTarget = false;
+                pathAgent.ClearPath();
+                return;
+            }
+
+            actionState = UnitActionState.ChasingTarget;
+            MoveTowardTarget(priorityTarget);
+        }
+
+        private void MoveTowardTarget(PrototypeUnitStatus target)
+        {
+            var targetPosition = target.transform.position;
+            if (Time.time < nextTargetRepathTime
+                && (!pathAgent.HasPath || !hasFocusPathTarget || Vector3.Distance(lastFocusPathTarget, targetPosition) >= targetRepathDistance))
+            {
+                return;
+            }
+
+            if (pathAgent.HasPath
+                && hasFocusPathTarget
+                && Vector3.Distance(lastFocusPathTarget, targetPosition) < targetRepathDistance)
+            {
+                return;
+            }
+
+            pathAgent.MoveTo(targetPosition);
+            lastFocusPathTarget = targetPosition;
+            hasFocusPathTarget = true;
+            nextTargetRepathTime = Time.time + targetRepathInterval;
         }
 
         private void ScanForTargets()
@@ -145,31 +187,79 @@ namespace ProjectS.Units
             }
 
             nextScanTime = Time.time + targetScanInterval;
-            if (priorityTarget != null && IsEnemy(priorityTarget) && IsInAttackRange(priorityTarget))
+            var scanRange = actionState == UnitActionState.HoldingPosition
+                ? status.AttackRange
+                : status.DetectionRange;
+
+            if (!TryAcquireTarget(scanRange, out var target))
             {
-                pathAgent.ClearPath();
                 return;
             }
 
+            priorityTarget = target;
+            targetMustStayDetected = actionState != UnitActionState.HoldingPosition;
+            UpdateTargetEngagement();
+        }
+
+        private bool TryAcquireTarget(float scanRange, out PrototypeUnitStatus target)
+        {
+            target = null;
             targetFilter.layerMask = targetMask;
-            var hitCount = Physics2D.OverlapCircle(transform.position, status.AttackRange, targetFilter, targetBuffer);
+            var hitCount = Physics2D.OverlapCircle(transform.position, scanRange, targetFilter, targetBuffer);
+            var bestDistance = float.PositiveInfinity;
+
             for (var i = 0; i < hitCount; i++)
             {
-                var target = targetBuffer[i].GetComponentInParent<PrototypeUnitStatus>();
-                if (target == null || !IsEnemy(target))
+                var candidate = targetBuffer[i].GetComponentInParent<PrototypeUnitStatus>();
+                if (!IsAttackableTarget(candidate) || !IsInDetectionRange(candidate))
                 {
                     continue;
                 }
 
-                priorityTarget = target;
-                pathAgent.ClearPath();
-                return;
+                var distance = GetTargetDistance(candidate);
+                if (distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestDistance = distance;
+                target = candidate;
             }
 
-            priorityTarget = null;
-            if (mode == UnitCommandMode.AttackMove && !pathAgent.HasPath)
+            return target != null;
+        }
+
+        private bool CanAcquireTargetsForCurrentState()
+        {
+            return priorityTarget == null
+                && (actionState == UnitActionState.AttackMoving
+                    || actionState == UnitActionState.Patrolling
+                    || actionState == UnitActionState.HoldingPosition);
+        }
+
+        private void ResumeInterruptedCommand()
+        {
+            switch (mode)
             {
-                pathAgent.MoveTo(commandDestination);
+                case UnitCommandMode.AttackMove:
+                    actionState = UnitActionState.AttackMoving;
+                    pathAgent.MoveTo(commandDestination);
+                    break;
+                case UnitCommandMode.Patrol:
+                    actionState = UnitActionState.Patrolling;
+                    if (!pathAgent.HasPath)
+                    {
+                        pathAgent.MoveTo(patrolEnd);
+                    }
+
+                    break;
+                case UnitCommandMode.HoldPosition:
+                    actionState = UnitActionState.HoldingPosition;
+                    pathAgent.ClearPath();
+                    break;
+                default:
+                    CompleteCurrentCommand();
+                    break;
             }
         }
 
@@ -183,9 +273,50 @@ namespace ProjectS.Units
             return other != status && other.Team != status.Team;
         }
 
+        private bool IsAttackableTarget(PrototypeUnitStatus target)
+        {
+            if (target == null || !target.gameObject.activeInHierarchy || !IsEnemy(target))
+            {
+                return false;
+            }
+
+            var health = target.GetComponent<UnitHealth>();
+            return health == null || !health.IsDead;
+        }
+
         private bool IsInAttackRange(PrototypeUnitStatus target)
         {
-            return Vector3.Distance(transform.position, target.transform.position) <= status.AttackRange;
+            return GetTargetDistance(target) <= Mathf.Max(0.05f, status.AttackRange - attackRangeStopBuffer);
+        }
+
+        private bool IsInDetectionRange(PrototypeUnitStatus target)
+        {
+            return GetTargetDistance(target) <= status.DetectionRange;
+        }
+
+        private float GetTargetDistance(PrototypeUnitStatus target)
+        {
+            if (target == null)
+            {
+                return float.PositiveInfinity;
+            }
+
+            if (attackCollider == null)
+            {
+                attackCollider = GetComponent<Collider2D>();
+            }
+
+            var targetCollider = target.GetComponent<Collider2D>();
+            if (attackCollider != null && targetCollider != null)
+            {
+                var colliderDistance = attackCollider.Distance(targetCollider);
+                if (colliderDistance.isValid)
+                {
+                    return Mathf.Max(0f, colliderDistance.distance);
+                }
+            }
+
+            return Vector3.Distance(transform.position, target.transform.position);
         }
 
         private void SwapPatrolEndpoint()
@@ -198,14 +329,17 @@ namespace ProjectS.Units
 
         private void CompleteCurrentCommand()
         {
-            if (queuedCommands.Count > 0)
-            {
-                Execute(queuedCommands.Dequeue());
-                return;
-            }
-
             mode = UnitCommandMode.Idle;
+            actionState = UnitActionState.Idle;
+            ClearTarget();
+        }
+
+        private void ClearTarget()
+        {
             priorityTarget = null;
+            hasFocusPathTarget = false;
+            targetMustStayDetected = false;
+            nextTargetRepathTime = 0f;
         }
     }
 }

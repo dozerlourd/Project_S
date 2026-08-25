@@ -12,6 +12,17 @@ namespace ProjectS.Units
         Patrol
     }
 
+    public enum UnitActionState
+    {
+        Idle,
+        Moving,
+        AttackMoving,
+        ChasingTarget,
+        AttackingTarget,
+        HoldingPosition,
+        Patrolling
+    }
+
     public readonly struct UnitCommand
     {
         public readonly UnitCommandMode Mode;

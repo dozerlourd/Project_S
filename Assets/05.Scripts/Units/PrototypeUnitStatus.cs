@@ -96,6 +96,7 @@ namespace ProjectS.Units
         [SerializeField] private float physicalAttackPower = 10f;
         [SerializeField] private float magicalAttackPower;
         [SerializeField] private float attackRange = 1.5f;
+        [SerializeField] private float detectionRange = 5f;
         [SerializeField] private float attackSpeed = 1f;
         [SerializeField] private float movementSpeed = 3f;
         [SerializeField] private int maxAttackTargets = 1;
@@ -130,6 +131,7 @@ namespace ProjectS.Units
         public float PhysicalAttackPower => physicalAttackPower;
         public float MagicalAttackPower => magicalAttackPower;
         public float AttackRange => attackRange;
+        public float DetectionRange => Mathf.Max(attackRange, detectionRange);
         public float AttackSpeed => attackSpeed;
         public float MovementSpeed => movementSpeed;
         public int MaxAttackTargets => maxAttackTargets;
@@ -150,8 +152,10 @@ namespace ProjectS.Units
 
         private void Awake()
         {
+            EnsureHealth();
             EnsureGroundPathAgent();
             EnsureCommandAgent();
+            EnsureCombatComponents();
         }
 
         public void Initialize(
@@ -169,6 +173,7 @@ namespace ProjectS.Units
             float physicalAttackPower,
             float magicalAttackPower,
             float attackRange,
+            float detectionRange,
             float attackSpeed,
             float movementSpeed,
             int maxAttackTargets,
@@ -191,6 +196,7 @@ namespace ProjectS.Units
             this.physicalAttackPower = physicalAttackPower;
             this.magicalAttackPower = magicalAttackPower;
             this.attackRange = attackRange;
+            this.detectionRange = Mathf.Max(attackRange, detectionRange);
             this.attackSpeed = attackSpeed;
             this.movementSpeed = movementSpeed;
             this.maxAttackTargets = maxAttackTargets;
@@ -224,6 +230,37 @@ namespace ProjectS.Units
             {
                 gameObject.AddComponent<UnitCommandAgent>();
             }
+        }
+
+        private void EnsureHealth()
+        {
+            if (GetComponent<UnitHealth>() == null)
+            {
+                gameObject.AddComponent<UnitHealth>();
+            }
+        }
+
+        private void EnsureCombatComponents()
+        {
+            if (placementType != PlacementType.Movable || !CanAttack())
+            {
+                return;
+            }
+
+            if (GetComponent<UnitCombat>() == null)
+            {
+                gameObject.AddComponent<UnitCombat>();
+            }
+
+            if (GetComponent<TemporaryAttackEffect>() == null)
+            {
+                gameObject.AddComponent<TemporaryAttackEffect>();
+            }
+        }
+
+        private bool CanAttack()
+        {
+            return roles.HasFlag(UnitRole.Combat) || physicalAttackPower > 0f || magicalAttackPower > 0f;
         }
     }
 }
