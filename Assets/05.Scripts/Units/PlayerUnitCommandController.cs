@@ -24,6 +24,7 @@ namespace ProjectS.Units
         private readonly Collider2D[] unitHitBuffer = new Collider2D[16];
         private readonly HashSet<Vector3Int> reservedCommandCells = new HashSet<Vector3Int>();
         private readonly HashSet<Vector3Int> occupiedCommandCells = new HashSet<Vector3Int>();
+        private readonly HashSet<PrototypeUnitStatus> highlightedTargets = new HashSet<PrototypeUnitStatus>();
         private PendingPointCommand pendingPointCommand = PendingPointCommand.None;
         private Vector2 dragStartScreenPosition;
         private Vector2 dragCurrentScreenPosition;
@@ -31,6 +32,7 @@ namespace ProjectS.Units
         private bool isDraggingSelection;
         private bool warnedMissingCamera;
         private bool warnedNoSelectedUnits;
+        private static Sprite fallbackRingSprite;
 
         private enum PendingPointCommand
         {
@@ -92,6 +94,7 @@ namespace ProjectS.Units
             }
 
             HandleKeyboardCommands();
+            RefreshTargetHighlights();
         }
 
         private void OnGUI()
@@ -165,7 +168,7 @@ namespace ProjectS.Units
         {
             if (pendingPointCommand != PendingPointCommand.None)
             {
-                CommandPointFromCursor(pendingPointCommand);
+                CommandPendingPointClick(pendingPointCommand);
                 pendingPointCommand = PendingPointCommand.None;
                 return;
             }
@@ -266,7 +269,6 @@ namespace ProjectS.Units
                 return;
             }
 
-            var queue = IsCommandQueuePressed();
             if (!TryGetCommandPoint(out var destination))
             {
                 Debug.Log("Player move command ignored because the clicked point did not hit the command plane.", this);
@@ -279,7 +281,20 @@ namespace ProjectS.Units
                     ? UnitCommandMode.Patrol
                     : UnitCommandMode.Move;
 
-            IssueToSelected(new UnitCommand(commandMode, destination, null, queue));
+            IssueToSelected(new UnitCommand(commandMode, destination, null, false));
+        }
+
+        private void CommandPendingPointClick(PendingPointCommand pointCommand)
+        {
+            if (pointCommand == PendingPointCommand.AttackMove
+                && TryGetUnitUnderCursor(out var target)
+                && target.Team != playerTeam)
+            {
+                CommandFocusAttack(target);
+                return;
+            }
+
+            CommandPointFromCursor(pointCommand);
         }
 
         private void CommandFocusAttack(PrototypeUnitStatus target)
@@ -290,7 +305,8 @@ namespace ProjectS.Units
                 return;
             }
 
-            IssueToSelected(new UnitCommand(UnitCommandMode.FocusAttack, target.transform.position, target, IsCommandQueuePressed()));
+            IssueToSelected(new UnitCommand(UnitCommandMode.FocusAttack, target.transform.position, target, false));
+            SetTargetVisible(target, true);
         }
 
         private void IssueToSelected(UnitCommand command)
@@ -320,7 +336,7 @@ namespace ProjectS.Units
                     var status = unit.GetComponent<PrototypeUnitStatus>();
                     var footprint = status != null ? status.OccupiedCells : Vector2Int.one;
                     var offsetDestination = GetUniqueTileDestination(command.Destination, destinationIndex, destinationCount, footprint);
-                    unit.Issue(new UnitCommand(command.Mode, offsetDestination, null, command.Queue));
+                    unit.Issue(new UnitCommand(command.Mode, offsetDestination, null, false));
                     destinationIndex++;
                 }
                 else
@@ -539,6 +555,7 @@ namespace ProjectS.Units
             }
 
             selectedUnits.Clear();
+            RefreshTargetHighlights();
         }
 
         private void SelectControlGroup(int index)
@@ -575,8 +592,109 @@ namespace ProjectS.Units
             var ring = agent.transform.Find("SelectionRing");
             if (ring != null)
             {
+                var renderer = ring.GetComponent<SpriteRenderer>();
+                if (renderer != null)
+                {
+                    renderer.color = new Color(0.1f, 0.8f, 1f, 0.85f);
+                }
+
                 ring.gameObject.SetActive(visible);
             }
+        }
+
+        private void RefreshTargetHighlights()
+        {
+            foreach (var target in highlightedTargets)
+            {
+                SetTargetVisible(target, false);
+            }
+
+            highlightedTargets.Clear();
+            foreach (var unit in selectedUnits)
+            {
+                if (unit == null)
+                {
+                    continue;
+                }
+
+                var target = unit.PriorityTarget;
+                if (target == null || target.Team == playerTeam || !target.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
+
+                highlightedTargets.Add(target);
+            }
+
+            foreach (var target in highlightedTargets)
+            {
+                SetTargetVisible(target, true);
+            }
+        }
+
+        private static void SetTargetVisible(PrototypeUnitStatus target, bool visible)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            var ring = target.transform.Find("TargetRing");
+            if (ring == null)
+            {
+                ring = CreateTargetRing(target.transform);
+            }
+
+            ring.gameObject.SetActive(visible);
+        }
+
+        private static Transform CreateTargetRing(Transform parent)
+        {
+            var ringObject = new GameObject("TargetRing");
+            ringObject.transform.SetParent(parent, false);
+            ringObject.transform.localPosition = new Vector3(0f, -0.2f, 0f);
+            ringObject.transform.localScale = new Vector3(1.05f, 0.58f, 1f);
+
+            var renderer = ringObject.AddComponent<SpriteRenderer>();
+            renderer.sprite = GetRingSprite(parent);
+            renderer.color = new Color(1f, 0.12f, 0.08f, 0.9f);
+            renderer.sortingOrder = 11;
+            return ringObject.transform;
+        }
+
+        private static Sprite GetRingSprite(Transform unit)
+        {
+            var selectionRing = unit.Find("SelectionRing");
+            var selectionRenderer = selectionRing != null ? selectionRing.GetComponent<SpriteRenderer>() : null;
+            if (selectionRenderer != null && selectionRenderer.sprite != null)
+            {
+                return selectionRenderer.sprite;
+            }
+
+            if (fallbackRingSprite != null)
+            {
+                return fallbackRingSprite;
+            }
+
+            var texture = new Texture2D(16, 16, TextureFormat.RGBA32, false)
+            {
+                name = "FallbackTargetRingSprite",
+                filterMode = FilterMode.Point
+            };
+            var center = new Vector2(7.5f, 7.5f);
+            for (var y = 0; y < texture.height; y++)
+            {
+                for (var x = 0; x < texture.width; x++)
+                {
+                    var radius = (new Vector2(x, y) - center).magnitude;
+                    texture.SetPixel(x, y, radius > 5f && radius < 7f ? Color.white : Color.clear);
+                }
+            }
+
+            texture.Apply();
+            fallbackRingSprite = Sprite.Create(texture, new Rect(0, 0, 16, 16), new Vector2(0.5f, 0.5f), 16f);
+            fallbackRingSprite.name = "FallbackTargetRingSprite";
+            return fallbackRingSprite;
         }
 
         private static Vector2 GetMousePosition()
@@ -590,11 +708,6 @@ namespace ProjectS.Units
             var keyboard = Keyboard.current;
             return keyboard != null
                 && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
-        }
-
-        private static bool IsCommandQueuePressed()
-        {
-            return IsAdditiveSelectionPressed();
         }
 
         private static bool IsControlGroupAssignPressed()

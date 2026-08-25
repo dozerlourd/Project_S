@@ -52,6 +52,15 @@ namespace ProjectS.Tilemaps
 
         public bool TryFindPath(Vector3 startWorld, Vector3 destinationWorld, List<Vector3> result)
         {
+            return TryFindPath(startWorld, destinationWorld, result, null);
+        }
+
+        public bool TryFindPath(
+            Vector3 startWorld,
+            Vector3 destinationWorld,
+            List<Vector3> result,
+            ICollection<Vector3Int> blockedCells)
+        {
             result?.Clear();
             ResolveReferences();
             if (tilemapWorld == null || result == null)
@@ -93,17 +102,20 @@ namespace ProjectS.Tilemaps
 
                 foreach (var neighbor in EnumerateNeighbors(current))
                 {
-                    if (closed.Contains(neighbor) || !tilemapWorld.IsWalkable(neighbor))
+                    if (closed.Contains(neighbor)
+                        || !tilemapWorld.IsWalkable(neighbor)
+                        || IsDynamicallyBlocked(neighbor, start, goal, blockedCells))
                     {
                         continue;
                     }
 
-                    if (IsDiagonalMove(current, neighbor) && !CanMoveDiagonally(current, neighbor))
+                    if (IsDiagonalMove(current, neighbor)
+                        && !CanMoveDiagonally(current, neighbor, start, goal, blockedCells))
                     {
                         continue;
                     }
 
-                    if (!IsCellStepWalkable(current, neighbor))
+                    if (!IsCellStepWalkable(current, neighbor, start, goal, blockedCells))
                     {
                         continue;
                     }
@@ -208,19 +220,49 @@ namespace ProjectS.Tilemaps
             }
         }
 
-        private bool CanMoveDiagonally(Vector3Int from, Vector3Int to)
+        private bool CanMoveDiagonally(
+            Vector3Int from,
+            Vector3Int to,
+            Vector3Int start,
+            Vector3Int goal,
+            ICollection<Vector3Int> blockedCells)
         {
             var delta = to - from;
             var horizontal = from + new Vector3Int(delta.x, 0, 0);
             var vertical = from + new Vector3Int(0, delta.y, 0);
-            return tilemapWorld.IsWalkable(horizontal) && tilemapWorld.IsWalkable(vertical);
+            return tilemapWorld.IsWalkable(horizontal)
+                && tilemapWorld.IsWalkable(vertical)
+                && !IsDynamicallyBlocked(horizontal, start, goal, blockedCells)
+                && !IsDynamicallyBlocked(vertical, start, goal, blockedCells);
         }
 
-        private bool IsCellStepWalkable(Vector3Int from, Vector3Int to)
+        private bool IsCellStepWalkable(
+            Vector3Int from,
+            Vector3Int to,
+            Vector3Int start,
+            Vector3Int goal,
+            ICollection<Vector3Int> blockedCells)
         {
+            if (IsDynamicallyBlocked(to, start, goal, blockedCells))
+            {
+                return false;
+            }
+
             return IsSegmentWalkable(
                 tilemapWorld.GetCellCenterWorld(from),
                 tilemapWorld.GetCellCenterWorld(to));
+        }
+
+        private static bool IsDynamicallyBlocked(
+            Vector3Int cell,
+            Vector3Int start,
+            Vector3Int goal,
+            ICollection<Vector3Int> blockedCells)
+        {
+            return cell != start
+                && cell != goal
+                && blockedCells != null
+                && blockedCells.Contains(cell);
         }
 
         private float GetSegmentSampleDistance()

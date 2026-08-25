@@ -1,0 +1,17 @@
+{
+    "name": "ProjectS.Units",
+    "rootNamespace": "ProjectS.Units",
+    "references": [
+        "ProjectS.Tilemaps",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

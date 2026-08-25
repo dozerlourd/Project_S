@@ -182,22 +182,22 @@ namespace ProjectS
             var keyboard = Keyboard.current;
             var input = Vector2.zero;
 
-            if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed)
+            if (keyboard.leftArrowKey.isPressed)
             {
                 input.x -= 1f;
             }
 
-            if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
+            if (keyboard.rightArrowKey.isPressed)
             {
                 input.x += 1f;
             }
 
-            if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed)
+            if (keyboard.downArrowKey.isPressed)
             {
                 input.y -= 1f;
             }
 
-            if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed)
+            if (keyboard.upArrowKey.isPressed)
             {
                 input.y += 1f;
             }
@@ -233,8 +233,7 @@ namespace ProjectS
             if (enableKeyboardMovement && Keyboard.current != null)
             {
                 var keyboard = Keyboard.current;
-                if (keyboard.wKey.isPressed || keyboard.aKey.isPressed || keyboard.sKey.isPressed || keyboard.dKey.isPressed ||
-                    keyboard.upArrowKey.isPressed || keyboard.leftArrowKey.isPressed || keyboard.downArrowKey.isPressed || keyboard.rightArrowKey.isPressed)
+                if (keyboard.upArrowKey.isPressed || keyboard.leftArrowKey.isPressed || keyboard.downArrowKey.isPressed || keyboard.rightArrowKey.isPressed)
                 {
                     return keyboardMoveSpeed;
                 }
