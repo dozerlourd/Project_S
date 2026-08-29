@@ -20,6 +20,8 @@ GameObject:
   - component: {fileID: 100010}
   - component: {fileID: 100011}
   - component: {fileID: 100012}
+  - component: {fileID: 100013}
+  - component: {fileID: 100014}
   m_Layer: 0
   m_Name: B_Worker
   m_TagString: Untagged
@@ -328,6 +330,34 @@ MonoBehaviour:
   size: {x: 0.62, y: 0.075}
   sortingOrder: 41
   lowHealthThreshold: 0.35
+--- !u!114 &100013
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d625444529bf4dbbb3dedce59903228d, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  carryCapacity: 5
+  fallbackGatherRange: 0.85
+  fallbackDropOffRange: 1.25
+--- !u!114 &100014
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1555832ac1743a6bdb34da0fe0b9712, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  buildPower: 1
 --- !u!1 &100100
 GameObject:
   m_ObjectHideFlags: 0

@@ -23,6 +23,7 @@ namespace ProjectS.Units
         private PrototypeUnitStatus status;
         private UnitPathAgent pathAgent;
         private Collider2D attackCollider;
+        private IUnitInteractionHandler[] interactionHandlers;
         private bool isRegistered;
         private UnitCommandMode mode = UnitCommandMode.Idle;
         private UnitActionState actionState = UnitActionState.Idle;
@@ -136,6 +137,15 @@ namespace ProjectS.Units
                     patrolEnd = command.Destination;
                     actionState = UnitActionState.Patrolling;
                     pathAgent.MoveTo(patrolEnd);
+                    break;
+                case UnitCommandMode.Interact:
+                    if (TryStartInteraction(command.InteractableTarget))
+                    {
+                        actionState = UnitActionState.Interacting;
+                        break;
+                    }
+
+                    CompleteCurrentCommand();
                     break;
                 default:
                     actionState = UnitActionState.Idle;
@@ -390,6 +400,11 @@ namespace ProjectS.Units
             {
                 attackCollider = GetComponent<Collider2D>();
             }
+
+            if (interactionHandlers == null || interactionHandlers.Length == 0)
+            {
+                interactionHandlers = GetComponents<IUnitInteractionHandler>();
+            }
         }
 
         private void RegisterAgent()
@@ -420,6 +435,30 @@ namespace ProjectS.Units
             var jitter = Mathf.Max(0f, targetScanJitter);
             var randomOffset = jitter > 0f ? Random.Range(0f, jitter) : 0f;
             nextScanTime = Time.time + (initial ? randomOffset : interval + randomOffset);
+        }
+
+        private bool TryStartInteraction(IUnitInteractableTarget target)
+        {
+            if (target == null || !target.CanInteract(this))
+            {
+                return false;
+            }
+
+            ResolveReferences();
+            if (interactionHandlers == null || interactionHandlers.Length == 0)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < interactionHandlers.Length; i++)
+            {
+                if (interactionHandlers[i] != null && interactionHandlers[i].TryHandleInteractionCommand(target))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void ScheduleNextTargetRepath()

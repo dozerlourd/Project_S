@@ -5,6 +5,8 @@ namespace ProjectS.Units
     public static class UnitRegistry
     {
         private static readonly List<UnitCommandAgent> AllCommandAgents = new List<UnitCommandAgent>();
+        private static readonly Dictionary<UnitCommandAgent, UnitTeam> AgentTeams =
+            new Dictionary<UnitCommandAgent, UnitTeam>();
         private static readonly Dictionary<UnitTeam, List<UnitCommandAgent>> CommandAgentsByTeam =
             new Dictionary<UnitTeam, List<UnitCommandAgent>>();
         private static readonly List<UnitCommandAgent> EmptyCommandAgents = new List<UnitCommandAgent>(0);
@@ -25,19 +27,28 @@ namespace ProjectS.Units
 
         public static void Register(UnitCommandAgent agent, PrototypeUnitStatus status)
         {
-            if (agent == null || status == null || AllCommandAgents.Contains(agent))
+            if (agent == null || status == null)
             {
                 return;
             }
 
-            AllCommandAgents.Add(agent);
-            if (!CommandAgentsByTeam.TryGetValue(status.Team, out var teamAgents))
+            if (!AllCommandAgents.Contains(agent))
             {
-                teamAgents = new List<UnitCommandAgent>();
-                CommandAgentsByTeam.Add(status.Team, teamAgents);
+                AllCommandAgents.Add(agent);
             }
 
-            teamAgents.Add(agent);
+            if (AgentTeams.TryGetValue(agent, out var registeredTeam))
+            {
+                if (registeredTeam == status.Team)
+                {
+                    return;
+                }
+
+                RemoveFromTeam(agent, registeredTeam);
+            }
+
+            AddToTeam(agent, status.Team);
+            AgentTeams[agent] = status.Team;
         }
 
         public static void Unregister(UnitCommandAgent agent, PrototypeUnitStatus status)
@@ -48,12 +59,15 @@ namespace ProjectS.Units
             }
 
             AllCommandAgents.Remove(agent);
-            if (status == null || !CommandAgentsByTeam.TryGetValue(status.Team, out var teamAgents))
+            if (AgentTeams.TryGetValue(agent, out var registeredTeam))
             {
-                return;
+                RemoveFromTeam(agent, registeredTeam);
+                AgentTeams.Remove(agent);
             }
-
-            teamAgents.Remove(agent);
+            else if (status != null)
+            {
+                RemoveFromTeam(agent, status.Team);
+            }
         }
 
         public static IReadOnlyList<UnitCommandAgent> GetAgents(UnitTeam team)
@@ -61,6 +75,28 @@ namespace ProjectS.Units
             return CommandAgentsByTeam.TryGetValue(team, out var agents)
                 ? agents
                 : EmptyCommandAgents;
+        }
+
+        private static void AddToTeam(UnitCommandAgent agent, UnitTeam team)
+        {
+            if (!CommandAgentsByTeam.TryGetValue(team, out var teamAgents))
+            {
+                teamAgents = new List<UnitCommandAgent>();
+                CommandAgentsByTeam.Add(team, teamAgents);
+            }
+
+            if (!teamAgents.Contains(agent))
+            {
+                teamAgents.Add(agent);
+            }
+        }
+
+        private static void RemoveFromTeam(UnitCommandAgent agent, UnitTeam team)
+        {
+            if (CommandAgentsByTeam.TryGetValue(team, out var teamAgents))
+            {
+                teamAgents.Remove(agent);
+            }
         }
     }
 }

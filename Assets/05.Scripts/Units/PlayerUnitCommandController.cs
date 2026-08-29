@@ -12,6 +12,7 @@ namespace ProjectS.Units
         [SerializeField] private Camera commandCamera;
         [SerializeField] private ProjectSTilemapNavigator navigator;
         [SerializeField] private LayerMask unitSelectionMask = ~0;
+        [SerializeField] private LayerMask interactableMask = ~0;
         [SerializeField] private bool logCommandWarnings = true;
         [SerializeField] private float commandPlaneZ;
         [SerializeField] private float clickSelectionRadius = 0.35f;
@@ -22,21 +23,29 @@ namespace ProjectS.Units
         private readonly List<UnitCommandAgent> selectedUnits = new List<UnitCommandAgent>();
         private readonly List<UnitCommandAgent>[] controlGroups = new List<UnitCommandAgent>[10];
         private readonly Collider2D[] unitHitBuffer = new Collider2D[16];
+        private readonly Collider2D[] interactableHitBuffer = new Collider2D[16];
         private readonly HashSet<Vector3Int> reservedCommandCells = new HashSet<Vector3Int>();
         private readonly HashSet<Vector3Int> occupiedCommandCells = new HashSet<Vector3Int>();
         private readonly HashSet<PrototypeUnitStatus> highlightedTargets = new HashSet<PrototypeUnitStatus>();
         private PendingPointCommand pendingPointCommand = PendingPointCommand.None;
         private Vector2 dragStartScreenPosition;
         private Vector2 dragCurrentScreenPosition;
+        private IUnitBuildPlacementService pendingBuildPlacementService;
         private bool isLeftMousePressed;
         private bool isDraggingSelection;
         private bool warnedMissingCamera;
         private bool warnedNoSelectedUnits;
         private static Sprite fallbackRingSprite;
 
+        public static PlayerUnitCommandController ActiveInstance { get; private set; }
+        public UnitTeam PlayerTeam => playerTeam;
+        public IReadOnlyList<UnitCommandAgent> SelectedUnits => selectedUnits;
+        public IPlayerSelectableTarget PrimarySelection { get; private set; }
+
         private enum PendingPointCommand
         {
             None,
+            Move,
             AttackMove,
             Patrol
         }
@@ -55,12 +64,21 @@ namespace ProjectS.Units
 
         private void Awake()
         {
+            ActiveInstance = this;
             for (var i = 0; i < controlGroups.Length; i++)
             {
                 controlGroups[i] = new List<UnitCommandAgent>();
             }
 
             ResolveSceneReferences(true);
+        }
+
+        private void OnDestroy()
+        {
+            if (ActiveInstance == this)
+            {
+                ActiveInstance = null;
+            }
         }
 
         private void Update()
@@ -143,6 +161,7 @@ namespace ProjectS.Units
 
             dragCurrentScreenPosition = screenPosition;
             if (pendingPointCommand == PendingPointCommand.None
+                && pendingBuildPlacementService == null
                 && Vector2.Distance(dragStartScreenPosition, dragCurrentScreenPosition) >= dragSelectThreshold)
             {
                 isDraggingSelection = true;
@@ -173,16 +192,29 @@ namespace ProjectS.Units
                 return;
             }
 
+            if (pendingBuildPlacementService != null)
+            {
+                CommandBuildPlacement();
+                return;
+            }
+
             SelectUnitUnderCursor();
         }
 
         private void HandleRightClick()
         {
             pendingPointCommand = PendingPointCommand.None;
+            pendingBuildPlacementService = null;
 
             if (TryGetUnitUnderCursor(out var target) && target.Team != playerTeam)
             {
                 CommandFocusAttack(target);
+                return;
+            }
+
+            if (TryGetInteractableUnderCursor(out var interactable))
+            {
+                CommandInteract(interactable);
                 return;
             }
 
@@ -199,7 +231,11 @@ namespace ProjectS.Units
 
             if (!TryGetUnitUnderCursor(out var status))
             {
-                if (!IsAdditiveSelectionPressed())
+                if (TryGetSelectableUnderCursor(out var selectable) && selectable.Team == playerTeam)
+                {
+                    SelectNonUnitTarget(selectable);
+                }
+                else if (!IsAdditiveSelectionPressed())
                 {
                     ClearSelection();
                 }
@@ -224,6 +260,12 @@ namespace ProjectS.Units
             }
 
             AddSelection(agent);
+        }
+
+        private void SelectNonUnitTarget(IPlayerSelectableTarget target)
+        {
+            ClearSelection();
+            PrimarySelection = target;
         }
 
         private void SelectUnitsInDragRect()
@@ -310,9 +352,93 @@ namespace ProjectS.Units
             SetTargetVisible(target, true);
         }
 
+        private void CommandInteract(IUnitInteractableTarget target)
+        {
+            if (selectedUnits.Count == 0)
+            {
+                WarnCommandBlockedReason();
+                return;
+            }
+
+            IssueToSelected(new UnitCommand(UnitCommandMode.Interact, target.InteractionPoint, null, target, false));
+        }
+
+        private void CommandBuildPlacement()
+        {
+            if (pendingBuildPlacementService == null || selectedUnits.Count == 0)
+            {
+                pendingBuildPlacementService = null;
+                WarnCommandBlockedReason();
+                return;
+            }
+
+            if (!TryGetCommandPoint(out var destination))
+            {
+                return;
+            }
+
+            if (pendingBuildPlacementService.TryPlaceDefaultConstructionSite(destination, out var constructionSite)
+                && constructionSite != null)
+            {
+                IssueToSelected(new UnitCommand(
+                    UnitCommandMode.Interact,
+                    constructionSite.InteractionPoint,
+                    null,
+                    constructionSite,
+                    false));
+            }
+
+            pendingBuildPlacementService = null;
+        }
+
+        public void BeginMoveCommand()
+        {
+            pendingPointCommand = PendingPointCommand.Move;
+            pendingBuildPlacementService = null;
+        }
+
+        public void BeginAttackMoveCommand()
+        {
+            pendingPointCommand = PendingPointCommand.AttackMove;
+            pendingBuildPlacementService = null;
+        }
+
+        public void BeginPatrolCommand()
+        {
+            pendingPointCommand = PendingPointCommand.Patrol;
+            pendingBuildPlacementService = null;
+        }
+
+        public void BeginBuildPlacement(IUnitBuildPlacementService placementService)
+        {
+            pendingPointCommand = PendingPointCommand.None;
+            pendingBuildPlacementService = placementService;
+        }
+
+        public void StopSelectedUnits()
+        {
+            pendingPointCommand = PendingPointCommand.None;
+            pendingBuildPlacementService = null;
+            foreach (var unit in selectedUnits)
+            {
+                unit?.Stop();
+            }
+        }
+
+        public void HoldSelectedUnits()
+        {
+            pendingPointCommand = PendingPointCommand.None;
+            pendingBuildPlacementService = null;
+            foreach (var unit in selectedUnits)
+            {
+                unit?.HoldPosition();
+            }
+        }
+
         private void IssueToSelected(UnitCommand command)
         {
             var pointCommand = command.Target == null
+                && command.InteractableTarget == null
                 && (command.Mode == UnitCommandMode.Move
                     || command.Mode == UnitCommandMode.AttackMove
                     || command.Mode == UnitCommandMode.Patrol);
@@ -526,6 +652,100 @@ namespace ProjectS.Units
             return status != null;
         }
 
+        private bool TryGetInteractableUnderCursor(out IUnitInteractableTarget target)
+        {
+            target = null;
+            if (commandCamera == null)
+            {
+                return false;
+            }
+
+            var worldPosition = commandCamera.ScreenToWorldPoint(GetMousePosition());
+            var filter = new ContactFilter2D
+            {
+                useLayerMask = true,
+                layerMask = interactableMask,
+                useTriggers = true
+            };
+
+            var hitCount = Physics2D.OverlapCircle(
+                worldPosition,
+                Mathf.Max(0.01f, clickSelectionRadius),
+                filter,
+                interactableHitBuffer);
+            if (hitCount <= 0)
+            {
+                return false;
+            }
+
+            var closestDistance = float.PositiveInfinity;
+            for (var i = 0; i < hitCount; i++)
+            {
+                var candidate = interactableHitBuffer[i].GetComponentInParent<IUnitInteractableTarget>();
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                var interactionPoint = candidate.InteractionPoint;
+                var distance = Vector2.SqrMagnitude((Vector2)interactionPoint - (Vector2)worldPosition);
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    target = candidate;
+                }
+            }
+
+            return target != null;
+        }
+
+        private bool TryGetSelectableUnderCursor(out IPlayerSelectableTarget target)
+        {
+            target = null;
+            if (commandCamera == null)
+            {
+                return false;
+            }
+
+            var worldPosition = commandCamera.ScreenToWorldPoint(GetMousePosition());
+            var filter = new ContactFilter2D
+            {
+                useLayerMask = true,
+                layerMask = unitSelectionMask,
+                useTriggers = true
+            };
+
+            var hitCount = Physics2D.OverlapCircle(
+                worldPosition,
+                Mathf.Max(0.01f, clickSelectionRadius),
+                filter,
+                unitHitBuffer);
+            if (hitCount <= 0)
+            {
+                return false;
+            }
+
+            var closestDistance = float.PositiveInfinity;
+            for (var i = 0; i < hitCount; i++)
+            {
+                var candidate = unitHitBuffer[i].GetComponentInParent<IPlayerSelectableTarget>();
+                if (candidate == null || candidate is PrototypeUnitStatus)
+                {
+                    continue;
+                }
+
+                var distance = Vector2.SqrMagnitude(
+                    (Vector2)candidate.SelectionTransform.position - (Vector2)worldPosition);
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    target = candidate;
+                }
+            }
+
+            return target != null;
+        }
+
         private bool TryGetSelectableStatus(UnitCommandAgent unit, out PrototypeUnitStatus status)
         {
             status = unit.GetComponent<PrototypeUnitStatus>();
@@ -542,6 +762,7 @@ namespace ProjectS.Units
             }
 
             selectedUnits.Add(agent);
+            PrimarySelection = agent.Status;
             SetSelectionVisible(agent, true);
         }
 
@@ -556,6 +777,7 @@ namespace ProjectS.Units
             }
 
             selectedUnits.Clear();
+            PrimarySelection = null;
             RefreshTargetHighlights();
         }
 

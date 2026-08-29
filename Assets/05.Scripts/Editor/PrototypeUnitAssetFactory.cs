@@ -1,4 +1,6 @@
 using System.IO;
+using ProjectS.Buildings;
+using ProjectS.Resources;
 using ProjectS.Units;
 using UnityEditor;
 using UnityEngine;
@@ -104,6 +106,11 @@ namespace ProjectS.Units.Editor
                 root.AddComponent<UnitHealth>();
                 root.AddComponent<UnitCombat>();
                 root.AddComponent<UnitHealthBar>();
+                if (unitType == PrototypeUnitType.Worker)
+                {
+                    root.AddComponent<WorkerGatherController>();
+                    root.AddComponent<WorkerConstructionController>();
+                }
 
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }

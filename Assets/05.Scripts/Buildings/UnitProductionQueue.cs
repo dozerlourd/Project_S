@@ -1,0 +1,231 @@
+using System.Collections.Generic;
+using ProjectS.Resources;
+using ProjectS.Tilemaps;
+using ProjectS.Units;
+using UnityEngine;
+
+namespace ProjectS.Buildings
+{
+    [RequireComponent(typeof(BuildingStatus))]
+    public sealed class UnitProductionQueue : MonoBehaviour
+    {
+        [SerializeField] private PlayerResourceWallet wallet;
+        [SerializeField] private ProjectSTilemapWorld tilemapWorld;
+        [SerializeField] private UnitProductionDefinition[] producibleUnits = new UnitProductionDefinition[0];
+        [SerializeField, Min(1)] private int maxQueueSize = 5;
+        [SerializeField] private Vector3 spawnOffset = new Vector3(1.5f, 0f, 0f);
+        [SerializeField] private Vector3 rallyOffset = new Vector3(3f, 0f, 0f);
+
+        private readonly Queue<UnitProductionDefinition> queue = new Queue<UnitProductionDefinition>();
+        private BuildingStatus status;
+        private UnitProductionDefinition activeProduction;
+        private float activeProgress;
+        private bool hasRallyPoint;
+        private Vector3 rallyPoint;
+
+        public IReadOnlyList<UnitProductionDefinition> ProducibleUnits => producibleUnits;
+        public int QueuedCount => queue.Count + (activeProduction != null ? 1 : 0);
+        public int MaxQueueSize => Mathf.Max(1, maxQueueSize);
+        public UnitProductionDefinition ActiveProduction => activeProduction;
+        public float ActiveProgress => activeProgress;
+        public float ActiveProgress01 => activeProduction != null
+            ? Mathf.Clamp01(activeProgress / activeProduction.ProductionTime)
+            : 0f;
+        public Vector3 RallyPoint => hasRallyPoint ? rallyPoint : transform.position + rallyOffset;
+
+        private void Awake()
+        {
+            ResolveReferences();
+        }
+
+        private void Update()
+        {
+            ResolveReferences();
+            if (!CanProduce())
+            {
+                return;
+            }
+
+            if (activeProduction == null)
+            {
+                TryStartNextProduction();
+            }
+
+            if (activeProduction == null)
+            {
+                return;
+            }
+
+            activeProgress += Time.deltaTime;
+            if (activeProgress >= activeProduction.ProductionTime)
+            {
+                CompleteActiveProduction();
+            }
+        }
+
+        public bool TryEnqueue(int definitionIndex)
+        {
+            if (definitionIndex < 0 || definitionIndex >= producibleUnits.Length)
+            {
+                return false;
+            }
+
+            return TryEnqueue(producibleUnits[definitionIndex]);
+        }
+
+        public bool TryEnqueue(PrototypeUnitType unitType)
+        {
+            for (var i = 0; i < producibleUnits.Length; i++)
+            {
+                var definition = producibleUnits[i];
+                if (definition != null && definition.UnitType == unitType)
+                {
+                    return TryEnqueue(definition);
+                }
+            }
+
+            return false;
+        }
+
+        public bool TryEnqueue(UnitProductionDefinition definition)
+        {
+            ResolveReferences();
+            if (definition == null || definition.UnitPrefab == null || !CanProduce() || QueuedCount >= MaxQueueSize)
+            {
+                return false;
+            }
+
+            if (wallet != null && !wallet.TrySpend(definition.Cost))
+            {
+                return false;
+            }
+
+            queue.Enqueue(definition);
+            TryStartNextProduction();
+            return true;
+        }
+
+        public void SetRallyPoint(Vector3 point)
+        {
+            rallyPoint = point;
+            hasRallyPoint = true;
+        }
+
+        public void Configure(
+            PlayerResourceWallet resourceWallet,
+            ProjectSTilemapWorld world,
+            UnitProductionDefinition[] definitions,
+            int queueSize,
+            Vector3 unitSpawnOffset,
+            Vector3 unitRallyOffset)
+        {
+            wallet = resourceWallet;
+            tilemapWorld = world;
+            producibleUnits = definitions ?? new UnitProductionDefinition[0];
+            maxQueueSize = Mathf.Max(1, queueSize);
+            spawnOffset = unitSpawnOffset;
+            rallyOffset = unitRallyOffset;
+        }
+
+        private void TryStartNextProduction()
+        {
+            if (activeProduction != null || queue.Count <= 0)
+            {
+                return;
+            }
+
+            activeProduction = queue.Dequeue();
+            activeProgress = 0f;
+        }
+
+        private void CompleteActiveProduction()
+        {
+            var definition = activeProduction;
+            activeProduction = null;
+            activeProgress = 0f;
+            if (definition == null || definition.UnitPrefab == null)
+            {
+                TryStartNextProduction();
+                return;
+            }
+
+            var spawnPosition = GetSpawnPosition();
+            var unitObject = Instantiate(definition.UnitPrefab, spawnPosition, Quaternion.identity);
+            unitObject.SetActive(true);
+            var unitStatus = unitObject.GetComponent<PrototypeUnitStatus>();
+            if (unitStatus != null && status != null)
+            {
+                unitStatus.SetTeam(status.Team);
+            }
+
+            var commandAgent = unitObject.GetComponent<UnitCommandAgent>();
+            if (commandAgent != null)
+            {
+                commandAgent.Issue(new UnitCommand(UnitCommandMode.Move, RallyPoint, null, false));
+            }
+
+            TryStartNextProduction();
+        }
+
+        private Vector3 GetSpawnPosition()
+        {
+            var position = transform.position + spawnOffset;
+            if (tilemapWorld == null)
+            {
+                return position;
+            }
+
+            var cell = tilemapWorld.WorldToCell(position);
+            if (tilemapWorld.IsWalkable(cell))
+            {
+                return tilemapWorld.GetCellCenterWorld(cell);
+            }
+
+            const int maxRadius = 5;
+            for (var radius = 1; radius <= maxRadius; radius++)
+            {
+                for (var y = -radius; y <= radius; y++)
+                {
+                    for (var x = -radius; x <= radius; x++)
+                    {
+                        if (Mathf.Max(Mathf.Abs(x), Mathf.Abs(y)) != radius)
+                        {
+                            continue;
+                        }
+
+                        var candidate = cell + new Vector3Int(x, y, 0);
+                        if (tilemapWorld.IsWalkable(candidate))
+                        {
+                            return tilemapWorld.GetCellCenterWorld(candidate);
+                        }
+                    }
+                }
+            }
+
+            return position;
+        }
+
+        private bool CanProduce()
+        {
+            return status != null && status.Completed;
+        }
+
+        private void ResolveReferences()
+        {
+            if (status == null)
+            {
+                status = GetComponent<BuildingStatus>();
+            }
+
+            if (wallet == null && status != null)
+            {
+                wallet = PlayerResourceWallet.FindForTeam(status.Team);
+            }
+
+            if (tilemapWorld == null)
+            {
+                tilemapWorld = ProjectSTilemapWorld.ActiveInstance;
+            }
+        }
+    }
+}

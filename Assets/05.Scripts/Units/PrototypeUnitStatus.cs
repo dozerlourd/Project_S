@@ -77,7 +77,7 @@ namespace ProjectS.Units
         AreaAttack
     }
 
-    public sealed class PrototypeUnitStatus : MonoBehaviour
+    public sealed class PrototypeUnitStatus : MonoBehaviour, IPlayerSelectableTarget
     {
         [Header("Classification")]
         [SerializeField] private UnitTrial trial;
@@ -149,6 +149,9 @@ namespace ProjectS.Units
         public bool CanGatherResources => canGatherResources;
         public bool HasAreaAttack => hasAreaAttack;
         public float AttackArea => attackArea;
+        public string SelectionName => unitType.ToString();
+        public Transform SelectionTransform => transform;
+        public GameObject SelectionGameObject => gameObject;
 
         private void Awake()
         {
@@ -204,6 +207,22 @@ namespace ProjectS.Units
             this.canGatherResources = canGatherResources;
             this.hasAreaAttack = hasAreaAttack;
             this.attackArea = attackArea;
+
+            var commandAgent = GetComponent<UnitCommandAgent>();
+            if (commandAgent != null)
+            {
+                UnitRegistry.Register(commandAgent, this);
+            }
+        }
+
+        public void SetTeam(UnitTeam newTeam)
+        {
+            team = newTeam;
+            var commandAgent = GetComponent<UnitCommandAgent>();
+            if (commandAgent != null)
+            {
+                UnitRegistry.Register(commandAgent, this);
+            }
         }
 
         private void EnsureGroundPathAgent()

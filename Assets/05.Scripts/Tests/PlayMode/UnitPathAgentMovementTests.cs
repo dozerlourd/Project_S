@@ -75,7 +75,47 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(maxSpeed, Is.LessThanOrEqualTo(MovementSpeed + MovementTolerance));
         }
 
+        [UnityTest]
+        public IEnumerator AttackMove_AcquiresNearbyEnemyAndEntersAttackState()
+        {
+            var attacker = CreateMovableUnit("AttackMoveAttacker", Vector3.zero, UnitTeam.Team1);
+            var enemy = CreateMovableUnit("AttackMoveEnemy", new Vector3(0.75f, 0f, 0f), UnitTeam.Team2);
+            var commandAgent = attacker.GetComponent<UnitCommandAgent>();
+            var enemyStatus = enemy.GetComponent<PrototypeUnitStatus>();
+
+            commandAgent.Issue(new UnitCommand(UnitCommandMode.AttackMove, new Vector3(4f, 0f, 0f), null, false));
+            yield return new WaitForSeconds(0.35f);
+
+            Assert.That(commandAgent.PriorityTarget, Is.EqualTo(enemyStatus));
+            Assert.That(commandAgent.ActionState, Is.EqualTo(UnitActionState.AttackingTarget));
+
+            Object.Destroy(attacker);
+            Object.Destroy(enemy);
+        }
+
+        [UnityTest]
+        public IEnumerator UnitRegistry_TracksAgentsByInitializedTeam()
+        {
+            var friendly = CreateMovableUnit("RegistryFriendly", Vector3.zero, UnitTeam.Team1);
+            var enemy = CreateMovableUnit("RegistryEnemy", Vector3.right, UnitTeam.Team2);
+            var friendlyAgent = friendly.GetComponent<UnitCommandAgent>();
+            var enemyAgent = enemy.GetComponent<UnitCommandAgent>();
+
+            yield return null;
+
+            Assert.That(UnitRegistry.GetAgents(UnitTeam.Team1), Does.Contain(friendlyAgent));
+            Assert.That(UnitRegistry.GetAgents(UnitTeam.Team2), Does.Contain(enemyAgent));
+
+            Object.Destroy(friendly);
+            Object.Destroy(enemy);
+        }
+
         private static GameObject CreateMovableUnit(string name, Vector3 position)
+        {
+            return CreateMovableUnit(name, position, UnitTeam.Team1);
+        }
+
+        private static GameObject CreateMovableUnit(string name, Vector3 position, UnitTeam team)
         {
             var unit = new GameObject(name);
             unit.transform.position = position;
@@ -83,7 +123,7 @@ namespace ProjectS.Tests.PlayMode
             var status = unit.AddComponent<PrototypeUnitStatus>();
             status.Initialize(
                 UnitTrial.Human,
-                UnitTeam.Team1,
+                team,
                 PrototypeUnitType.Soldier,
                 MovementDomain.Ground,
                 UnitRole.Combat,
