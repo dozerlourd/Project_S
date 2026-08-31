@@ -19,6 +19,10 @@ namespace ProjectS.Units
         [SerializeField] private float dragSelectThreshold = 8f;
         [SerializeField] private Color dragFillColor = new Color(0.2f, 0.6f, 1f, 0.18f);
         [SerializeField] private Color dragOutlineColor = new Color(0.2f, 0.65f, 1f, 0.85f);
+        [SerializeField] private Color validPlacementColor = new Color(0.1f, 0.85f, 0.25f, 0.35f);
+        [SerializeField] private Color invalidPlacementColor = new Color(1f, 0.16f, 0.1f, 0.35f);
+        [SerializeField] private Color pendingCommandCursorColor = new Color(1f, 0.92f, 0.2f, 0.8f);
+        [SerializeField] private bool logInteractionCommands = true;
 
         private readonly List<UnitCommandAgent> selectedUnits = new List<UnitCommandAgent>();
         private readonly List<UnitCommandAgent>[] controlGroups = new List<UnitCommandAgent>[10];
@@ -26,21 +30,64 @@ namespace ProjectS.Units
         private readonly Collider2D[] interactableHitBuffer = new Collider2D[16];
         private readonly HashSet<Vector3Int> reservedCommandCells = new HashSet<Vector3Int>();
         private readonly HashSet<Vector3Int> occupiedCommandCells = new HashSet<Vector3Int>();
-        private readonly HashSet<PrototypeUnitStatus> highlightedTargets = new HashSet<PrototypeUnitStatus>();
+        private readonly HashSet<IUnitAttackTarget> highlightedTargets = new HashSet<IUnitAttackTarget>();
         private PendingPointCommand pendingPointCommand = PendingPointCommand.None;
         private Vector2 dragStartScreenPosition;
         private Vector2 dragCurrentScreenPosition;
         private IUnitBuildPlacementService pendingBuildPlacementService;
+        private IUnitRallyPointService pendingRallyQueue;
         private bool isLeftMousePressed;
         private bool isDraggingSelection;
         private bool warnedMissingCamera;
         private bool warnedNoSelectedUnits;
         private static Sprite fallbackRingSprite;
 
+        private const float ResourcePanelX = 12f;
+        private const float ResourcePanelTopY = 12f;
+        private const float ResourcePanelWidth = 260f;
+        private const float ResourcePanelHeight = 64f;
+        private const float SelectionPanelX = 12f;
+        private const float SelectionPanelBottomMargin = 12f;
+        private const float SelectionPanelWidth = 360f;
+        private const float SelectionPanelHeight = 220f;
+        private const float CommandPanelRightMargin = 12f;
+        private const float CommandPanelBottomMargin = 12f;
+        private const float CommandPanelWidth = 420f;
+        private const float CommandPanelHeight = 286f;
+        private const float PathStatsPanelRightMargin = 12f;
+        private const float PathStatsPanelTopY = 12f;
+        private const float PathStatsPanelWidth = 280f;
+        private const float PathStatsPanelHeight = 92f;
+
         public static PlayerUnitCommandController ActiveInstance { get; private set; }
         public UnitTeam PlayerTeam => playerTeam;
         public IReadOnlyList<UnitCommandAgent> SelectedUnits => selectedUnits;
         public IPlayerSelectableTarget PrimarySelection { get; private set; }
+        public bool IsBuildPlacementPending => pendingBuildPlacementService != null;
+        public string BuildPlacementStatusMessage
+        {
+            get
+            {
+                if (pendingBuildPlacementService == null)
+                {
+                    return string.Empty;
+                }
+
+                if (selectedUnits.Count == 0)
+                {
+                    return "Select a builder before placing.";
+                }
+
+                if (!TryGetBuildPlacementPoint(out var destination))
+                {
+                    return "Move cursor over the map to place.";
+                }
+
+                return pendingBuildPlacementService.CanPlaceDefaultConstructionSite(destination)
+                    ? "Left-click to place. Right-click or Esc to cancel."
+                    : pendingBuildPlacementService.LastPlacementFailureReason;
+            }
+        }
 
         private enum PendingPointCommand
         {
@@ -117,13 +164,14 @@ namespace ProjectS.Units
 
         private void OnGUI()
         {
-            if (!isDraggingSelection)
+            if (isDraggingSelection)
             {
-                return;
+                var selectionRect = GetGuiSelectionRect(dragStartScreenPosition, dragCurrentScreenPosition);
+                DrawFilledRect(selectionRect, dragFillColor);
+                DrawRectOutline(selectionRect, dragOutlineColor);
             }
 
-            var selectionRect = GetGuiSelectionRect(dragStartScreenPosition, dragCurrentScreenPosition);
-            DrawSelectionRect(selectionRect);
+            DrawPendingCommandPreview();
         }
 
         private void ResolveSceneReferences(bool allowSceneSearch = false)
@@ -146,6 +194,13 @@ namespace ProjectS.Units
 
         private void BeginLeftMouseInteraction(Vector2 screenPosition)
         {
+            if (IsPointerOverRuntimeHud(screenPosition))
+            {
+                isLeftMousePressed = false;
+                isDraggingSelection = false;
+                return;
+            }
+
             isLeftMousePressed = true;
             isDraggingSelection = false;
             dragStartScreenPosition = screenPosition;
@@ -170,8 +225,19 @@ namespace ProjectS.Units
 
         private void EndLeftMouseInteraction(Vector2 screenPosition)
         {
+            if (!isLeftMousePressed)
+            {
+                return;
+            }
+
             dragCurrentScreenPosition = screenPosition;
             isLeftMousePressed = false;
+
+            if (IsPointerOverRuntimeHud(screenPosition))
+            {
+                isDraggingSelection = false;
+                return;
+            }
 
             if (isDraggingSelection)
             {
@@ -192,6 +258,12 @@ namespace ProjectS.Units
                 return;
             }
 
+            if (pendingRallyQueue != null)
+            {
+                CommandRallyPoint();
+                return;
+            }
+
             if (pendingBuildPlacementService != null)
             {
                 CommandBuildPlacement();
@@ -203,10 +275,35 @@ namespace ProjectS.Units
 
         private void HandleRightClick()
         {
+            if (IsPointerOverRuntimeHud(GetMousePosition()))
+            {
+                return;
+            }
+
+            if (pendingPointCommand != PendingPointCommand.None)
+            {
+                CommandPendingPointClick(pendingPointCommand);
+                pendingPointCommand = PendingPointCommand.None;
+                return;
+            }
+
+            if (pendingRallyQueue != null)
+            {
+                CommandRallyPoint();
+                return;
+            }
+
+            if (pendingBuildPlacementService != null)
+            {
+                CancelBuildPlacement();
+                return;
+            }
+
             pendingPointCommand = PendingPointCommand.None;
             pendingBuildPlacementService = null;
+            pendingRallyQueue = null;
 
-            if (TryGetUnitUnderCursor(out var target) && target.Team != playerTeam)
+            if (TryGetAttackTargetUnderCursor(out var target) && target.Team != playerTeam)
             {
                 CommandFocusAttack(target);
                 return;
@@ -330,7 +427,7 @@ namespace ProjectS.Units
         private void CommandPendingPointClick(PendingPointCommand pointCommand)
         {
             if (pointCommand == PendingPointCommand.AttackMove
-                && TryGetUnitUnderCursor(out var target)
+                && TryGetAttackTargetUnderCursor(out var target)
                 && target.Team != playerTeam)
             {
                 CommandFocusAttack(target);
@@ -340,7 +437,7 @@ namespace ProjectS.Units
             CommandPointFromCursor(pointCommand);
         }
 
-        private void CommandFocusAttack(PrototypeUnitStatus target)
+        private void CommandFocusAttack(IUnitAttackTarget target)
         {
             if (selectedUnits.Count == 0)
             {
@@ -348,7 +445,7 @@ namespace ProjectS.Units
                 return;
             }
 
-            IssueToSelected(new UnitCommand(UnitCommandMode.FocusAttack, target.transform.position, target, false));
+            IssueToSelected(new UnitCommand(UnitCommandMode.FocusAttack, target.SelectionTransform.position, target, false));
             SetTargetVisible(target, true);
         }
 
@@ -360,6 +457,13 @@ namespace ProjectS.Units
                 return;
             }
 
+            if (logInteractionCommands)
+            {
+                Debug.Log(
+                    $"Right-click interaction command issued to {selectedUnits.Count} selected unit(s): {FormatInteractableTargetName(target)}.",
+                    this);
+            }
+
             IssueToSelected(new UnitCommand(UnitCommandMode.Interact, target.InteractionPoint, null, target, false));
         }
 
@@ -368,11 +472,12 @@ namespace ProjectS.Units
             if (pendingBuildPlacementService == null || selectedUnits.Count == 0)
             {
                 pendingBuildPlacementService = null;
+                pendingRallyQueue = null;
                 WarnCommandBlockedReason();
                 return;
             }
 
-            if (!TryGetCommandPoint(out var destination))
+            if (!TryGetBuildPlacementPoint(out var destination))
             {
                 return;
             }
@@ -386,8 +491,50 @@ namespace ProjectS.Units
                     null,
                     constructionSite,
                     false));
+                pendingBuildPlacementService = null;
+                return;
             }
 
+            WarnPlacementFailure();
+        }
+
+        private void CancelBuildPlacement()
+        {
+            pendingBuildPlacementService = null;
+            pendingRallyQueue = null;
+        }
+
+        private void WarnPlacementFailure()
+        {
+            if (!logCommandWarnings || pendingBuildPlacementService == null)
+            {
+                return;
+            }
+
+            var reason = pendingBuildPlacementService.LastPlacementFailureReason;
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                reason = "Building placement failed.";
+            }
+
+            Debug.LogWarning(reason, this);
+        }
+
+        private void CommandRallyPoint()
+        {
+            if (pendingRallyQueue == null)
+            {
+                return;
+            }
+
+            if (!TryGetCommandPoint(out var destination))
+            {
+                return;
+            }
+
+            pendingRallyQueue.SetRallyPoint(destination);
+            pendingRallyQueue = null;
+            pendingPointCommand = PendingPointCommand.None;
             pendingBuildPlacementService = null;
         }
 
@@ -395,30 +542,42 @@ namespace ProjectS.Units
         {
             pendingPointCommand = PendingPointCommand.Move;
             pendingBuildPlacementService = null;
+            pendingRallyQueue = null;
         }
 
         public void BeginAttackMoveCommand()
         {
             pendingPointCommand = PendingPointCommand.AttackMove;
             pendingBuildPlacementService = null;
+            pendingRallyQueue = null;
         }
 
         public void BeginPatrolCommand()
         {
             pendingPointCommand = PendingPointCommand.Patrol;
             pendingBuildPlacementService = null;
+            pendingRallyQueue = null;
         }
 
         public void BeginBuildPlacement(IUnitBuildPlacementService placementService)
         {
             pendingPointCommand = PendingPointCommand.None;
             pendingBuildPlacementService = placementService;
+            pendingRallyQueue = null;
+        }
+
+        public void BeginRallyPointCommand(IUnitRallyPointService productionQueue)
+        {
+            pendingPointCommand = PendingPointCommand.None;
+            pendingBuildPlacementService = null;
+            pendingRallyQueue = productionQueue;
         }
 
         public void StopSelectedUnits()
         {
             pendingPointCommand = PendingPointCommand.None;
             pendingBuildPlacementService = null;
+            pendingRallyQueue = null;
             foreach (var unit in selectedUnits)
             {
                 unit?.Stop();
@@ -429,6 +588,7 @@ namespace ProjectS.Units
         {
             pendingPointCommand = PendingPointCommand.None;
             pendingBuildPlacementService = null;
+            pendingRallyQueue = null;
             foreach (var unit in selectedUnits)
             {
                 unit?.HoldPosition();
@@ -501,19 +661,32 @@ namespace ProjectS.Units
                 return;
             }
 
+            if (keyboard.escapeKey.wasPressedThisFrame)
+            {
+                pendingPointCommand = PendingPointCommand.None;
+                CancelBuildPlacement();
+                return;
+            }
+
             if (keyboard.aKey.wasPressedThisFrame)
             {
                 pendingPointCommand = PendingPointCommand.AttackMove;
+                pendingBuildPlacementService = null;
+                pendingRallyQueue = null;
             }
 
             if (keyboard.pKey.wasPressedThisFrame)
             {
                 pendingPointCommand = PendingPointCommand.Patrol;
+                pendingBuildPlacementService = null;
+                pendingRallyQueue = null;
             }
 
             if (keyboard.sKey.wasPressedThisFrame)
             {
                 pendingPointCommand = PendingPointCommand.None;
+                pendingBuildPlacementService = null;
+                pendingRallyQueue = null;
                 foreach (var unit in selectedUnits)
                 {
                     unit?.Stop();
@@ -523,6 +696,8 @@ namespace ProjectS.Units
             if (keyboard.hKey.wasPressedThisFrame)
             {
                 pendingPointCommand = PendingPointCommand.None;
+                pendingBuildPlacementService = null;
+                pendingRallyQueue = null;
                 foreach (var unit in selectedUnits)
                 {
                     unit?.HoldPosition();
@@ -572,6 +747,52 @@ namespace ProjectS.Units
         private bool TryGetCommandPoint(out Vector3 destination)
         {
             destination = Vector3.zero;
+            if (!TryGetCursorWorldPoint(out destination))
+            {
+                return false;
+            }
+
+            if (navigator != null)
+            {
+                if (!navigator.TryGetCommandPoint(destination, out var tilemapDestination))
+                {
+                    return false;
+                }
+
+                destination = tilemapDestination;
+            }
+
+            return true;
+        }
+
+        private bool TryGetBuildPlacementPoint(out Vector3 destination)
+        {
+            destination = Vector3.zero;
+            if (!TryGetCursorWorldPoint(out destination))
+            {
+                return false;
+            }
+
+            var tilemapWorld = navigator != null ? navigator.TilemapWorld : null;
+            if (tilemapWorld == null)
+            {
+                return true;
+            }
+
+            var cell = tilemapWorld.WorldToCell(destination);
+            if (!tilemapWorld.ContainsCell(cell))
+            {
+                return false;
+            }
+
+            destination = tilemapWorld.GetCellCenterWorld(cell);
+            destination.z = commandPlaneZ;
+            return true;
+        }
+
+        private bool TryGetCursorWorldPoint(out Vector3 worldPosition)
+        {
+            worldPosition = Vector3.zero;
             if (commandCamera == null)
             {
                 return false;
@@ -584,18 +805,8 @@ namespace ProjectS.Units
                 return false;
             }
 
-            destination = ray.GetPoint(enter);
-            destination.z = commandPlaneZ;
-            if (navigator != null)
-            {
-                if (!navigator.TryGetCommandPoint(destination, out var tilemapDestination))
-                {
-                    return false;
-                }
-
-                destination = tilemapDestination;
-            }
-
+            worldPosition = ray.GetPoint(enter);
+            worldPosition.z = commandPlaneZ;
             return true;
         }
 
@@ -618,7 +829,11 @@ namespace ProjectS.Units
                 return false;
             }
 
-            var worldPosition = commandCamera.ScreenToWorldPoint(GetMousePosition());
+            if (!TryGetCursorWorldPoint(out var worldPosition))
+            {
+                return false;
+            }
+
             var filter = new ContactFilter2D
             {
                 useLayerMask = true,
@@ -652,7 +867,7 @@ namespace ProjectS.Units
             return status != null;
         }
 
-        private bool TryGetInteractableUnderCursor(out IUnitInteractableTarget target)
+        private bool TryGetAttackTargetUnderCursor(out IUnitAttackTarget target)
         {
             target = null;
             if (commandCamera == null)
@@ -660,7 +875,59 @@ namespace ProjectS.Units
                 return false;
             }
 
-            var worldPosition = commandCamera.ScreenToWorldPoint(GetMousePosition());
+            if (!TryGetCursorWorldPoint(out var worldPosition))
+            {
+                return false;
+            }
+
+            var filter = new ContactFilter2D
+            {
+                useLayerMask = true,
+                layerMask = unitSelectionMask,
+                useTriggers = true
+            };
+
+            var hitCount = Physics2D.OverlapCircle(worldPosition, Mathf.Max(0.01f, clickSelectionRadius), filter, unitHitBuffer);
+            if (hitCount <= 0)
+            {
+                return false;
+            }
+
+            var closestDistance = float.PositiveInfinity;
+            for (var i = 0; i < hitCount; i++)
+            {
+                var candidate = unitHitBuffer[i].GetComponentInParent<IUnitAttackTarget>();
+                if (candidate == null || !candidate.IsAlive || candidate.SelectionTransform == null)
+                {
+                    continue;
+                }
+
+                var distance = Vector2.SqrMagnitude(
+                    (Vector2)candidate.SelectionTransform.position - (Vector2)worldPosition);
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    target = candidate;
+                }
+            }
+
+            return target != null;
+        }
+
+        private bool TryGetInteractableUnderCursor(out IUnitInteractableTarget target)
+        {
+            target = null;
+            if (!TryGetCursorWorldPoint(out var worldPosition))
+            {
+                return false;
+            }
+
+            return TryGetInteractableAtWorldPoint(worldPosition, out target);
+        }
+
+        public bool TryGetInteractableAtWorldPoint(Vector3 worldPosition, out IUnitInteractableTarget target)
+        {
+            target = null;
             var filter = new ContactFilter2D
             {
                 useLayerMask = true,
@@ -707,7 +974,11 @@ namespace ProjectS.Units
                 return false;
             }
 
-            var worldPosition = commandCamera.ScreenToWorldPoint(GetMousePosition());
+            if (!TryGetCursorWorldPoint(out var worldPosition))
+            {
+                return false;
+            }
+
             var filter = new ContactFilter2D
             {
                 useLayerMask = true,
@@ -841,7 +1112,10 @@ namespace ProjectS.Units
                 }
 
                 var target = unit.PriorityTarget;
-                if (target == null || target.Team == playerTeam || !target.gameObject.activeInHierarchy)
+                if (target == null
+                    || target.Team == playerTeam
+                    || target.SelectionGameObject == null
+                    || !target.SelectionGameObject.activeInHierarchy)
                 {
                     continue;
                 }
@@ -855,17 +1129,17 @@ namespace ProjectS.Units
             }
         }
 
-        private static void SetTargetVisible(PrototypeUnitStatus target, bool visible)
+        private static void SetTargetVisible(IUnitAttackTarget target, bool visible)
         {
-            if (target == null)
+            if (target == null || target.SelectionTransform == null)
             {
                 return;
             }
 
-            var ring = target.transform.Find("TargetRing");
+            var ring = target.SelectionTransform.Find("TargetRing");
             if (ring == null)
             {
-                ring = CreateTargetRing(target.transform);
+                ring = CreateTargetRing(target.SelectionTransform);
             }
 
             ring.gameObject.SetActive(visible);
@@ -1121,19 +1395,180 @@ namespace ProjectS.Units
 
         private void DrawSelectionRect(Rect rect)
         {
+            DrawFilledRect(rect, dragFillColor);
+            DrawRectOutline(rect, dragOutlineColor);
+        }
+
+        private void DrawPendingCommandPreview()
+        {
+            if (pendingPointCommand == PendingPointCommand.None
+                && pendingBuildPlacementService == null
+                && pendingRallyQueue == null)
+            {
+                return;
+            }
+
+            Vector3 destination;
+            var hasDestination = pendingBuildPlacementService != null
+                ? TryGetBuildPlacementPoint(out destination)
+                : TryGetCommandPoint(out destination);
+            if (!hasDestination || commandCamera == null)
+            {
+                return;
+            }
+
+            var screenPosition = commandCamera.WorldToScreenPoint(destination);
+            if (screenPosition.z < 0f)
+            {
+                return;
+            }
+
+            var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
+            if (pendingBuildPlacementService != null)
+            {
+                DrawBuildPlacementPreview(destination, guiPosition);
+                return;
+            }
+
+            DrawPointCommandPreview(guiPosition);
+        }
+
+        private void DrawBuildPlacementPreview(Vector3 destination, Vector2 guiPosition)
+        {
+            const float cellPixelSize = 18f;
+            var previewCells = pendingBuildPlacementService.GetDefaultConstructionSitePreviewCells(destination);
+            var canPlace = pendingBuildPlacementService.CanPlaceDefaultConstructionSite(destination);
+            var invalidBecauseOfGlobalState = !canPlace && !HasInvalidPreviewCell(previewCells);
+
+            if (previewCells == null || previewCells.Count == 0)
+            {
+                var fallbackColor = canPlace ? validPlacementColor : invalidPlacementColor;
+                var fallbackRect = new Rect(
+                    guiPosition.x - cellPixelSize * 0.5f,
+                    guiPosition.y - cellPixelSize * 0.5f,
+                    cellPixelSize,
+                    cellPixelSize);
+                DrawFilledRect(fallbackRect, fallbackColor);
+                DrawRectOutline(fallbackRect, new Color(fallbackColor.r, fallbackColor.g, fallbackColor.b, 0.95f));
+                return;
+            }
+
+            for (var i = 0; i < previewCells.Count; i++)
+            {
+                var previewCell = previewCells[i];
+                var screenPosition = commandCamera.WorldToScreenPoint(previewCell.WorldCenter);
+                if (screenPosition.z < 0f)
+                {
+                    continue;
+                }
+
+                var cellGuiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
+                var color = previewCell.CanPlace && !invalidBecauseOfGlobalState
+                    ? validPlacementColor
+                    : invalidPlacementColor;
+                var rect = new Rect(
+                    cellGuiPosition.x - cellPixelSize * 0.5f,
+                    cellGuiPosition.y - cellPixelSize * 0.5f,
+                    cellPixelSize,
+                    cellPixelSize);
+                DrawFilledRect(rect, color);
+                DrawRectOutline(rect, new Color(color.r, color.g, color.b, 0.95f));
+            }
+        }
+
+        private static bool HasInvalidPreviewCell(IReadOnlyList<UnitBuildPlacementPreviewCell> previewCells)
+        {
+            if (previewCells == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < previewCells.Count; i++)
+            {
+                if (!previewCells[i].CanPlace)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void DrawPointCommandPreview(Vector2 guiPosition)
+        {
+            const float size = 18f;
+            var horizontal = new Rect(guiPosition.x - size * 0.5f, guiPosition.y - 1f, size, 2f);
+            var vertical = new Rect(guiPosition.x - 1f, guiPosition.y - size * 0.5f, 2f, size);
+            DrawFilledRect(horizontal, pendingCommandCursorColor);
+            DrawFilledRect(vertical, pendingCommandCursorColor);
+        }
+
+        private static void DrawFilledRect(Rect rect, Color color)
+        {
             var fillTexture = Texture2D.whiteTexture;
             var previousColor = GUI.color;
 
-            GUI.color = dragFillColor;
+            GUI.color = color;
             GUI.DrawTexture(rect, fillTexture);
+            GUI.color = previousColor;
+        }
 
-            GUI.color = dragOutlineColor;
+        private static void DrawRectOutline(Rect rect, Color color)
+        {
+            var fillTexture = Texture2D.whiteTexture;
+            var previousColor = GUI.color;
+
+            GUI.color = color;
             GUI.DrawTexture(new Rect(rect.xMin, rect.yMin, rect.width, 1f), fillTexture);
             GUI.DrawTexture(new Rect(rect.xMin, rect.yMax - 1f, rect.width, 1f), fillTexture);
             GUI.DrawTexture(new Rect(rect.xMin, rect.yMin, 1f, rect.height), fillTexture);
             GUI.DrawTexture(new Rect(rect.xMax - 1f, rect.yMin, 1f, rect.height), fillTexture);
 
             GUI.color = previousColor;
+        }
+
+        private static bool IsPointerOverRuntimeHud(Vector2 screenPosition)
+        {
+            return IsScreenPointInGuiRect(screenPosition, new Rect(ResourcePanelX, ResourcePanelTopY, ResourcePanelWidth, ResourcePanelHeight))
+                || IsScreenPointInGuiRect(
+                    screenPosition,
+                    new Rect(
+                        SelectionPanelX,
+                        Screen.height - SelectionPanelHeight - SelectionPanelBottomMargin,
+                        SelectionPanelWidth,
+                        SelectionPanelHeight))
+                || IsScreenPointInGuiRect(
+                    screenPosition,
+                    new Rect(
+                        Screen.width - CommandPanelWidth - CommandPanelRightMargin,
+                        Screen.height - CommandPanelHeight - CommandPanelBottomMargin,
+                        CommandPanelWidth,
+                        CommandPanelHeight))
+                || IsScreenPointInGuiRect(
+                    screenPosition,
+                    new Rect(
+                        Screen.width - PathStatsPanelWidth - PathStatsPanelRightMargin,
+                        PathStatsPanelTopY,
+                        PathStatsPanelWidth,
+                        PathStatsPanelHeight));
+        }
+
+        private static bool IsScreenPointInGuiRect(Vector2 screenPosition, Rect guiRect)
+        {
+            var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
+            return guiRect.Contains(guiPosition);
+        }
+
+        private static string FormatInteractableTargetName(IUnitInteractableTarget target)
+        {
+            if (target == null)
+            {
+                return "MissingTarget";
+            }
+
+            return target is Component component && component != null
+                ? component.gameObject.name
+                : target.GetType().Name;
         }
 
         private static KeyControl GetDigitKey(Keyboard keyboard, int digit)

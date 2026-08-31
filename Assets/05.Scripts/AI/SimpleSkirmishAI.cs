@@ -37,6 +37,13 @@ namespace ProjectS.AI
 
         private void Update()
         {
+            if (ProjectS.RtsMatchController.ActiveInstance != null
+                && ProjectS.RtsMatchController.ActiveInstance.IsMatchOver)
+            {
+                enabled = false;
+                return;
+            }
+
             if (Time.time < nextDecisionTime)
             {
                 return;

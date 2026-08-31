@@ -12,6 +12,7 @@ namespace ProjectS.Resources
         [SerializeField, Min(1)] private int carryCapacity = 5;
         [SerializeField, Min(0.1f)] private float fallbackGatherRange = 0.85f;
         [SerializeField, Min(0.1f)] private float fallbackDropOffRange = 1.25f;
+        [SerializeField] private bool logGathering = true;
 
         private PrototypeUnitStatus status;
         private UnitCommandAgent commandAgent;
@@ -22,10 +23,12 @@ namespace ProjectS.Resources
         private GatherState state = GatherState.Idle;
         private int carriedAmount;
         private float gatherTimer;
+        private string lastFailureReason;
 
         public bool HasCarriedResources => carriedAmount > 0;
         public ResourceType CarriedType => carriedType;
         public int CarriedAmount => carriedAmount;
+        public string LastFailureReason => lastFailureReason;
 
         private void Awake()
         {
@@ -47,7 +50,7 @@ namespace ProjectS.Resources
                 return;
             }
 
-            if (targetNode == null || (!targetNode.CanGather() && carriedAmount <= 0))
+            if (targetNode == null || (!targetNode.isActiveAndEnabled && carriedAmount <= 0) || (!targetNode.CanGather() && carriedAmount <= 0))
             {
                 CancelGathering(true);
                 return;
@@ -78,8 +81,14 @@ namespace ProjectS.Resources
             {
                 targetDropOff = dropOff;
                 state = GatherState.ReturningToDropOff;
+                LogGathering($"Returning carried {carriedAmount} {carriedType} to {FormatTargetName(targetDropOff)}.");
                 pathAgent.MoveTo(targetDropOff.InteractionPoint);
                 return true;
+            }
+
+            if (target is ResourceDropOff)
+            {
+                return Fail("Cannot deposit resources at an enemy or unavailable drop-off.");
             }
 
             return false;
@@ -89,14 +98,17 @@ namespace ProjectS.Resources
         {
             if (status == null || !status.CanGatherResources || resourceNode == null || !resourceNode.CanGather())
             {
-                return false;
+                return Fail("Cannot start gathering because the worker or resource node is unavailable.");
             }
 
             targetNode = resourceNode;
             targetDropOff = null;
             carriedAmount = 0;
             gatherTimer = 0f;
+            lastFailureReason = string.Empty;
             state = GatherState.MovingToResource;
+            LogGathering($"Accepted resource gather command for {FormatTargetName(targetNode)}.");
+            LogGathering($"Started gathering route to {FormatTargetName(targetNode)}.");
             pathAgent.MoveTo(targetNode.InteractionPoint);
             return true;
         }
@@ -122,6 +134,7 @@ namespace ProjectS.Resources
             pathAgent.ClearPath();
             gatherTimer = 0f;
             state = GatherState.Gathering;
+            LogGathering($"Started gathering {targetNode.ResourceType} from {FormatTargetName(targetNode)}.");
         }
 
         private void UpdateGathering()
@@ -146,15 +159,20 @@ namespace ProjectS.Resources
                 return;
             }
 
+            LogGathering(
+                $"Gathered {carriedAmount} {carriedType} from {FormatTargetName(targetNode)}. Remaining: {targetNode.RemainingAmount}.");
+
             targetDropOff = ResourceDropOff.FindNearest(status.Team, transform.position);
             if (targetDropOff == null)
             {
+                Fail("No available resource drop-off found for carried resources.");
                 state = GatherState.Idle;
                 commandAgent.Stop();
                 return;
             }
 
             state = GatherState.ReturningToDropOff;
+            LogGathering($"Found drop-off {FormatTargetName(targetDropOff)}. Returning with {carriedAmount} {carriedType}.");
             pathAgent.MoveTo(targetDropOff.InteractionPoint);
         }
 
@@ -165,10 +183,14 @@ namespace ProjectS.Resources
                 targetDropOff = ResourceDropOff.FindNearest(status.Team, transform.position);
                 if (targetDropOff == null)
                 {
+                    Fail("Lost access to a resource drop-off while returning carried resources.");
+                    state = GatherState.Idle;
+                    commandAgent.Stop();
                     return;
                 }
 
                 pathAgent.MoveTo(targetDropOff.InteractionPoint);
+                LogGathering($"Repathing to replacement drop-off {FormatTargetName(targetDropOff)}.");
             }
 
             if (!IsInRange(targetDropOff.InteractionPoint, Mathf.Max(fallbackDropOffRange, targetDropOff.InteractionRange)))
@@ -182,15 +204,24 @@ namespace ProjectS.Resources
             }
 
             var deposited = targetDropOff.TryDeposit(status.Team, CreateCarriedAmount());
+            var depositedAmount = carriedAmount;
+            var depositedType = carriedType;
             carriedAmount = 0;
-            if (!deposited || targetNode == null || !targetNode.CanGather())
+            if (!deposited || targetNode == null || !targetNode.isActiveAndEnabled || !targetNode.CanGather())
             {
+                if (!deposited)
+                {
+                    Fail("Failed to deposit carried resources.");
+                }
+
                 state = GatherState.Idle;
                 commandAgent.Stop();
                 return;
             }
 
+            LogGathering($"Deposited {depositedAmount} {depositedType} at {FormatTargetName(targetDropOff)}.");
             state = GatherState.MovingToResource;
+            LogGathering($"Repeating gather route to {FormatTargetName(targetNode)}.");
             pathAgent.MoveTo(targetNode.InteractionPoint);
         }
 
@@ -217,6 +248,26 @@ namespace ProjectS.Resources
             {
                 commandAgent.Stop();
             }
+        }
+
+        private bool Fail(string reason)
+        {
+            lastFailureReason = reason;
+            Debug.LogWarning(reason, this);
+            return false;
+        }
+
+        private void LogGathering(string message)
+        {
+            if (logGathering)
+            {
+                Debug.Log($"[WorkerGather] {name}: {message}", this);
+            }
+        }
+
+        private static string FormatTargetName(Component target)
+        {
+            return target != null ? target.gameObject.name : "MissingTarget";
         }
 
         private enum GatherState

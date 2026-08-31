@@ -15,6 +15,8 @@ namespace ProjectS.Resources
         [SerializeField, Min(0f)] private float gatherDuration = 1.5f;
         [SerializeField, Min(0.1f)] private float interactionRange = 0.85f;
         [SerializeField] private bool depleteWhenEmpty = true;
+        [SerializeField] private bool fitClickColliderToVisualBounds = true;
+        [SerializeField, Min(0f)] private float clickColliderPadding = 0.05f;
 
         public Vector3 InteractionPoint => transform.position;
         public float InteractionRange => interactionRange;
@@ -24,6 +26,11 @@ namespace ProjectS.Resources
         public float GatherDuration => gatherDuration;
         public bool IsDepleted => totalAmount <= 0;
         public static IReadOnlyList<ResourceNode> AllNodes => Nodes;
+
+        private void Awake()
+        {
+            FitClickColliderToVisualBounds();
+        }
 
         private void OnEnable()
         {
@@ -45,7 +52,14 @@ namespace ProjectS.Resources
             for (var i = 0; i < Nodes.Count; i++)
             {
                 var node = Nodes[i];
-                if (node == null || node.resourceType != type || !node.CanGather())
+                if (node == null)
+                {
+                    Nodes.RemoveAt(i);
+                    i--;
+                    continue;
+                }
+
+                if (!node.isActiveAndEnabled || node.resourceType != type || !node.CanGather())
                 {
                     continue;
                 }
@@ -69,6 +83,8 @@ namespace ProjectS.Resources
             gatherAmountPerTrip = Mathf.Max(1, gatherAmountPerTrip);
             gatherDuration = Mathf.Max(0f, gatherDuration);
             interactionRange = Mathf.Max(0.1f, interactionRange);
+            clickColliderPadding = Mathf.Max(0f, clickColliderPadding);
+            FitClickColliderToVisualBounds();
         }
 
         public bool CanInteract(UnitCommandAgent agent)
@@ -113,6 +129,40 @@ namespace ProjectS.Resources
             }
 
             return gathered;
+        }
+
+        private void FitClickColliderToVisualBounds()
+        {
+            if (!fitClickColliderToVisualBounds)
+            {
+                return;
+            }
+
+            var boxCollider = GetComponent<BoxCollider2D>();
+            var spriteRenderer = GetComponent<SpriteRenderer>();
+            if (boxCollider == null || spriteRenderer == null || spriteRenderer.sprite == null)
+            {
+                return;
+            }
+
+            var visualBounds = spriteRenderer.bounds;
+            var scale = transform.lossyScale;
+            var scaleX = Mathf.Approximately(scale.x, 0f) ? 1f : Mathf.Abs(scale.x);
+            var scaleY = Mathf.Approximately(scale.y, 0f) ? 1f : Mathf.Abs(scale.y);
+            var visualSize = new Vector2(
+                visualBounds.size.x / scaleX + clickColliderPadding * 2f,
+                visualBounds.size.y / scaleY + clickColliderPadding * 2f);
+
+            if (visualSize.x <= 0f || visualSize.y <= 0f)
+            {
+                return;
+            }
+
+            boxCollider.size = new Vector2(
+                Mathf.Max(boxCollider.size.x, visualSize.x),
+                Mathf.Max(boxCollider.size.y, visualSize.y));
+            boxCollider.offset = transform.InverseTransformPoint(visualBounds.center);
+            boxCollider.isTrigger = true;
         }
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.Units;
@@ -7,6 +8,8 @@ namespace ProjectS.Buildings
 {
     public sealed class ConstructionSite : MonoBehaviour, IUnitInteractableTarget
     {
+        private static readonly List<ConstructionSite> ActiveSites = new List<ConstructionSite>();
+
         [SerializeField] private UnitTeam team = UnitTeam.Team1;
         [SerializeField] private BuildingKind completedBuildingKind = BuildingKind.MainBase;
         [SerializeField] private Vector2Int footprint = new Vector2Int(2, 2);
@@ -16,6 +19,7 @@ namespace ProjectS.Buildings
         [SerializeField] private bool addResourceDropOffOnComplete = true;
         [SerializeField] private GameObject completedBuildingPrefab;
 
+        private static string lastCreateFailureReason;
         private float buildProgress;
         private bool completed;
 
@@ -27,6 +31,7 @@ namespace ProjectS.Buildings
         public float BuildProgress => buildProgress;
         public float BuildProgress01 => Mathf.Clamp01(buildProgress / BuildTime);
         public bool Completed => completed;
+        public static string LastCreateFailureReason => lastCreateFailureReason;
 
         private void OnValidate()
         {
@@ -38,6 +43,19 @@ namespace ProjectS.Buildings
         private void Awake()
         {
             EnsureCollider();
+        }
+
+        private void OnEnable()
+        {
+            if (!ActiveSites.Contains(this))
+            {
+                ActiveSites.Add(this);
+            }
+        }
+
+        private void OnDisable()
+        {
+            ActiveSites.Remove(this);
         }
 
         public void Initialize(
@@ -56,6 +74,7 @@ namespace ProjectS.Buildings
             completedBuildingPrefab = finishedPrefab;
             buildProgress = 0f;
             completed = false;
+            EnsureCollider();
         }
 
         public bool CanInteract(UnitCommandAgent agent)
@@ -85,21 +104,44 @@ namespace ProjectS.Buildings
 
         public static bool CanPlace(ProjectSTilemapWorld tilemapWorld, Vector3 worldPosition, Vector2Int footprint)
         {
-            if (tilemapWorld == null)
-            {
-                return true;
-            }
+            return string.IsNullOrEmpty(GetPlacementFailureReason(tilemapWorld, worldPosition, footprint));
+        }
 
-            var centerCell = tilemapWorld.WorldToCell(worldPosition);
-            foreach (var cell in EnumerateFootprintCells(centerCell, footprint))
+        public static string GetPlacementFailureReason(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3 worldPosition,
+            Vector2Int footprint)
+        {
+            var previewCells = GetPlacementPreviewCells(tilemapWorld, worldPosition, footprint);
+            for (var i = 0; i < previewCells.Count; i++)
             {
-                if (!tilemapWorld.IsBuildable(cell))
+                if (!previewCells[i].CanPlace)
                 {
-                    return false;
+                    return previewCells[i].FailureReason;
                 }
             }
 
-            return true;
+            return string.Empty;
+        }
+
+        public static IReadOnlyList<UnitBuildPlacementPreviewCell> GetPlacementPreviewCells(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3 worldPosition,
+            Vector2Int footprint)
+        {
+            footprint = SanitizeFootprint(footprint);
+            var previewCells = new List<UnitBuildPlacementPreviewCell>();
+            var centerCell = tilemapWorld != null ? tilemapWorld.WorldToCell(worldPosition) : Vector3Int.zero;
+            foreach (var cell in EnumerateFootprintCells(centerCell, footprint))
+            {
+                var cellCenter = tilemapWorld != null
+                    ? tilemapWorld.GetCellCenterWorld(cell)
+                    : worldPosition + new Vector3(cell.x - centerCell.x, cell.y - centerCell.y, 0f);
+                var reason = GetCellPlacementFailureReason(tilemapWorld, cell, cellCenter);
+                previewCells.Add(new UnitBuildPlacementPreviewCell(cellCenter, string.IsNullOrEmpty(reason), reason));
+            }
+
+            return previewCells;
         }
 
         public static bool TryCreate(
@@ -116,13 +158,29 @@ namespace ProjectS.Buildings
             out ConstructionSite site)
         {
             site = null;
-            if (!CanPlace(tilemapWorld, worldPosition, footprint))
+            var placementFailureReason = GetPlacementFailureReason(tilemapWorld, worldPosition, footprint);
+            if (!string.IsNullOrEmpty(placementFailureReason))
             {
+                FailCreate($"Cannot place {buildingKind} construction site at {worldPosition}: {placementFailureReason}");
+                return false;
+            }
+
+            if (!cost.IsEmpty && wallet == null)
+            {
+                FailCreate($"Cannot place {buildingKind} construction site: no resource wallet is available for {team}.");
+                return false;
+            }
+
+            if (wallet != null && wallet.Team != team)
+            {
+                FailCreate(
+                    $"Cannot place {buildingKind} construction site: wallet team mismatch. Expected {team}, received {wallet.Team}.");
                 return false;
             }
 
             if (wallet != null && !wallet.TrySpend(cost))
             {
+                FailCreate($"Cannot place {buildingKind} construction site: insufficient resources for cost ({cost}).");
                 return false;
             }
 
@@ -138,6 +196,7 @@ namespace ProjectS.Buildings
             }
 
             site.Initialize(team, buildingKind, footprint, cost, buildTime, completedBuildingPrefab);
+            lastCreateFailureReason = string.Empty;
             return true;
         }
 
@@ -196,15 +255,211 @@ namespace ProjectS.Buildings
                 boxCollider = gameObject.AddComponent<BoxCollider2D>();
             }
 
-            boxCollider.size = new Vector2(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
+            var sanitizedFootprint = SanitizeFootprint(footprint);
+            boxCollider.size = new Vector2(sanitizedFootprint.x, sanitizedFootprint.y);
             boxCollider.isTrigger = true;
+        }
+
+        private static void FailCreate(string reason)
+        {
+            lastCreateFailureReason = reason;
+            Debug.LogWarning(reason);
+        }
+
+        private static string GetCellPlacementFailureReason(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3Int cell,
+            Vector3 cellCenter)
+        {
+            if (tilemapWorld != null && !tilemapWorld.IsBuildable(cell))
+            {
+                return $"cell {cell} is not buildable.";
+            }
+
+            if (IsOccupiedByConstructionSite(tilemapWorld, cell, cellCenter))
+            {
+                return $"cell {cell} is occupied by another construction site.";
+            }
+
+            if (IsOccupiedByBuilding(tilemapWorld, cell, cellCenter))
+            {
+                return $"cell {cell} is occupied by a building.";
+            }
+
+            if (IsOccupiedByResource(tilemapWorld, cell, cellCenter))
+            {
+                return $"cell {cell} is occupied by a resource node.";
+            }
+
+            if (IsOccupiedByUnit(tilemapWorld, cell, cellCenter))
+            {
+                return $"cell {cell} is occupied by a unit.";
+            }
+
+            return string.Empty;
+        }
+
+        private static bool IsOccupiedByConstructionSite(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3Int cell,
+            Vector3 cellCenter)
+        {
+            for (var i = ActiveSites.Count - 1; i >= 0; i--)
+            {
+                var site = ActiveSites[i];
+                if (site == null)
+                {
+                    ActiveSites.RemoveAt(i);
+                    continue;
+                }
+
+                if (!site.isActiveAndEnabled || site.completed)
+                {
+                    continue;
+                }
+
+                if (OccupiesCell(tilemapWorld, site.transform.position, site.footprint, cell, cellCenter))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsOccupiedByBuilding(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3Int cell,
+            Vector3 cellCenter)
+        {
+            var buildings = BuildingRegistry.All;
+            for (var i = buildings.Count - 1; i >= 0; i--)
+            {
+                var building = buildings[i];
+                if (building == null || !building.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
+                if (OccupiesCell(tilemapWorld, building.transform.position, building.Footprint, cell, cellCenter))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsOccupiedByResource(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3Int cell,
+            Vector3 cellCenter)
+        {
+            var resources = ResourceNode.AllNodes;
+            for (var i = 0; i < resources.Count; i++)
+            {
+                var resource = resources[i];
+                if (resource == null || !resource.isActiveAndEnabled || resource.IsDepleted)
+                {
+                    continue;
+                }
+
+                if (OccupiesColliderCell(tilemapWorld, resource.GetComponent<Collider2D>(), resource.transform.position, cell, cellCenter))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsOccupiedByUnit(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3Int cell,
+            Vector3 cellCenter)
+        {
+            var units = UnitRegistry.AllAgents;
+            for (var i = units.Count - 1; i >= 0; i--)
+            {
+                var unit = units[i];
+                if (unit == null || !unit.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
+                var status = unit.Status;
+                if (status == null || !status.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
+                if (OccupiesCell(tilemapWorld, unit.transform.position, status.OccupiedCells, cell, cellCenter))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool OccupiesCell(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3 worldPosition,
+            Vector2Int occupiedFootprint,
+            Vector3Int queriedCell,
+            Vector3 queriedCellCenter)
+        {
+            occupiedFootprint = SanitizeFootprint(occupiedFootprint);
+            if (tilemapWorld != null)
+            {
+                var centerCell = tilemapWorld.WorldToCell(worldPosition);
+                foreach (var occupiedCell in EnumerateFootprintCells(centerCell, occupiedFootprint))
+                {
+                    if (occupiedCell == queriedCell)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            var halfExtents = new Vector2(occupiedFootprint.x * 0.5f, occupiedFootprint.y * 0.5f);
+            return Mathf.Abs(worldPosition.x - queriedCellCenter.x) < halfExtents.x
+                && Mathf.Abs(worldPosition.y - queriedCellCenter.y) < halfExtents.y;
+        }
+
+        private static bool OccupiesColliderCell(
+            ProjectSTilemapWorld tilemapWorld,
+            Collider2D collider,
+            Vector3 fallbackWorldPosition,
+            Vector3Int queriedCell,
+            Vector3 queriedCellCenter)
+        {
+            if (collider == null)
+            {
+                return OccupiesCell(tilemapWorld, fallbackWorldPosition, Vector2Int.one, queriedCell, queriedCellCenter);
+            }
+
+            if (tilemapWorld != null)
+            {
+                var minCell = tilemapWorld.WorldToCell(collider.bounds.min);
+                var maxCell = tilemapWorld.WorldToCell(collider.bounds.max);
+                return queriedCell.x >= Mathf.Min(minCell.x, maxCell.x)
+                    && queriedCell.x <= Mathf.Max(minCell.x, maxCell.x)
+                    && queriedCell.y >= Mathf.Min(minCell.y, maxCell.y)
+                    && queriedCell.y <= Mathf.Max(minCell.y, maxCell.y);
+            }
+
+            var cellBounds = new Bounds(queriedCellCenter, new Vector3(1f, 1f, 0.1f));
+            return cellBounds.Intersects(collider.bounds);
         }
 
         private static System.Collections.Generic.IEnumerable<Vector3Int> EnumerateFootprintCells(
             Vector3Int centerCell,
             Vector2Int footprint)
         {
-            footprint = new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
+            footprint = SanitizeFootprint(footprint);
             var startX = centerCell.x - (footprint.x - 1) / 2;
             var startY = centerCell.y - (footprint.y - 1) / 2;
 
@@ -215,6 +470,11 @@ namespace ProjectS.Buildings
                     yield return new Vector3Int(startX + x, startY + y, centerCell.z);
                 }
             }
+        }
+
+        private static Vector2Int SanitizeFootprint(Vector2Int footprint)
+        {
+            return new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
         }
     }
 }

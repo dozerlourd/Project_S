@@ -7,7 +7,7 @@ using UnityEngine;
 namespace ProjectS.Buildings
 {
     [RequireComponent(typeof(BuildingStatus))]
-    public sealed class UnitProductionQueue : MonoBehaviour
+    public sealed class UnitProductionQueue : MonoBehaviour, IUnitRallyPointService
     {
         [SerializeField] private PlayerResourceWallet wallet;
         [SerializeField] private ProjectSTilemapWorld tilemapWorld;
@@ -22,11 +22,14 @@ namespace ProjectS.Buildings
         private float activeProgress;
         private bool hasRallyPoint;
         private Vector3 rallyPoint;
+        private string lastEnqueueFailureReason;
 
         public IReadOnlyList<UnitProductionDefinition> ProducibleUnits => producibleUnits;
+        public int PendingCount => queue.Count;
         public int QueuedCount => queue.Count + (activeProduction != null ? 1 : 0);
         public int MaxQueueSize => Mathf.Max(1, maxQueueSize);
         public UnitProductionDefinition ActiveProduction => activeProduction;
+        public string LastEnqueueFailureReason => lastEnqueueFailureReason;
         public float ActiveProgress => activeProgress;
         public float ActiveProgress01 => activeProduction != null
             ? Mathf.Clamp01(activeProgress / activeProduction.ProductionTime)
@@ -40,6 +43,12 @@ namespace ProjectS.Buildings
 
         private void Update()
         {
+            if (ProjectS.RtsMatchController.ActiveInstance != null
+                && ProjectS.RtsMatchController.ActiveInstance.IsMatchOver)
+            {
+                return;
+            }
+
             ResolveReferences();
             if (!CanProduce())
             {
@@ -67,7 +76,7 @@ namespace ProjectS.Buildings
         {
             if (definitionIndex < 0 || definitionIndex >= producibleUnits.Length)
             {
-                return false;
+                return FailEnqueue($"Invalid production definition index: {definitionIndex}.");
             }
 
             return TryEnqueue(producibleUnits[definitionIndex]);
@@ -84,25 +93,106 @@ namespace ProjectS.Buildings
                 }
             }
 
-            return false;
+            return FailEnqueue($"No producible unit definition found for {unitType}.");
         }
 
         public bool TryEnqueue(UnitProductionDefinition definition)
         {
             ResolveReferences();
-            if (definition == null || definition.UnitPrefab == null || !CanProduce() || QueuedCount >= MaxQueueSize)
+            if (!CanEnqueue(definition, out var failureReason))
             {
-                return false;
+                if (definition != null
+                    && wallet != null
+                    && !definition.Cost.IsEmpty
+                    && failureReason.Contains("insufficient resources")
+                    && !wallet.CanAfford(definition.Cost))
+                {
+                    wallet.TrySpend(definition.Cost);
+                }
+
+                return FailEnqueue(failureReason);
             }
 
-            if (wallet != null && !wallet.TrySpend(definition.Cost))
+            if (wallet != null && !definition.Cost.IsEmpty && !wallet.TrySpend(definition.Cost))
             {
-                return false;
+                return FailEnqueue($"Cannot enqueue {definition.DisplayName}: insufficient resources for cost ({definition.Cost}).");
             }
 
             queue.Enqueue(definition);
+            lastEnqueueFailureReason = string.Empty;
             TryStartNextProduction();
             return true;
+        }
+
+        public bool CanEnqueue(UnitProductionDefinition definition, out string failureReason)
+        {
+            ResolveReferences();
+            if (ProjectS.RtsMatchController.ActiveInstance != null
+                && ProjectS.RtsMatchController.ActiveInstance.IsMatchOver)
+            {
+                failureReason = "Cannot enqueue production: match has ended.";
+                return false;
+            }
+
+            if (definition == null)
+            {
+                failureReason = "Cannot enqueue production: definition is missing.";
+                return false;
+            }
+
+            if (definition.UnitPrefab == null)
+            {
+                failureReason = $"Cannot enqueue {definition.DisplayName}: unit prefab is missing.";
+                return false;
+            }
+
+            if (!CanProduce())
+            {
+                failureReason = "Cannot enqueue production: building is not completed.";
+                return false;
+            }
+
+            if (QueuedCount >= MaxQueueSize)
+            {
+                failureReason = "Cannot enqueue production: queue is full.";
+                return false;
+            }
+
+            if (!definition.Cost.IsEmpty && wallet == null)
+            {
+                failureReason = $"Cannot enqueue {definition.DisplayName}: no resource wallet is available.";
+                return false;
+            }
+
+            if (wallet != null && !wallet.CanAfford(definition.Cost))
+            {
+                failureReason = $"Cannot enqueue {definition.DisplayName}: insufficient resources for cost ({definition.Cost}).";
+                return false;
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        public UnitProductionDefinition GetPendingProduction(int index)
+        {
+            if (index < 0 || index >= queue.Count)
+            {
+                return null;
+            }
+
+            var currentIndex = 0;
+            foreach (var definition in queue)
+            {
+                if (currentIndex == index)
+                {
+                    return definition;
+                }
+
+                currentIndex++;
+            }
+
+            return null;
         }
 
         public void SetRallyPoint(Vector3 point)
@@ -217,7 +307,7 @@ namespace ProjectS.Buildings
                 status = GetComponent<BuildingStatus>();
             }
 
-            if (wallet == null && status != null)
+            if (status != null && (wallet == null || wallet.Team != status.Team))
             {
                 wallet = PlayerResourceWallet.FindForTeam(status.Team);
             }
@@ -226,6 +316,13 @@ namespace ProjectS.Buildings
             {
                 tilemapWorld = ProjectSTilemapWorld.ActiveInstance;
             }
+        }
+
+        private bool FailEnqueue(string reason)
+        {
+            lastEnqueueFailureReason = reason;
+            Debug.LogWarning(reason, this);
+            return false;
         }
     }
 }

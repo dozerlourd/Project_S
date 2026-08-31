@@ -77,7 +77,7 @@ namespace ProjectS.Units
         AreaAttack
     }
 
-    public sealed class PrototypeUnitStatus : MonoBehaviour, IPlayerSelectableTarget
+    public sealed class PrototypeUnitStatus : MonoBehaviour, IPlayerSelectableTarget, IUnitAttackTarget
     {
         [Header("Classification")]
         [SerializeField] private UnitTrial trial;
@@ -152,6 +152,15 @@ namespace ProjectS.Units
         public string SelectionName => unitType.ToString();
         public Transform SelectionTransform => transform;
         public GameObject SelectionGameObject => gameObject;
+        public bool IsAlive
+        {
+            get
+            {
+                var health = GetComponent<UnitHealth>();
+                return health == null || !health.IsDead;
+            }
+        }
+        public Collider2D AttackCollider => GetComponent<Collider2D>();
 
         private void Awake()
         {
@@ -159,6 +168,16 @@ namespace ProjectS.Units
             EnsureGroundPathAgent();
             EnsureCommandAgent();
             EnsureCombatComponents();
+        }
+
+        private void OnEnable()
+        {
+            UnitAttackTargetRegistry.Register(this);
+        }
+
+        private void OnDisable()
+        {
+            UnitAttackTargetRegistry.Unregister(this);
         }
 
         public void Initialize(
@@ -213,6 +232,17 @@ namespace ProjectS.Units
             {
                 UnitRegistry.Register(commandAgent, this);
             }
+
+            var health = GetComponent<UnitHealth>();
+            if (health != null)
+            {
+                health.ResetHealth();
+            }
+
+            if (isActiveAndEnabled)
+            {
+                UnitAttackTargetRegistry.Register(this);
+            }
         }
 
         public void SetTeam(UnitTeam newTeam)
@@ -222,6 +252,20 @@ namespace ProjectS.Units
             if (commandAgent != null)
             {
                 UnitRegistry.Register(commandAgent, this);
+            }
+
+            if (isActiveAndEnabled)
+            {
+                UnitAttackTargetRegistry.Register(this);
+            }
+        }
+
+        public void TakeDamage(float amount)
+        {
+            var health = GetComponent<UnitHealth>();
+            if (health != null)
+            {
+                health.TakeDamage(amount);
             }
         }
 

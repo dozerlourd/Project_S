@@ -30,17 +30,19 @@ namespace ProjectS.Units
         private Vector3 commandDestination;
         private Vector3 patrolStart;
         private Vector3 patrolEnd;
-        private PrototypeUnitStatus priorityTarget;
+        private IUnitAttackTarget priorityTarget;
         private Vector3 lastFocusPathTarget;
         private bool hasFocusPathTarget;
         private bool targetMustStayDetected;
         private float nextScanTime;
         private float nextTargetRepathTime;
+        private string lastInteractionFailureReason;
 
         public UnitCommandMode Mode => mode;
         public UnitActionState ActionState => actionState;
-        public PrototypeUnitStatus PriorityTarget => priorityTarget;
+        public IUnitAttackTarget PriorityTarget => priorityTarget;
         public PrototypeUnitStatus Status => status;
+        public string LastInteractionFailureReason => lastInteractionFailureReason;
 
         private void Awake()
         {
@@ -181,9 +183,9 @@ namespace ProjectS.Units
             MoveTowardTarget(priorityTarget);
         }
 
-        private void MoveTowardTarget(PrototypeUnitStatus target)
+        private void MoveTowardTarget(IUnitAttackTarget target)
         {
-            var targetPosition = target.transform.position;
+            var targetPosition = target.SelectionTransform.position;
 
             if (pathAgent.HasPath
                 && hasFocusPathTarget
@@ -227,7 +229,7 @@ namespace ProjectS.Units
             UpdateTargetEngagement();
         }
 
-        private bool TryAcquireTarget(float scanRange, out PrototypeUnitStatus target)
+        private bool TryAcquireTarget(float scanRange, out IUnitAttackTarget target)
         {
             target = null;
             var bestDistance = float.PositiveInfinity;
@@ -241,16 +243,10 @@ namespace ProjectS.Units
                     continue;
                 }
 
-                var agents = UnitRegistry.GetAgents(team);
-                for (var i = 0; i < agents.Count; i++)
+                var candidates = UnitAttackTargetRegistry.GetTargets(team);
+                for (var i = 0; i < candidates.Count; i++)
                 {
-                    var candidateAgent = agents[i];
-                    if (candidateAgent == null)
-                    {
-                        continue;
-                    }
-
-                    var candidate = candidateAgent.Status;
+                    var candidate = candidates[i];
                     if (!IsAttackableTarget(candidate))
                     {
                         continue;
@@ -306,38 +302,41 @@ namespace ProjectS.Units
 
         private bool CanAttack()
         {
-            return status.Roles.HasFlag(UnitRole.Combat) || status.PhysicalAttackPower > 0f || status.MagicalAttackPower > 0f;
+            return status != null
+                && (status.Roles.HasFlag(UnitRole.Combat)
+                    || status.PhysicalAttackPower > 0f
+                    || status.MagicalAttackPower > 0f);
         }
 
-        private bool IsEnemy(PrototypeUnitStatus other)
+        private bool IsEnemy(IUnitAttackTarget other)
         {
-            return other != status && other.Team != status.Team;
+            return status != null && !ReferenceEquals(other, status) && other.Team != status.Team;
         }
 
-        private bool IsAttackableTarget(PrototypeUnitStatus target)
+        private bool IsAttackableTarget(IUnitAttackTarget target)
         {
-            if (target == null || !target.gameObject.activeInHierarchy || !IsEnemy(target))
+            if (IsMissingTarget(target) || !IsEnemy(target))
             {
                 return false;
             }
 
-            var health = target.GetComponent<UnitHealth>();
-            return health == null || !health.IsDead;
+            var targetObject = target.SelectionGameObject;
+            return targetObject != null && targetObject.activeInHierarchy && target.IsAlive;
         }
 
-        private bool IsInAttackRange(PrototypeUnitStatus target)
+        private bool IsInAttackRange(IUnitAttackTarget target)
         {
             return GetTargetDistance(target) <= Mathf.Max(0.05f, status.AttackRange - attackRangeStopBuffer);
         }
 
-        private bool IsInDetectionRange(PrototypeUnitStatus target)
+        private bool IsInDetectionRange(IUnitAttackTarget target)
         {
             return GetTargetDistance(target) <= status.DetectionRange;
         }
 
-        private float GetTargetDistance(PrototypeUnitStatus target)
+        private float GetTargetDistance(IUnitAttackTarget target)
         {
-            if (target == null)
+            if (IsMissingTarget(target) || target.SelectionTransform == null)
             {
                 return float.PositiveInfinity;
             }
@@ -347,7 +346,7 @@ namespace ProjectS.Units
                 attackCollider = GetComponent<Collider2D>();
             }
 
-            var targetCollider = target.GetComponent<Collider2D>();
+            var targetCollider = target.AttackCollider;
             if (attackCollider != null && targetCollider != null)
             {
                 var colliderDistance = attackCollider.Distance(targetCollider);
@@ -357,7 +356,7 @@ namespace ProjectS.Units
                 }
             }
 
-            return Vector3.Distance(transform.position, target.transform.position);
+            return Vector3.Distance(transform.position, target.SelectionTransform.position);
         }
 
         private void SwapPatrolEndpoint()
@@ -439,14 +438,24 @@ namespace ProjectS.Units
 
         private bool TryStartInteraction(IUnitInteractableTarget target)
         {
-            if (target == null || !target.CanInteract(this))
+            if (target == null)
             {
+                lastInteractionFailureReason = "Interaction command failed because the target is missing.";
+                return false;
+            }
+
+            if (!target.CanInteract(this))
+            {
+                lastInteractionFailureReason =
+                    $"Interaction command failed because {target.GetType().Name} rejected the selected unit.";
                 return false;
             }
 
             ResolveReferences();
             if (interactionHandlers == null || interactionHandlers.Length == 0)
             {
+                lastInteractionFailureReason =
+                    "Interaction command failed because the unit has no interaction handlers.";
                 return false;
             }
 
@@ -454,10 +463,13 @@ namespace ProjectS.Units
             {
                 if (interactionHandlers[i] != null && interactionHandlers[i].TryHandleInteractionCommand(target))
                 {
+                    lastInteractionFailureReason = string.Empty;
                     return true;
                 }
             }
 
+            lastInteractionFailureReason =
+                $"Interaction command failed because no handler accepted {target.GetType().Name}.";
             return false;
         }
 
@@ -497,12 +509,22 @@ namespace ProjectS.Units
             if (priorityTarget != null)
             {
                 Gizmos.color = targetLineGizmoColor;
-                Gizmos.DrawLine(transform.position, priorityTarget.transform.position);
+                Gizmos.DrawLine(transform.position, priorityTarget.SelectionTransform.position);
             }
 
 #if UNITY_EDITOR
             Handles.Label(transform.position + Vector3.up * 0.8f, actionState.ToString());
 #endif
+        }
+
+        private static bool IsMissingTarget(IUnitAttackTarget target)
+        {
+            if (target == null)
+            {
+                return true;
+            }
+
+            return target is Object unityObject && unityObject == null;
         }
     }
 }

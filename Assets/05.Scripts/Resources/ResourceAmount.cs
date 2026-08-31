@@ -61,5 +61,10 @@ namespace ProjectS.Resources
             gas -= cost.gas;
             return true;
         }
+
+        public override string ToString()
+        {
+            return $"Minerals: {minerals}, Gas: {gas}";
+        }
     }
 }

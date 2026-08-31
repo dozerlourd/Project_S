@@ -24,6 +24,7 @@ namespace ProjectS.Units
         {
             var target = commandAgent.PriorityTarget;
             if (target == null
+                || target.SelectionTransform == null
                 || commandAgent.ActionState != UnitActionState.AttackingTarget
                 || !CanAttack()
                 || Time.time < nextAttackTime)
@@ -31,14 +32,13 @@ namespace ProjectS.Units
                 return;
             }
 
-            var targetHealth = target.GetComponent<UnitHealth>();
-            if (targetHealth == null || targetHealth.IsDead || !IsTargetInRange(target))
+            if (!target.IsAlive || !IsTargetInRange(target))
             {
                 return;
             }
 
-            targetHealth.TakeDamage(GetAttackDamage());
-            attackEffect?.PlayAttackFlash(target.transform.position);
+            target.TakeDamage(GetAttackDamage());
+            attackEffect?.PlayAttackFlash(target.SelectionTransform.position);
             nextAttackTime = Time.time + GetAttackInterval();
         }
 
@@ -49,9 +49,9 @@ namespace ProjectS.Units
                 || status.MagicalAttackPower > 0f;
         }
 
-        private bool IsTargetInRange(PrototypeUnitStatus target)
+        private bool IsTargetInRange(IUnitAttackTarget target)
         {
-            if (target == null)
+            if (target == null || target.SelectionTransform == null)
             {
                 return false;
             }
@@ -61,7 +61,7 @@ namespace ProjectS.Units
                 attackCollider = GetComponent<Collider2D>();
             }
 
-            var targetCollider = target.GetComponent<Collider2D>();
+            var targetCollider = target.AttackCollider;
             if (attackCollider != null && targetCollider != null)
             {
                 var colliderDistance = attackCollider.Distance(targetCollider);
@@ -71,7 +71,7 @@ namespace ProjectS.Units
                 }
             }
 
-            return Vector3.Distance(transform.position, target.transform.position) <= status.AttackRange;
+            return Vector3.Distance(transform.position, target.SelectionTransform.position) <= status.AttackRange;
         }
 
         private float GetAttackDamage()

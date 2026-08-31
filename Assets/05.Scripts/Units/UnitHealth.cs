@@ -23,6 +23,18 @@ namespace ProjectS.Units
             currentHealth = status != null ? status.MaxHealth : 1f;
         }
 
+        public void ResetHealth()
+        {
+            if (status == null)
+            {
+                status = GetComponent<PrototypeUnitStatus>();
+            }
+
+            currentHealth = status != null ? status.MaxHealth : 1f;
+            isDead = false;
+            HealthChanged?.Invoke(this, currentHealth);
+        }
+
         public void TakeDamage(float amount)
         {
             if (isDead || amount <= 0f)

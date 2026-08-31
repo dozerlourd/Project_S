@@ -227,6 +227,9 @@ namespace ProjectS.Editor
 
             var hud = runtime.AddComponent<RtsGameHud>();
             hud.Configure(UnitTeam.Team1, placementService);
+
+            var matchController = runtime.AddComponent<ProjectS.RtsMatchController>();
+            matchController.Configure(UnitTeam.Team1, UnitTeam.Team2);
         }
 
         private static void CreateAiController(Vector3 fallbackAttackPoint, Transform parent)

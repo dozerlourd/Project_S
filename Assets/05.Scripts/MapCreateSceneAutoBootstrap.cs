@@ -15,6 +15,7 @@ namespace ProjectS
     {
         private const string TargetSceneName = "MapCreate_Scene";
         private const string SetupRootName = "ProjectS Match Test Setup";
+        private const string ResourceLayerName = "Resource";
         private const int ResourceSortingOrder = 12;
         private const int SelectionSortingOrder = 18;
         private const int UnitSortingOrder = 20;
@@ -173,6 +174,7 @@ namespace ProjectS
             }
 
             hud.Configure(UnitTeam.Team1, placementService);
+            EnsureMatchController(parent);
         }
 
         private static void CreateAiController(Vector3 fallbackAttackPoint, Transform parent)
@@ -180,6 +182,17 @@ namespace ProjectS
             var aiObject = CreateChild(parent, "Simple Skirmish AI");
             var ai = aiObject.AddComponent<SimpleSkirmishAI>();
             ai.Configure(UnitTeam.Team2, UnitTeam.Team1, 4, 4, fallbackAttackPoint);
+        }
+
+        private static void EnsureMatchController(Transform parent)
+        {
+            var matchController = FindFirstObjectByType<RtsMatchController>();
+            if (matchController == null)
+            {
+                matchController = CreateChild(parent, "RTS Match Controller").AddComponent<RtsMatchController>();
+            }
+
+            matchController.Configure(UnitTeam.Team1, UnitTeam.Team2);
         }
 
         private static PlayerResourceWallet CreateWallet(string name, UnitTeam team, ResourceAmount resources, Transform parent)
@@ -347,6 +360,7 @@ namespace ProjectS
         {
             var nodeObject = CreateChild(parent, name);
             nodeObject.transform.position = Snap(tilemapWorld, position);
+            SetLayerIfExists(nodeObject, ResourceLayerName);
             var renderer = nodeObject.AddComponent<SpriteRenderer>();
             renderer.sprite = squareSprite ??= CreateSquareSprite();
             renderer.color = type == ResourceType.Minerals
@@ -366,6 +380,15 @@ namespace ProjectS
                 type == ResourceType.Minerals ? 1.2f : 1.8f,
                 type == ResourceType.Minerals ? 0.95f : 1.05f,
                 true);
+        }
+
+        private static void SetLayerIfExists(GameObject target, string layerName)
+        {
+            var layer = LayerMask.NameToLayer(layerName);
+            if (target != null && layer >= 0)
+            {
+                target.layer = layer;
+            }
         }
 
         private static void CreateStartingUnits(

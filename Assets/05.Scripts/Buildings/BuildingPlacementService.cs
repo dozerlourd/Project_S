@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.Units;
@@ -18,6 +19,8 @@ namespace ProjectS.Buildings
         [SerializeField] private Vector2Int defaultFootprint = new Vector2Int(2, 2);
 
         public static BuildingPlacementService ActiveInstance { get; private set; }
+        public Vector2Int DefaultFootprint => new Vector2Int(Mathf.Max(1, defaultFootprint.x), Mathf.Max(1, defaultFootprint.y));
+        public string LastPlacementFailureReason { get; private set; }
 
         private void Awake()
         {
@@ -36,7 +39,7 @@ namespace ProjectS.Buildings
         public bool TryPlaceDefaultConstructionSite(Vector3 worldPosition, out ConstructionSite site)
         {
             ResolveReferences();
-            return ConstructionSite.TryCreate(
+            var placed = ConstructionSite.TryCreate(
                 worldPosition,
                 team,
                 wallet,
@@ -48,6 +51,60 @@ namespace ProjectS.Buildings
                 defaultBuildTime,
                 defaultFootprint,
                 out site);
+            LastPlacementFailureReason = placed ? string.Empty : ConstructionSite.LastCreateFailureReason;
+            return placed;
+        }
+
+        public bool CanPlaceDefaultConstructionSite(Vector3 worldPosition)
+        {
+            ResolveReferences();
+            var placementFailureReason = ConstructionSite.GetPlacementFailureReason(tilemapWorld, worldPosition, DefaultFootprint);
+            if (!string.IsNullOrEmpty(placementFailureReason))
+            {
+                LastPlacementFailureReason =
+                    $"Cannot place {defaultBuildingKind} construction site at {worldPosition}: {placementFailureReason}";
+                return false;
+            }
+
+            if (defaultCost.IsEmpty)
+            {
+                LastPlacementFailureReason = string.Empty;
+                return true;
+            }
+
+            if (wallet == null)
+            {
+                LastPlacementFailureReason =
+                    $"Cannot place {defaultBuildingKind} construction site: no resource wallet is available for {team}.";
+                return false;
+            }
+
+            if (!wallet.CanAfford(defaultCost))
+            {
+                LastPlacementFailureReason =
+                    $"Cannot place {defaultBuildingKind} construction site: insufficient resources for cost ({defaultCost}).";
+                return false;
+            }
+
+            LastPlacementFailureReason = string.Empty;
+            return true;
+        }
+
+        public IReadOnlyList<UnitBuildPlacementPreviewCell> GetDefaultConstructionSitePreviewCells(Vector3 worldPosition)
+        {
+            ResolveReferences();
+            return ConstructionSite.GetPlacementPreviewCells(tilemapWorld, worldPosition, DefaultFootprint);
+        }
+
+        bool IUnitBuildPlacementService.CanPlaceDefaultConstructionSite(Vector3 worldPosition)
+        {
+            return CanPlaceDefaultConstructionSite(worldPosition);
+        }
+
+        IReadOnlyList<UnitBuildPlacementPreviewCell> IUnitBuildPlacementService.GetDefaultConstructionSitePreviewCells(
+            Vector3 worldPosition)
+        {
+            return GetDefaultConstructionSitePreviewCells(worldPosition);
         }
 
         bool IUnitBuildPlacementService.TryPlaceDefaultConstructionSite(
@@ -88,7 +145,7 @@ namespace ProjectS.Buildings
                 tilemapWorld = ProjectSTilemapWorld.ActiveInstance;
             }
 
-            if (wallet == null)
+            if (wallet == null || wallet.Team != team)
             {
                 wallet = PlayerResourceWallet.FindForTeam(team);
             }

@@ -13,11 +13,13 @@ namespace ProjectS.Resources
         [SerializeField] private ResourceAmount startingResources = new ResourceAmount(50, 0);
 
         private ResourceAmount currentResources;
+        private string lastFailureReason;
 
         public UnitTeam Team => team;
         public int Minerals => currentResources.Minerals;
         public int Gas => currentResources.Gas;
         public ResourceAmount CurrentResources => currentResources;
+        public string LastFailureReason => lastFailureReason;
 
         private void Awake()
         {
@@ -26,6 +28,13 @@ namespace ProjectS.Resources
 
         private void OnEnable()
         {
+            if (WalletsByTeam.TryGetValue(team, out var existingWallet) && existingWallet != null && existingWallet != this)
+            {
+                Debug.LogWarning(
+                    $"Replacing existing resource wallet for {team}. Only one active wallet should own a team's resources.",
+                    this);
+            }
+
             WalletsByTeam[team] = this;
         }
 
@@ -54,6 +63,7 @@ namespace ProjectS.Resources
             team = ownerTeam;
             startingResources = resources;
             currentResources = resources;
+            lastFailureReason = string.Empty;
             if (isActiveAndEnabled)
             {
                 WalletsByTeam[team] = this;
@@ -83,7 +93,15 @@ namespace ProjectS.Resources
 
         public bool TrySpend(ResourceAmount cost)
         {
-            return currentResources.TrySpend(cost);
+            if (currentResources.TrySpend(cost))
+            {
+                lastFailureReason = string.Empty;
+                return true;
+            }
+
+            lastFailureReason = $"Insufficient resources for cost ({cost}). Current resources: {currentResources}.";
+            Debug.LogWarning(lastFailureReason, this);
+            return false;
         }
     }
 }
