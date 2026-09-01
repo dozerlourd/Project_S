@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &7300000000000000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7300000000000000002}
+  - component: {fileID: 7300000000000000003}
+  - component: {fileID: 7300000000000000004}
+  - component: {fileID: 7300000000000000005}
+  m_Layer: 0
+  m_Name: PrototypeSpliterProductionBuilding
+  m_TagString: Untagged
+  m_IsActive: 1
+--- !u!4 &7300000000000000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 7300000000000000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+--- !u!114 &7300000000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 7300000000000000001}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: c9a4f98e0da742a6a7cf7ce992e2475c, type: 3}
+  bodyColor: {r: 0.45, g: 0.2, b: 0.66, a: 1}
+  trimColor: {r: 0.08, g: 0.13, b: 0.18, a: 1}
+  worldSize: {x: 2.5, y: 2.5}
+  spriteResourcePath: Temp/Buildings/SpliterProductionBuilding
+--- !u!114 &7300000000000000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 7300000000000000001}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: e8ac7355a8174129b745ecf8686916b9, type: 3}
+  team: 0
+  kind: 3
+  footprint: {x: 2, y: 2}
+  completed: 1
+--- !u!114 &7300000000000000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_GameObject: {fileID: 7300000000000000001}
+  m_Enabled: 1
+  m_Script: {fileID: 11500000, guid: 6d6a428624434c9d81aa9721ad811340, type: 3}
+  wallet: {fileID: 0}
+  tilemapWorld: {fileID: 0}
+  producibleUnits: []
+  maxQueueSize: 5
+  spawnOffset: {x: 2.5, y: -0.5, z: 0}
+  rallyOffset: {x: 5, y: -1, z: 0}

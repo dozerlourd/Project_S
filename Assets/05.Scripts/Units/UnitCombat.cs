@@ -37,7 +37,7 @@ namespace ProjectS.Units
                 return;
             }
 
-            target.TakeDamage(GetAttackDamage());
+            target.TakeDamage(GetAttackDamage(), status);
             attackEffect?.PlayAttackFlash(target.SelectionTransform.position);
             nextAttackTime = Time.time + GetAttackInterval();
         }

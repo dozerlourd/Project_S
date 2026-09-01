@@ -13,6 +13,10 @@ namespace ProjectS.Buildings
         [SerializeField] private PlayerResourceWallet wallet;
         [SerializeField] private GameObject constructionSitePrefab;
         [SerializeField] private GameObject completedBuildingPrefab;
+        [SerializeField] private GameObject combatProductionBuildingPrefab;
+        [SerializeField] private GameObject spliterProductionBuildingPrefab;
+        [SerializeField] private GameObject autoTurretBuildingPrefab;
+        [SerializeField] private GameObject speedAuraBuildingPrefab;
         [SerializeField] private BuildingKind defaultBuildingKind = BuildingKind.MainBase;
         [SerializeField] private ResourceAmount defaultCost = new ResourceAmount(150, 0);
         [SerializeField, Min(0.1f)] private float defaultBuildTime = 8f;
@@ -20,6 +24,8 @@ namespace ProjectS.Buildings
 
         public static BuildingPlacementService ActiveInstance { get; private set; }
         public Vector2Int DefaultFootprint => new Vector2Int(Mathf.Max(1, defaultFootprint.x), Mathf.Max(1, defaultFootprint.y));
+        public BuildingKind SelectedBuildingKind => defaultBuildingKind;
+        public ResourceAmount SelectedBuildingCost => defaultCost;
         public string LastPlacementFailureReason { get; private set; }
 
         private void Awake()
@@ -132,10 +138,68 @@ namespace ProjectS.Buildings
             tilemapWorld = world;
             constructionSitePrefab = sitePrefab;
             completedBuildingPrefab = finishedPrefab;
+            combatProductionBuildingPrefab = finishedPrefab;
             defaultBuildingKind = buildingKind;
             defaultCost = cost;
             defaultBuildTime = Mathf.Max(0.1f, buildTime);
             defaultFootprint = new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
+        }
+
+        public void ConfigureBuildOptions(
+            GameObject spliterProductionPrefab,
+            GameObject autoTurretPrefab,
+            GameObject speedAuraPrefab)
+        {
+            spliterProductionBuildingPrefab = spliterProductionPrefab;
+            autoTurretBuildingPrefab = autoTurretPrefab;
+            speedAuraBuildingPrefab = speedAuraPrefab;
+        }
+
+        public bool SelectBuilding(BuildingKind buildingKind)
+        {
+            switch (buildingKind)
+            {
+                case BuildingKind.Production:
+                    if (combatProductionBuildingPrefab == null)
+                    {
+                        LastPlacementFailureReason = "Combat production building prefab is not configured.";
+                        return false;
+                    }
+
+                    completedBuildingPrefab = combatProductionBuildingPrefab;
+                    defaultBuildingKind = BuildingKind.Production;
+                    defaultCost = new ResourceAmount(150, 0);
+                    defaultBuildTime = 8f;
+                    defaultFootprint = new Vector2Int(2, 2);
+                    LastPlacementFailureReason = string.Empty;
+                    return true;
+                case BuildingKind.SpliterProduction:
+                    return SelectConfiguredBuilding(buildingKind, spliterProductionBuildingPrefab, new ResourceAmount(175, 0), 9f, new Vector2Int(2, 2));
+                case BuildingKind.AutoTurret:
+                    return SelectConfiguredBuilding(buildingKind, autoTurretBuildingPrefab, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2));
+                case BuildingKind.SpeedAura:
+                    return SelectConfiguredBuilding(buildingKind, speedAuraBuildingPrefab, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2));
+                default:
+                    LastPlacementFailureReason = $"Building type {buildingKind} is not available.";
+                    return false;
+            }
+        }
+
+        private bool SelectConfiguredBuilding(BuildingKind buildingKind, GameObject prefab, ResourceAmount cost, float buildTime, Vector2Int footprint)
+        {
+            if (prefab == null)
+            {
+                LastPlacementFailureReason = $"Building type {buildingKind} has no configured prefab.";
+                return false;
+            }
+
+            completedBuildingPrefab = prefab;
+            defaultBuildingKind = buildingKind;
+            defaultCost = cost;
+            defaultBuildTime = buildTime;
+            defaultFootprint = footprint;
+            LastPlacementFailureReason = string.Empty;
+            return true;
         }
 
         private void ResolveReferences()

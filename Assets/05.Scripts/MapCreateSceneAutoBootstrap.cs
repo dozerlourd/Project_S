@@ -31,7 +31,6 @@ namespace ProjectS
         private static void EnsureBootstrap()
         {
             if (SceneManager.GetActiveScene().name != TargetSceneName
-                || GameObject.Find(SetupRootName) != null
                 || FindFirstObjectByType<MapCreateSceneAutoBootstrap>() != null)
             {
                 return;
@@ -45,14 +44,46 @@ namespace ProjectS
         {
             yield return null;
 
-            if (GameObject.Find(SetupRootName) != null)
+            var existingRoot = GameObject.Find(SetupRootName);
+            if (existingRoot != null)
             {
+                UpgradeExistingSetup(existingRoot.transform);
                 Destroy(gameObject);
                 yield break;
             }
 
             BuildTestSetup();
             Destroy(gameObject);
+        }
+
+        private static void UpgradeExistingSetup(Transform root)
+        {
+            var placementService = FindFirstObjectByType<BuildingPlacementService>();
+            if (placementService == null)
+            {
+                return;
+            }
+
+            var templates = root.Find("Runtime Building Templates");
+            if (templates == null)
+            {
+                var templatesObject = CreateChild(root, "Runtime Building Templates");
+                templatesObject.SetActive(false);
+                templates = templatesObject.transform;
+            }
+
+            placementService.ConfigureBuildOptions(
+                FindOrCreateBuildingTemplate(templates, "Spliter Production Building Template", BuildingKind.SpliterProduction, true, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f)),
+                FindOrCreateBuildingTemplate(templates, "Auto Turret Building Template", BuildingKind.AutoTurret, false, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f)),
+                FindOrCreateBuildingTemplate(templates, "Speed Aura Building Template", BuildingKind.SpeedAura, false, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f)));
+        }
+
+        private static GameObject FindOrCreateBuildingTemplate(Transform parent, string name, BuildingKind kind, bool hasProductionQueue, Vector2 size, Color color)
+        {
+            var existing = parent.Find(name);
+            return existing != null
+                ? existing.gameObject
+                : CreateBuildingPrototype(name, kind, false, hasProductionQueue, size, color, parent);
         }
 
         private void BuildTestSetup()
@@ -111,6 +142,9 @@ namespace ProjectS
                 new Vector2(2.4f, 2f),
                 new Color(0.48f, 0.36f, 0.68f, 1f),
                 prototypeRoot.transform);
+            var spliterProductionPrototype = CreateBuildingPrototype("Spliter Production Building Prototype", BuildingKind.SpliterProduction, false, true, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f), prototypeRoot.transform);
+            var autoTurretPrototype = CreateBuildingPrototype("Auto Turret Building Prototype", BuildingKind.AutoTurret, false, false, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f), prototypeRoot.transform);
+            var speedAuraPrototype = CreateBuildingPrototype("Speed Aura Building Prototype", BuildingKind.SpeedAura, false, false, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f), prototypeRoot.transform);
             var constructionPrototype = CreateConstructionSitePrototype(prototypeRoot.transform);
 
             var workerDefinitions = new[]
@@ -120,20 +154,26 @@ namespace ProjectS
             var combatDefinitions = new[]
             {
                 CreateProductionDefinition("Soldier", PrototypeUnitType.Soldier, soldierPrototype, new ResourceAmount(100, 0), 7f),
-                CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterPrototype, new ResourceAmount(125, 0), 8f),
                 CreateProductionDefinition("Ranger", PrototypeUnitType.Ranger, rangerPrototype, new ResourceAmount(100, 25), 8f)
             };
+            var spliterDefinitions = new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterPrototype, new ResourceAmount(125, 0), 8f) };
 
             InstantiateBuilding(mainBasePrototype, "Player Main Base", UnitTeam.Team1, BuildingKind.MainBase, playerStart, playerWallet, tilemapWorld, workerDefinitions, new Vector3(2.5f, -1.5f, 0f), new Vector3(5f, -2f, 0f), root.transform);
             InstantiateBuilding(productionPrototype, "Player Production", UnitTeam.Team1, BuildingKind.Production, Snap(tilemapWorld, playerStart + new Vector3(4f, -3f, 0f)), playerWallet, tilemapWorld, combatDefinitions, new Vector3(2.5f, -0.5f, 0f), new Vector3(5f, -1f, 0f), root.transform);
+            InstantiateBuilding(spliterProductionPrototype, "Player Spliter Production", UnitTeam.Team1, BuildingKind.SpliterProduction, Snap(tilemapWorld, playerStart + new Vector3(7f, -3f, 0f)), playerWallet, tilemapWorld, spliterDefinitions, new Vector3(2.5f, -0.5f, 0f), new Vector3(5f, -1f, 0f), root.transform);
+            InstantiateBuilding(autoTurretPrototype, "Player Auto Turret", UnitTeam.Team1, BuildingKind.AutoTurret, Snap(tilemapWorld, playerStart + new Vector3(3f, 3f, 0f)), playerWallet, tilemapWorld, new UnitProductionDefinition[0], Vector3.zero, Vector3.zero, root.transform);
+            InstantiateBuilding(speedAuraPrototype, "Player Speed Aura", UnitTeam.Team1, BuildingKind.SpeedAura, Snap(tilemapWorld, playerStart + new Vector3(-3f, 3f, 0f)), playerWallet, tilemapWorld, new UnitProductionDefinition[0], Vector3.zero, Vector3.zero, root.transform);
             InstantiateBuilding(mainBasePrototype, "AI Main Base", UnitTeam.Team2, BuildingKind.MainBase, aiStart, aiWallet, tilemapWorld, workerDefinitions, new Vector3(-2.5f, 1.5f, 0f), new Vector3(-5f, 2f, 0f), root.transform);
             InstantiateBuilding(productionPrototype, "AI Production", UnitTeam.Team2, BuildingKind.Production, Snap(tilemapWorld, aiStart + new Vector3(-4f, 3f, 0f)), aiWallet, tilemapWorld, combatDefinitions, new Vector3(-2.5f, 0.5f, 0f), new Vector3(-5f, 1f, 0f), root.transform);
+            InstantiateBuilding(spliterProductionPrototype, "AI Spliter Production", UnitTeam.Team2, BuildingKind.SpliterProduction, Snap(tilemapWorld, aiStart + new Vector3(-7f, 3f, 0f)), aiWallet, tilemapWorld, spliterDefinitions, new Vector3(-2.5f, 0.5f, 0f), new Vector3(-5f, 1f, 0f), root.transform);
+            InstantiateBuilding(autoTurretPrototype, "AI Auto Turret", UnitTeam.Team2, BuildingKind.AutoTurret, Snap(tilemapWorld, aiStart + new Vector3(-3f, -3f, 0f)), aiWallet, tilemapWorld, new UnitProductionDefinition[0], Vector3.zero, Vector3.zero, root.transform);
+            InstantiateBuilding(speedAuraPrototype, "AI Speed Aura", UnitTeam.Team2, BuildingKind.SpeedAura, Snap(tilemapWorld, aiStart + new Vector3(3f, -3f, 0f)), aiWallet, tilemapWorld, new UnitProductionDefinition[0], Vector3.zero, Vector3.zero, root.transform);
 
             CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
             CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team1, playerStart, workerPrototype, soldierPrototype, spliterPrototype, rangerPrototype, root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team2, aiStart, workerPrototype, soldierPrototype, spliterPrototype, rangerPrototype, root.transform, tilemapWorld);
-            CreatePlayerSystems(playerWallet, tilemapWorld, constructionPrototype, productionPrototype, root.transform);
+            CreatePlayerSystems(playerWallet, tilemapWorld, constructionPrototype, productionPrototype, spliterProductionPrototype, autoTurretPrototype, speedAuraPrototype, root.transform);
             CreateAiController(playerStart, root.transform);
         }
 
@@ -142,6 +182,9 @@ namespace ProjectS
             ProjectSTilemapWorld tilemapWorld,
             GameObject constructionPrototype,
             GameObject productionPrototype,
+            GameObject spliterProductionPrototype,
+            GameObject autoTurretPrototype,
+            GameObject speedAuraPrototype,
             Transform parent)
         {
             var commandController = PlayerUnitCommandController.ActiveInstance ?? FindFirstObjectByType<PlayerUnitCommandController>();
@@ -166,6 +209,7 @@ namespace ProjectS
                 new ResourceAmount(150, 0),
                 8f,
                 new Vector2Int(2, 2));
+            placementService.ConfigureBuildOptions(spliterProductionPrototype, autoTurretPrototype, speedAuraPrototype);
 
             var hud = FindFirstObjectByType<RtsGameHud>();
             if (hud == null)
@@ -267,7 +311,7 @@ namespace ProjectS
             root.SetActive(false);
             root.AddComponent<SpriteRenderer>();
             var visual = root.AddComponent<PrototypeBuildingVisual>();
-            visual.Configure(color, new Color(0.08f, 0.13f, 0.18f, 1f), size);
+            visual.Configure(color, new Color(0.08f, 0.13f, 0.18f, 1f), size, GetBuildingSpriteResourcePath(kind));
 
             var collider = root.AddComponent<BoxCollider2D>();
             collider.size = size;
@@ -285,7 +329,27 @@ namespace ProjectS
                 root.AddComponent<UnitProductionQueue>();
             }
 
+            if (kind == BuildingKind.AutoTurret)
+            {
+                root.AddComponent<BuildingAutoTurret>();
+            }
+            else if (kind == BuildingKind.SpeedAura)
+            {
+                root.AddComponent<BuildingSpeedAura>();
+            }
+
             return root;
+        }
+
+        private static string GetBuildingSpriteResourcePath(BuildingKind kind)
+        {
+            switch (kind)
+            {
+                case BuildingKind.SpliterProduction: return "Temp/Buildings/SpliterProductionBuilding";
+                case BuildingKind.AutoTurret: return "Temp/Buildings/AutoTurretBuilding";
+                case BuildingKind.SpeedAura: return "Temp/Buildings/SpeedAuraBuilding";
+                default: return string.Empty;
+            }
         }
 
         private static GameObject CreateConstructionSitePrototype(Transform parent)

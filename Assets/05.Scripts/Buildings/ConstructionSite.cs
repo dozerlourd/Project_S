@@ -237,7 +237,9 @@ namespace ProjectS.Buildings
                 gameObject.AddComponent<ResourceDropOff>();
             }
 
-            if ((completedBuildingKind == BuildingKind.MainBase || completedBuildingKind == BuildingKind.Production)
+            if ((completedBuildingKind == BuildingKind.MainBase
+                    || completedBuildingKind == BuildingKind.Production
+                    || completedBuildingKind == BuildingKind.SpliterProduction)
                 && GetComponent<UnitProductionQueue>() == null)
             {
                 gameObject.AddComponent<UnitProductionQueue>();

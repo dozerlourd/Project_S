@@ -7,6 +7,7 @@ namespace ProjectS.Buildings
         [SerializeField] private Color bodyColor = new Color(0.42f, 0.62f, 0.88f, 1f);
         [SerializeField] private Color trimColor = new Color(0.08f, 0.14f, 0.24f, 1f);
         [SerializeField] private Vector2 worldSize = new Vector2(2f, 2f);
+        [SerializeField] private string spriteResourcePath;
 
         private SpriteRenderer spriteRenderer;
         private BoxCollider2D boxCollider;
@@ -32,11 +33,12 @@ namespace ProjectS.Buildings
             worldSize = new Vector2(Mathf.Max(0.25f, worldSize.x), Mathf.Max(0.25f, worldSize.y));
         }
 
-        public void Configure(Color body, Color trim, Vector2 size)
+        public void Configure(Color body, Color trim, Vector2 size, string resourcePath = null)
         {
             bodyColor = body;
             trimColor = trim;
             worldSize = new Vector2(Mathf.Max(0.25f, size.x), Mathf.Max(0.25f, size.y));
+            spriteResourcePath = resourcePath ?? string.Empty;
             if (Application.isPlaying)
             {
                 ApplyVisual();
@@ -59,7 +61,7 @@ namespace ProjectS.Buildings
                 return;
             }
 
-            spriteRenderer.sprite = CreateSprite();
+            spriteRenderer.sprite = CreateSpriteFromResource() ?? CreateSprite();
             spriteRenderer.drawMode = SpriteDrawMode.Sliced;
             spriteRenderer.size = worldSize;
             spriteRenderer.sortingOrder = 20;
@@ -103,6 +105,26 @@ namespace ProjectS.Buildings
 
             texture.Apply();
             return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 24f);
+        }
+
+        private Sprite CreateSpriteFromResource()
+        {
+            if (string.IsNullOrWhiteSpace(spriteResourcePath))
+            {
+                return null;
+            }
+
+            var texture = UnityEngine.Resources.Load<Texture2D>(spriteResourcePath);
+            if (texture == null)
+            {
+                return null;
+            }
+
+            return Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                Mathf.Max(texture.width, texture.height) / Mathf.Max(worldSize.x, worldSize.y));
         }
     }
 }

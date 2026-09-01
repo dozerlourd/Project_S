@@ -81,16 +81,24 @@ namespace ProjectS.Tilemaps
                 return true;
             }
 
-            var open = new List<Vector3Int> { start };
+            var open = new CellPriorityQueue();
+            var openSet = new HashSet<Vector3Int> { start };
             var cameFrom = new Dictionary<Vector3Int, Vector3Int>();
             var gScore = new Dictionary<Vector3Int, float> { [start] = 0f };
             var fScore = new Dictionary<Vector3Int, float> { [start] = Heuristic(start, goal) };
             var closed = new HashSet<Vector3Int>();
             var expandedCells = 0;
+            open.Enqueue(start, fScore[start]);
 
             while (open.Count > 0 && expandedCells < maxExpandedCells)
             {
-                var current = PopLowestScore(open, fScore);
+                var current = open.Dequeue();
+                openSet.Remove(current);
+                if (closed.Contains(current))
+                {
+                    continue;
+                }
+
                 if (current == goal)
                 {
                     BuildWorldPath(cameFrom, current, result);
@@ -128,10 +136,16 @@ namespace ProjectS.Tilemaps
 
                     cameFrom[neighbor] = current;
                     gScore[neighbor] = tentativeScore;
-                    fScore[neighbor] = tentativeScore + Heuristic(neighbor, goal);
-                    if (!open.Contains(neighbor))
+                    var neighborScore = tentativeScore + Heuristic(neighbor, goal);
+                    fScore[neighbor] = neighborScore;
+                    if (!openSet.Contains(neighbor))
                     {
-                        open.Add(neighbor);
+                        open.Enqueue(neighbor, neighborScore);
+                        openSet.Add(neighbor);
+                    }
+                    else
+                    {
+                        open.Enqueue(neighbor, neighborScore);
                     }
                 }
             }
@@ -248,9 +262,7 @@ namespace ProjectS.Tilemaps
                 return false;
             }
 
-            return IsSegmentWalkable(
-                tilemapWorld.GetCellCenterWorld(from),
-                tilemapWorld.GetCellCenterWorld(to));
+            return tilemapWorld.IsWalkable(from) && tilemapWorld.IsWalkable(to);
         }
 
         private static bool IsDynamicallyBlocked(
@@ -296,25 +308,6 @@ namespace ProjectS.Tilemaps
             }
         }
 
-        private static Vector3Int PopLowestScore(List<Vector3Int> open, Dictionary<Vector3Int, float> fScore)
-        {
-            var bestIndex = 0;
-            var bestScore = fScore.TryGetValue(open[0], out var score) ? score : float.PositiveInfinity;
-            for (var i = 1; i < open.Count; i++)
-            {
-                var candidateScore = fScore.TryGetValue(open[i], out score) ? score : float.PositiveInfinity;
-                if (candidateScore < bestScore)
-                {
-                    bestScore = candidateScore;
-                    bestIndex = i;
-                }
-            }
-
-            var best = open[bestIndex];
-            open.RemoveAt(bestIndex);
-            return best;
-        }
-
         private static bool IsDiagonalMove(Vector3Int from, Vector3Int to)
         {
             var delta = to - from;
@@ -324,6 +317,95 @@ namespace ProjectS.Tilemaps
         private static float Heuristic(Vector3Int from, Vector3Int to)
         {
             return Mathf.Abs(from.x - to.x) + Mathf.Abs(from.y - to.y);
+        }
+
+        private sealed class CellPriorityQueue
+        {
+            private readonly List<Entry> entries = new List<Entry>();
+
+            public int Count => entries.Count;
+
+            public void Enqueue(Vector3Int cell, float priority)
+            {
+                entries.Add(new Entry(cell, priority));
+                SiftUp(entries.Count - 1);
+            }
+
+            public Vector3Int Dequeue()
+            {
+                var best = entries[0].Cell;
+                var lastIndex = entries.Count - 1;
+                entries[0] = entries[lastIndex];
+                entries.RemoveAt(lastIndex);
+                if (entries.Count > 0)
+                {
+                    SiftDown(0);
+                }
+
+                return best;
+            }
+
+            private void SiftUp(int index)
+            {
+                while (index > 0)
+                {
+                    var parent = (index - 1) / 2;
+                    if (entries[parent].Priority <= entries[index].Priority)
+                    {
+                        break;
+                    }
+
+                    Swap(parent, index);
+                    index = parent;
+                }
+            }
+
+            private void SiftDown(int index)
+            {
+                while (true)
+                {
+                    var left = index * 2 + 1;
+                    var right = left + 1;
+                    var best = index;
+
+                    if (left < entries.Count && entries[left].Priority < entries[best].Priority)
+                    {
+                        best = left;
+                    }
+
+                    if (right < entries.Count && entries[right].Priority < entries[best].Priority)
+                    {
+                        best = right;
+                    }
+
+                    if (best == index)
+                    {
+                        break;
+                    }
+
+                    Swap(index, best);
+                    index = best;
+                }
+            }
+
+            private void Swap(int a, int b)
+            {
+                var temp = entries[a];
+                entries[a] = entries[b];
+                entries[b] = temp;
+            }
+
+            private readonly struct Entry
+            {
+                public Entry(Vector3Int cell, float priority)
+                {
+                    Cell = cell;
+                    Priority = priority;
+                }
+
+                public Vector3Int Cell { get; }
+                public float Priority { get; }
+            }
         }
     }
 }

@@ -35,7 +35,10 @@ namespace ProjectS.Units
         private Vector2 dragStartScreenPosition;
         private Vector2 dragCurrentScreenPosition;
         private IUnitBuildPlacementService pendingBuildPlacementService;
+        private IUnitBuildPlacementService defaultBuildPlacementService;
         private IUnitRallyPointService pendingRallyQueue;
+        private string buildPlacementFeedback;
+        private bool isBuildMenuOpen;
         private bool isLeftMousePressed;
         private bool isDraggingSelection;
         private bool warnedMissingCamera;
@@ -53,29 +56,31 @@ namespace ProjectS.Units
         private const float CommandPanelRightMargin = 12f;
         private const float CommandPanelBottomMargin = 12f;
         private const float CommandPanelWidth = 420f;
-        private const float CommandPanelHeight = 286f;
+        private const float CommandPanelHeight = 400f;
         private const float PathStatsPanelRightMargin = 12f;
         private const float PathStatsPanelTopY = 12f;
         private const float PathStatsPanelWidth = 280f;
         private const float PathStatsPanelHeight = 92f;
+        private const string FriendlyBuilderRequiredMessage = "Select a friendly builder before placing.";
 
         public static PlayerUnitCommandController ActiveInstance { get; private set; }
         public UnitTeam PlayerTeam => playerTeam;
         public IReadOnlyList<UnitCommandAgent> SelectedUnits => selectedUnits;
         public IPlayerSelectableTarget PrimarySelection { get; private set; }
         public bool IsBuildPlacementPending => pendingBuildPlacementService != null;
+        public bool IsBuildMenuOpen => isBuildMenuOpen;
         public string BuildPlacementStatusMessage
         {
             get
             {
                 if (pendingBuildPlacementService == null)
                 {
-                    return string.Empty;
+                    return buildPlacementFeedback;
                 }
 
-                if (selectedUnits.Count == 0)
+                if (!HasSelectedFriendlyBuilder())
                 {
-                    return "Select a builder before placing.";
+                    return FriendlyBuilderRequiredMessage;
                 }
 
                 if (!TryGetBuildPlacementPoint(out var destination))
@@ -469,11 +474,15 @@ namespace ProjectS.Units
 
         private void CommandBuildPlacement()
         {
-            if (pendingBuildPlacementService == null || selectedUnits.Count == 0)
+            if (pendingBuildPlacementService == null)
             {
-                pendingBuildPlacementService = null;
-                pendingRallyQueue = null;
-                WarnCommandBlockedReason();
+                return;
+            }
+
+            if (!HasSelectedFriendlyBuilder())
+            {
+                buildPlacementFeedback = FriendlyBuilderRequiredMessage;
+                WarnPlacementFailure();
                 return;
             }
 
@@ -492,16 +501,18 @@ namespace ProjectS.Units
                     constructionSite,
                     false));
                 pendingBuildPlacementService = null;
+                buildPlacementFeedback = string.Empty;
                 return;
             }
 
             WarnPlacementFailure();
         }
 
-        private void CancelBuildPlacement()
+        public void CancelBuildPlacement()
         {
             pendingBuildPlacementService = null;
             pendingRallyQueue = null;
+            buildPlacementFeedback = string.Empty;
         }
 
         private void WarnPlacementFailure()
@@ -512,6 +523,11 @@ namespace ProjectS.Units
             }
 
             var reason = pendingBuildPlacementService.LastPlacementFailureReason;
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                reason = BuildPlacementStatusMessage;
+            }
+
             if (string.IsNullOrWhiteSpace(reason))
             {
                 reason = "Building placement failed.";
@@ -540,44 +556,91 @@ namespace ProjectS.Units
 
         public void BeginMoveCommand()
         {
+            CloseBuildMenu();
             pendingPointCommand = PendingPointCommand.Move;
             pendingBuildPlacementService = null;
             pendingRallyQueue = null;
+            buildPlacementFeedback = string.Empty;
         }
 
         public void BeginAttackMoveCommand()
         {
+            CloseBuildMenu();
             pendingPointCommand = PendingPointCommand.AttackMove;
             pendingBuildPlacementService = null;
             pendingRallyQueue = null;
+            buildPlacementFeedback = string.Empty;
         }
 
         public void BeginPatrolCommand()
         {
+            CloseBuildMenu();
             pendingPointCommand = PendingPointCommand.Patrol;
             pendingBuildPlacementService = null;
             pendingRallyQueue = null;
+            buildPlacementFeedback = string.Empty;
         }
 
         public void BeginBuildPlacement(IUnitBuildPlacementService placementService)
         {
             pendingPointCommand = PendingPointCommand.None;
-            pendingBuildPlacementService = placementService;
             pendingRallyQueue = null;
+            if (placementService == null)
+            {
+                pendingBuildPlacementService = null;
+                buildPlacementFeedback = "Building placement is unavailable.";
+                return;
+            }
+
+            if (!HasSelectedFriendlyBuilder())
+            {
+                pendingBuildPlacementService = null;
+                buildPlacementFeedback = FriendlyBuilderRequiredMessage;
+                return;
+            }
+
+            pendingBuildPlacementService = placementService;
+            buildPlacementFeedback = string.Empty;
+        }
+
+        public void SetDefaultBuildPlacementService(IUnitBuildPlacementService placementService)
+        {
+            defaultBuildPlacementService = placementService;
+        }
+
+        public void ToggleBuildMenu()
+        {
+            isBuildMenuOpen = !isBuildMenuOpen;
+            if (!isBuildMenuOpen)
+            {
+                return;
+            }
+
+            pendingPointCommand = PendingPointCommand.None;
+            CancelBuildPlacement();
+        }
+
+        public void CloseBuildMenu()
+        {
+            isBuildMenuOpen = false;
         }
 
         public void BeginRallyPointCommand(IUnitRallyPointService productionQueue)
         {
+            CloseBuildMenu();
             pendingPointCommand = PendingPointCommand.None;
             pendingBuildPlacementService = null;
             pendingRallyQueue = productionQueue;
+            buildPlacementFeedback = string.Empty;
         }
 
         public void StopSelectedUnits()
         {
+            CloseBuildMenu();
             pendingPointCommand = PendingPointCommand.None;
             pendingBuildPlacementService = null;
             pendingRallyQueue = null;
+            buildPlacementFeedback = string.Empty;
             foreach (var unit in selectedUnits)
             {
                 unit?.Stop();
@@ -586,9 +649,11 @@ namespace ProjectS.Units
 
         public void HoldSelectedUnits()
         {
+            CloseBuildMenu();
             pendingPointCommand = PendingPointCommand.None;
             pendingBuildPlacementService = null;
             pendingRallyQueue = null;
+            buildPlacementFeedback = string.Empty;
             foreach (var unit in selectedUnits)
             {
                 unit?.HoldPosition();
@@ -597,14 +662,10 @@ namespace ProjectS.Units
 
         private void IssueToSelected(UnitCommand command)
         {
-            var pointCommand = command.Target == null
-                && command.InteractableTarget == null
-                && (command.Mode == UnitCommandMode.Move
-                    || command.Mode == UnitCommandMode.AttackMove
-                    || command.Mode == UnitCommandMode.Patrol);
+            var shouldReserveDestinations = ShouldReserveCommandDestinations(command);
             var destinationIndex = 0;
             var destinationCount = CountLiveSelectedUnits();
-            if (pointCommand)
+            if (shouldReserveDestinations)
             {
                 RebuildOccupiedCommandCells();
             }
@@ -618,12 +679,12 @@ namespace ProjectS.Units
                     continue;
                 }
 
-                if (pointCommand)
+                if (shouldReserveDestinations)
                 {
                     var status = unit.GetComponent<PrototypeUnitStatus>();
                     var footprint = status != null ? status.OccupiedCells : Vector2Int.one;
                     var offsetDestination = GetUniqueTileDestination(command.Destination, destinationIndex, destinationCount, footprint);
-                    unit.Issue(new UnitCommand(command.Mode, offsetDestination, null, false));
+                    unit.Issue(new UnitCommand(command.Mode, offsetDestination, command.Target, command.InteractableTarget, false));
                     destinationIndex++;
                 }
                 else
@@ -632,11 +693,20 @@ namespace ProjectS.Units
                 }
             }
 
-            if (pointCommand)
+            if (shouldReserveDestinations)
             {
                 reservedCommandCells.Clear();
                 occupiedCommandCells.Clear();
             }
+        }
+
+        private static bool ShouldReserveCommandDestinations(UnitCommand command)
+        {
+            return command.Mode == UnitCommandMode.Move
+                || command.Mode == UnitCommandMode.AttackMove
+                || command.Mode == UnitCommandMode.Patrol
+                || command.Mode == UnitCommandMode.FocusAttack
+                || command.Mode == UnitCommandMode.Interact;
         }
 
         private int CountLiveSelectedUnits()
@@ -668,40 +738,34 @@ namespace ProjectS.Units
                 return;
             }
 
+            if (keyboard.mKey.wasPressedThisFrame)
+            {
+                BeginMoveCommand();
+            }
+
             if (keyboard.aKey.wasPressedThisFrame)
             {
-                pendingPointCommand = PendingPointCommand.AttackMove;
-                pendingBuildPlacementService = null;
-                pendingRallyQueue = null;
+                BeginAttackMoveCommand();
             }
 
             if (keyboard.pKey.wasPressedThisFrame)
             {
-                pendingPointCommand = PendingPointCommand.Patrol;
-                pendingBuildPlacementService = null;
-                pendingRallyQueue = null;
+                BeginPatrolCommand();
             }
 
             if (keyboard.sKey.wasPressedThisFrame)
             {
-                pendingPointCommand = PendingPointCommand.None;
-                pendingBuildPlacementService = null;
-                pendingRallyQueue = null;
-                foreach (var unit in selectedUnits)
-                {
-                    unit?.Stop();
-                }
+                StopSelectedUnits();
             }
 
             if (keyboard.hKey.wasPressedThisFrame)
             {
-                pendingPointCommand = PendingPointCommand.None;
-                pendingBuildPlacementService = null;
-                pendingRallyQueue = null;
-                foreach (var unit in selectedUnits)
-                {
-                    unit?.HoldPosition();
-                }
+                HoldSelectedUnits();
+            }
+
+            if (keyboard.bKey.wasPressedThisFrame)
+            {
+                ToggleBuildMenu();
             }
 
             HandleControlGroups(keyboard);
@@ -742,6 +806,31 @@ namespace ProjectS.Units
             {
                 WarnOnce(ref warnedNoSelectedUnits, "Player move command ignored because no player ground unit is selected.");
             }
+        }
+
+        private bool HasSelectedFriendlyBuilder()
+        {
+            for (var i = selectedUnits.Count - 1; i >= 0; i--)
+            {
+                var unit = selectedUnits[i];
+                if (unit == null)
+                {
+                    selectedUnits.RemoveAt(i);
+                    continue;
+                }
+
+                var status = unit.Status;
+                if (status != null
+                    && status.isActiveAndEnabled
+                    && status.IsAlive
+                    && status.Team == playerTeam
+                    && status.Roles.HasFlag(UnitRole.Builder))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool TryGetCommandPoint(out Vector3 destination)

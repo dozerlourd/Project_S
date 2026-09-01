@@ -24,14 +24,18 @@ namespace ProjectS.Units
         private UnitPathAgent pathAgent;
         private Collider2D attackCollider;
         private IUnitInteractionHandler[] interactionHandlers;
+        private IUnitCommandInterruptHandler[] interruptHandlers;
         private bool isRegistered;
         private UnitCommandMode mode = UnitCommandMode.Idle;
         private UnitActionState actionState = UnitActionState.Idle;
+        private UnitCommand latestCommand;
+        private int latestCommandId;
         private Vector3 commandDestination;
         private Vector3 patrolStart;
         private Vector3 patrolEnd;
         private IUnitAttackTarget priorityTarget;
         private Vector3 lastFocusPathTarget;
+        private Vector3 focusTargetOffset;
         private bool hasFocusPathTarget;
         private bool targetMustStayDetected;
         private float nextScanTime;
@@ -40,7 +44,10 @@ namespace ProjectS.Units
 
         public UnitCommandMode Mode => mode;
         public UnitActionState ActionState => actionState;
+        public UnitCommand LatestCommand => latestCommand;
+        public int LatestCommandId => latestCommandId;
         public IUnitAttackTarget PriorityTarget => priorityTarget;
+        public Vector3 CommandDestination => commandDestination;
         public PrototypeUnitStatus Status => status;
         public string LastInteractionFailureReason => lastInteractionFailureReason;
 
@@ -90,29 +97,63 @@ namespace ProjectS.Units
 
         public void Issue(UnitCommand command)
         {
-            Execute(command);
+            var commandId = BeginNewCommand(command);
+            Execute(command, commandId);
         }
 
         public void Stop()
         {
-            ClearTarget();
-            mode = UnitCommandMode.Idle;
-            actionState = UnitActionState.Idle;
-            pathAgent.ClearPath();
+            Issue(new UnitCommand(UnitCommandMode.Idle, transform.position, null, false));
         }
 
         public void HoldPosition()
         {
-            ClearTarget();
-            mode = UnitCommandMode.HoldPosition;
-            actionState = UnitActionState.HoldingPosition;
-            pathAgent.ClearPath();
+            Issue(new UnitCommand(UnitCommandMode.HoldPosition, transform.position, null, false));
         }
 
-        private void Execute(UnitCommand command)
+        public bool TryRetaliate(IUnitAttackTarget attacker)
         {
+            if ((mode != UnitCommandMode.Idle && mode != UnitCommandMode.HoldPosition)
+                || !CanAttack()
+                || !IsAttackableTarget(attacker))
+            {
+                return false;
+            }
+
+            Issue(new UnitCommand(UnitCommandMode.FocusAttack, attacker.SelectionTransform.position, attacker, false));
+            return true;
+        }
+
+        private int BeginNewCommand(UnitCommand command)
+        {
+            ResolveReferences();
+            if (latestCommandId > 0 || mode != UnitCommandMode.Idle || actionState != UnitActionState.Idle)
+            {
+                NotifyCommandInterrupted();
+            }
+
+            latestCommand = command;
+            latestCommandId++;
             pathAgent.ClearPath();
             ClearTarget();
+            lastInteractionFailureReason = string.Empty;
+            commandDestination = command.Destination;
+            mode = command.Mode;
+            return latestCommandId;
+        }
+
+        private bool IsLatestCommand(int commandId)
+        {
+            return commandId == latestCommandId;
+        }
+
+        private void Execute(UnitCommand command, int commandId)
+        {
+            if (!IsLatestCommand(commandId))
+            {
+                return;
+            }
+
             commandDestination = command.Destination;
             mode = command.Mode;
 
@@ -128,6 +169,9 @@ namespace ProjectS.Units
                     break;
                 case UnitCommandMode.FocusAttack:
                     priorityTarget = command.Target;
+                    focusTargetOffset = command.Target != null
+                        ? command.Destination - command.Target.SelectionTransform.position
+                        : Vector3.zero;
                     targetMustStayDetected = false;
                     UpdateTargetEngagement();
                     break;
@@ -153,6 +197,8 @@ namespace ProjectS.Units
                     actionState = UnitActionState.Idle;
                     break;
             }
+
+            SyncPathOccupationOverride();
         }
 
         private void UpdateTargetEngagement()
@@ -185,7 +231,7 @@ namespace ProjectS.Units
 
         private void MoveTowardTarget(IUnitAttackTarget target)
         {
-            var targetPosition = target.SelectionTransform.position;
+            var targetPosition = target.SelectionTransform.position + focusTargetOffset;
 
             if (pathAgent.HasPath
                 && hasFocusPathTarget
@@ -377,6 +423,7 @@ namespace ProjectS.Units
         private void ClearTarget()
         {
             priorityTarget = null;
+            focusTargetOffset = Vector3.zero;
             hasFocusPathTarget = false;
             targetMustStayDetected = false;
             nextTargetRepathTime = 0f;
@@ -403,6 +450,25 @@ namespace ProjectS.Units
             if (interactionHandlers == null || interactionHandlers.Length == 0)
             {
                 interactionHandlers = GetComponents<IUnitInteractionHandler>();
+            }
+
+            if (interruptHandlers == null || interruptHandlers.Length == 0)
+            {
+                interruptHandlers = GetComponents<IUnitCommandInterruptHandler>();
+            }
+        }
+
+        private void NotifyCommandInterrupted()
+        {
+            ResolveReferences();
+            if (interruptHandlers == null || interruptHandlers.Length == 0)
+            {
+                return;
+            }
+
+            for (var i = 0; i < interruptHandlers.Length; i++)
+            {
+                interruptHandlers[i]?.OnUnitCommandInterrupted();
             }
         }
 

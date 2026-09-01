@@ -38,6 +38,11 @@ namespace ProjectS.Units
         bool TryHandleInteractionCommand(IUnitInteractableTarget target);
     }
 
+    public interface IUnitCommandInterruptHandler
+    {
+        void OnUnitCommandInterrupted();
+    }
+
     public interface IUnitBuildPlacementService
     {
         Vector2Int DefaultFootprint { get; }
@@ -79,6 +84,7 @@ namespace ProjectS.Units
         bool IsAlive { get; }
         Collider2D AttackCollider { get; }
         void TakeDamage(float amount);
+        void TakeDamage(float amount, IUnitAttackTarget attacker);
     }
 
     public readonly struct UnitCommand

@@ -26,6 +26,7 @@ namespace ProjectS.Units
         private PrototypeUnitStatus status;
         private ProjectSTilemapWorld occupiedWorld;
         private Vector3Int occupiedCell;
+        private readonly List<Vector3Int> occupiedCells = new List<Vector3Int>();
         private int waypointIndex;
         private Vector3 lastMoveDirection;
         private Vector3 requestedDestination;
@@ -348,7 +349,15 @@ namespace ProjectS.Units
 
         private bool IsCellAvailable(ProjectSTilemapWorld tilemapWorld, Vector3Int cell)
         {
-            return tilemapWorld.IsWalkable(cell) && !IsCellOccupied(tilemapWorld, cell);
+            foreach (var footprintCell in EnumerateFootprintCells(cell))
+            {
+                if (!tilemapWorld.IsWalkable(footprintCell) || IsCellOccupied(tilemapWorld, footprintCell))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private bool IsCellOccupied(ProjectSTilemapWorld tilemapWorld, Vector3Int cell)
@@ -383,7 +392,7 @@ namespace ProjectS.Units
             }
 
             var nextCell = tilemapWorld.WorldToCell(transform.position);
-            if (hasOccupiedCell && occupiedCell == nextCell)
+            if (hasOccupiedCell && occupiedCell == nextCell && IsCurrentFootprintRegistered(nextCell))
             {
                 return;
             }
@@ -396,8 +405,14 @@ namespace ProjectS.Units
         {
             EnsureOccupancyWorld(tilemapWorld);
             var occupiedCellCounts = GetOccupiedCellCounts(status.Team);
-            occupiedCellCounts.TryGetValue(cell, out var count);
-            occupiedCellCounts[cell] = count + 1;
+            occupiedCells.Clear();
+            foreach (var footprintCell in EnumerateFootprintCells(cell))
+            {
+                occupiedCellCounts.TryGetValue(footprintCell, out var count);
+                occupiedCellCounts[footprintCell] = count + 1;
+                occupiedCells.Add(footprintCell);
+            }
+
             occupiedWorld = tilemapWorld;
             occupiedCell = cell;
             hasOccupiedCell = true;
@@ -413,18 +428,28 @@ namespace ProjectS.Units
             }
 
             var occupiedCellCounts = GetOccupiedCellCounts(status.Team);
-            if (occupiedWorld == occupancyWorld && occupiedCellCounts.TryGetValue(occupiedCell, out var count))
+            if (occupiedWorld == occupancyWorld)
             {
-                if (count <= 1)
+                for (var i = 0; i < occupiedCells.Count; i++)
                 {
-                    occupiedCellCounts.Remove(occupiedCell);
-                }
-                else
-                {
-                    occupiedCellCounts[occupiedCell] = count - 1;
+                    var cell = occupiedCells[i];
+                    if (!occupiedCellCounts.TryGetValue(cell, out var count))
+                    {
+                        continue;
+                    }
+
+                    if (count <= 1)
+                    {
+                        occupiedCellCounts.Remove(cell);
+                    }
+                    else
+                    {
+                        occupiedCellCounts[cell] = count - 1;
+                    }
                 }
             }
 
+            occupiedCells.Clear();
             hasOccupiedCell = false;
             occupiedWorld = null;
         }
@@ -535,6 +560,38 @@ namespace ProjectS.Units
         private float GetMovementSpeed()
         {
             return status != null ? status.MovementSpeed : 3f;
+        }
+
+        private bool IsCurrentFootprintRegistered(Vector3Int centerCell)
+        {
+            var index = 0;
+            foreach (var footprintCell in EnumerateFootprintCells(centerCell))
+            {
+                if (index >= occupiedCells.Count || occupiedCells[index] != footprintCell)
+                {
+                    return false;
+                }
+
+                index++;
+            }
+
+            return index == occupiedCells.Count;
+        }
+
+        private IEnumerable<Vector3Int> EnumerateFootprintCells(Vector3Int centerCell)
+        {
+            var footprint = status != null ? status.OccupiedCells : Vector2Int.one;
+            footprint = new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
+            var startX = centerCell.x - (footprint.x - 1) / 2;
+            var startY = centerCell.y - (footprint.y - 1) / 2;
+
+            for (var y = 0; y < footprint.y; y++)
+            {
+                for (var x = 0; x < footprint.x; x++)
+                {
+                    yield return new Vector3Int(startX + x, startY + y, centerCell.z);
+                }
+            }
         }
 
         private void ResolveNavigator(bool allowSceneSearch = false)

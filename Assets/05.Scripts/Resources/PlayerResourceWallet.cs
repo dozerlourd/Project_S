@@ -14,6 +14,9 @@ namespace ProjectS.Resources
 
         private ResourceAmount currentResources;
         private string lastFailureReason;
+        private bool initialized;
+        private bool registered;
+        private UnitTeam registeredTeam;
 
         public UnitTeam Team => team;
         public int Minerals => currentResources.Minerals;
@@ -28,22 +31,12 @@ namespace ProjectS.Resources
 
         private void OnEnable()
         {
-            if (WalletsByTeam.TryGetValue(team, out var existingWallet) && existingWallet != null && existingWallet != this)
-            {
-                Debug.LogWarning(
-                    $"Replacing existing resource wallet for {team}. Only one active wallet should own a team's resources.",
-                    this);
-            }
-
-            WalletsByTeam[team] = this;
+            Register(initialized);
         }
 
         private void OnDisable()
         {
-            if (WalletsByTeam.TryGetValue(team, out var wallet) && wallet == this)
-            {
-                WalletsByTeam.Remove(team);
-            }
+            Unregister();
         }
 
         public static PlayerResourceWallet FindForTeam(UnitTeam team)
@@ -53,20 +46,16 @@ namespace ProjectS.Resources
 
         public void Initialize(UnitTeam ownerTeam, ResourceAmount resources)
         {
-            if (isActiveAndEnabled
-                && WalletsByTeam.TryGetValue(team, out var registeredWallet)
-                && registeredWallet == this)
-            {
-                WalletsByTeam.Remove(team);
-            }
+            Unregister();
 
             team = ownerTeam;
             startingResources = resources;
             currentResources = resources;
             lastFailureReason = string.Empty;
+            initialized = true;
             if (isActiveAndEnabled)
             {
-                WalletsByTeam[team] = this;
+                Register(true);
             }
         }
 
@@ -102,6 +91,41 @@ namespace ProjectS.Resources
             lastFailureReason = $"Insufficient resources for cost ({cost}). Current resources: {currentResources}.";
             Debug.LogWarning(lastFailureReason, this);
             return false;
+        }
+
+        private void Register(bool allowReplacement)
+        {
+            if (WalletsByTeam.TryGetValue(team, out var existingWallet) && existingWallet != null && existingWallet != this)
+            {
+                if (!allowReplacement)
+                {
+                    registered = false;
+                    return;
+                }
+
+                Debug.LogWarning(
+                    $"Replacing existing resource wallet for {team}. Only one active wallet should own a team's resources.",
+                    this);
+            }
+
+            WalletsByTeam[team] = this;
+            registeredTeam = team;
+            registered = true;
+        }
+
+        private void Unregister()
+        {
+            if (!registered)
+            {
+                return;
+            }
+
+            if (WalletsByTeam.TryGetValue(registeredTeam, out var wallet) && wallet == this)
+            {
+                WalletsByTeam.Remove(registeredTeam);
+            }
+
+            registered = false;
         }
     }
 }

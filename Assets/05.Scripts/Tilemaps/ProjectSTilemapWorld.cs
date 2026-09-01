@@ -20,6 +20,11 @@ namespace ProjectS.Tilemaps
         [SerializeField] private bool emptyCellsBuildable;
 
         private readonly List<Tilemap> queryTilemaps = new List<Tilemap>();
+        private readonly Dictionary<Vector3Int, ProjectSTileSample> sampleCache =
+            new Dictionary<Vector3Int, ProjectSTileSample>();
+
+        private BoundsInt cachedBounds;
+        private bool cacheDirty = true;
 
         public static ProjectSTilemapWorld ActiveInstance { get; private set; }
 
@@ -31,12 +36,14 @@ namespace ProjectS.Tilemaps
         private void Awake()
         {
             ResolveReferences();
+            MarkNavigationCacheDirty();
             ActiveInstance = this;
         }
 
         private void OnEnable()
         {
             ResolveReferences();
+            MarkNavigationCacheDirty();
             ActiveInstance = this;
         }
 
@@ -64,6 +71,8 @@ namespace ProjectS.Tilemaps
             {
                 explicitBounds.size = new Vector3Int(explicitBounds.size.x, explicitBounds.size.y, 1);
             }
+
+            MarkNavigationCacheDirty();
         }
 
         public void ResolveReferences()
@@ -79,6 +88,28 @@ namespace ProjectS.Tilemaps
             }
 
             RebuildQueryTilemaps();
+        }
+
+        public void MarkNavigationCacheDirty()
+        {
+            cacheDirty = true;
+        }
+
+        public void RebuildNavigationCache()
+        {
+            ResolveReferences();
+            sampleCache.Clear();
+            cachedBounds = CellBounds;
+
+            foreach (var position in cachedBounds.allPositionsWithin)
+            {
+                if (TrySampleUncached(position, cachedBounds, out var sample))
+                {
+                    sampleCache[position] = sample;
+                }
+            }
+
+            cacheDirty = false;
         }
 
         public Vector3Int WorldToCell(Vector3 worldPosition)
@@ -116,13 +147,24 @@ namespace ProjectS.Tilemaps
 
         public bool TrySample(Vector3Int cell, out ProjectSTileSample sample)
         {
+            EnsureNavigationCache();
+            if (!ContainsCachedCell(cell))
+            {
+                sample = default;
+                return false;
+            }
+
+            return sampleCache.TryGetValue(cell, out sample);
+        }
+
+        private bool TrySampleUncached(Vector3Int cell, BoundsInt bounds, out ProjectSTileSample sample)
+        {
             sample = default;
-            if (!ContainsCell(cell))
+            if (!ContainsCell(bounds, cell))
             {
                 return false;
             }
 
-            ResolveReferences();
             var hasTile = false;
             var terrainType = fallbackTerrainType;
             var walkable = emptyCellsWalkable;
@@ -283,6 +325,27 @@ namespace ProjectS.Tilemaps
             }
 
             return new BoundsInt(min, max - min);
+        }
+
+        private void EnsureNavigationCache()
+        {
+            if (cacheDirty)
+            {
+                RebuildNavigationCache();
+            }
+        }
+
+        private bool ContainsCachedCell(Vector3Int cell)
+        {
+            return ContainsCell(cachedBounds, cell);
+        }
+
+        private static bool ContainsCell(BoundsInt bounds, Vector3Int cell)
+        {
+            return cell.x >= bounds.xMin
+                && cell.y >= bounds.yMin
+                && cell.x < bounds.xMax
+                && cell.y < bounds.yMax;
         }
     }
 }

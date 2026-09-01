@@ -6,7 +6,7 @@ namespace ProjectS.Buildings
     [RequireComponent(typeof(PrototypeUnitStatus))]
     [RequireComponent(typeof(UnitCommandAgent))]
     [RequireComponent(typeof(UnitPathAgent))]
-    public sealed class WorkerConstructionController : MonoBehaviour, IUnitInteractionHandler
+    public sealed class WorkerConstructionController : MonoBehaviour, IUnitInteractionHandler, IUnitCommandInterruptHandler
     {
         [SerializeField, Min(0.1f)] private float buildPower = 1f;
 
@@ -14,6 +14,7 @@ namespace ProjectS.Buildings
         private UnitCommandAgent commandAgent;
         private UnitPathAgent pathAgent;
         private ConstructionSite targetSite;
+        private Vector3 targetInteractionPoint;
 
         private void Awake()
         {
@@ -40,11 +41,11 @@ namespace ProjectS.Buildings
                 return;
             }
 
-            if (!IsInRange(targetSite.InteractionPoint, targetSite.InteractionRange))
+            if (!IsInRange(targetInteractionPoint, targetSite.InteractionRange))
             {
                 if (!pathAgent.HasPath)
                 {
-                    pathAgent.MoveTo(targetSite.InteractionPoint);
+                    pathAgent.MoveTo(targetInteractionPoint);
                 }
 
                 return;
@@ -67,8 +68,15 @@ namespace ProjectS.Buildings
             }
 
             targetSite = site;
-            pathAgent.MoveTo(site.InteractionPoint);
+            targetInteractionPoint = commandAgent.CommandDestination;
+            pathAgent.MoveTo(targetInteractionPoint);
             return true;
+        }
+
+        public void OnUnitCommandInterrupted()
+        {
+            targetSite = null;
+            targetInteractionPoint = default;
         }
 
         private bool IsInRange(Vector3 point, float range)

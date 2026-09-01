@@ -7,7 +7,7 @@ namespace ProjectS.Resources
     [RequireComponent(typeof(PrototypeUnitStatus))]
     [RequireComponent(typeof(UnitCommandAgent))]
     [RequireComponent(typeof(UnitPathAgent))]
-    public sealed class WorkerGatherController : MonoBehaviour, IUnitInteractionHandler
+    public sealed class WorkerGatherController : MonoBehaviour, IUnitInteractionHandler, IUnitCommandInterruptHandler
     {
         [SerializeField, Min(1)] private int carryCapacity = 5;
         [SerializeField, Min(0.1f)] private float fallbackGatherRange = 0.85f;
@@ -92,6 +92,11 @@ namespace ProjectS.Resources
             }
 
             return false;
+        }
+
+        public void OnUnitCommandInterrupted()
+        {
+            CancelGathering(false);
         }
 
         private bool StartGathering(ResourceNode resourceNode)

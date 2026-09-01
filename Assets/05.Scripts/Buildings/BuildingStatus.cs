@@ -8,6 +8,9 @@ namespace ProjectS.Buildings
         MainBase,
         Production,
         ResourceDropOff,
+        SpliterProduction,
+        AutoTurret,
+        SpeedAura,
         Other
     }
 
@@ -94,6 +97,11 @@ namespace ProjectS.Buildings
 
             EnsureHealth();
             health?.TakeDamage(amount);
+        }
+
+        public void TakeDamage(float amount, IUnitAttackTarget attacker)
+        {
+            TakeDamage(amount);
         }
 
         private void ResolveReferences()

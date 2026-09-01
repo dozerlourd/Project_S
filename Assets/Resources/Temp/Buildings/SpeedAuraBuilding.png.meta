@@ -1,0 +1,403 @@
+fileFormatVersion: 2
+guid: fa62a0ae41719ce45a73cda9a6e88177
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 6856502625248793145
+    second: SpeedAuraBuilding_0
+  - first:
+      213: -1654220290898572805
+    second: SpeedAuraBuilding_1
+  - first:
+      213: 42701677077145207
+    second: SpeedAuraBuilding_2
+  - first:
+      213: -2187849284323478388
+    second: SpeedAuraBuilding_3
+  - first:
+      213: 2766716653045167902
+    second: SpeedAuraBuilding_4
+  - first:
+      213: 3330461066300340551
+    second: SpeedAuraBuilding_5
+  - first:
+      213: -3371294849139483726
+    second: SpeedAuraBuilding_6
+  - first:
+      213: 3159721380693921102
+    second: SpeedAuraBuilding_7
+  - first:
+      213: -8260578116309277194
+    second: SpeedAuraBuilding_8
+  - first:
+      213: -5370670474318741102
+    second: SpeedAuraBuilding_9
+  - first:
+      213: 8609689888714240556
+    second: SpeedAuraBuilding_10
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 1334
+        height: 1179
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 932dc737fc0372f50800000000000000
+      internalID: 6856502625248793145
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_1
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 952
+        width: 5
+        height: 43
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bf94fbce8670b09e0800000000000000
+      internalID: -1654220290898572805
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_2
+      rect:
+        serializedVersion: 2
+        x: 20
+        y: 742
+        width: 49
+        height: 70
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7762f75f2f4b79000800000000000000
+      internalID: 42701677077145207
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_3
+      rect:
+        serializedVersion: 2
+        x: 22
+        y: 806
+        width: 13
+        height: 17
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c847ec9eaa233a1e0800000000000000
+      internalID: -2187849284323478388
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_4
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 684
+        width: 49
+        height: 55
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e173ae2232a556620800000000000000
+      internalID: 2766716653045167902
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_5
+      rect:
+        serializedVersion: 2
+        x: 14
+        y: 669
+        width: 11
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 749b91bb1bc283e20800000000000000
+      internalID: 3330461066300340551
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_6
+      rect:
+        serializedVersion: 2
+        x: 17
+        y: 450
+        width: 30
+        height: 39
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2bbdfe35231c631d0800000000000000
+      internalID: -3371294849139483726
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_7
+      rect:
+        serializedVersion: 2
+        x: 16
+        y: 385
+        width: 35
+        height: 45
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e4dc775dad599db20800000000000000
+      internalID: 3159721380693921102
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_8
+      rect:
+        serializedVersion: 2
+        x: 16
+        y: 211
+        width: 116
+        height: 124
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6f5250a38f78c5d80800000000000000
+      internalID: -8260578116309277194
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_9
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 179
+        width: 5
+        height: 30
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2918d8c98ab8775b0800000000000000
+      internalID: -5370670474318741102
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: SpeedAuraBuilding_10
+      rect:
+        serializedVersion: 2
+        x: 389
+        y: 0
+        width: 132
+        height: 5
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c22b5137653cb7770800000000000000
+      internalID: 8609689888714240556
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      SpeedAuraBuilding_0: 6856502625248793145
+      SpeedAuraBuilding_1: -1654220290898572805
+      SpeedAuraBuilding_10: 8609689888714240556
+      SpeedAuraBuilding_2: 42701677077145207
+      SpeedAuraBuilding_3: -2187849284323478388
+      SpeedAuraBuilding_4: 2766716653045167902
+      SpeedAuraBuilding_5: 3330461066300340551
+      SpeedAuraBuilding_6: -3371294849139483726
+      SpeedAuraBuilding_7: 3159721380693921102
+      SpeedAuraBuilding_8: -8260578116309277194
+      SpeedAuraBuilding_9: -5370670474318741102
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

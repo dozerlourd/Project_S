@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ProjectS.Units
@@ -117,6 +118,8 @@ namespace ProjectS.Units
         [SerializeField] private bool hasAreaAttack;
         [SerializeField] private float attackArea;
 
+        private readonly Dictionary<object, float> movementSpeedModifiers = new Dictionary<object, float>();
+
         public UnitTrial Trial => trial;
         public UnitTeam Team => team;
         public PrototypeUnitType UnitType => unitType;
@@ -133,7 +136,19 @@ namespace ProjectS.Units
         public float AttackRange => attackRange;
         public float DetectionRange => Mathf.Max(attackRange, detectionRange);
         public float AttackSpeed => attackSpeed;
-        public float MovementSpeed => movementSpeed;
+        public float MovementSpeed
+        {
+            get
+            {
+                var multiplier = 1f;
+                foreach (var modifier in movementSpeedModifiers.Values)
+                {
+                    multiplier *= Mathf.Max(0.01f, modifier);
+                }
+
+                return movementSpeed * multiplier;
+            }
+        }
         public int MaxAttackTargets => maxAttackTargets;
         public Vector2Int OccupiedCells => new Vector2Int(Mathf.Max(1, occupiedCells.x), Mathf.Max(1, occupiedCells.y));
         public bool HasHealthRegeneration => hasHealthRegeneration;
@@ -260,12 +275,39 @@ namespace ProjectS.Units
             }
         }
 
+        public void SetMovementSpeedModifier(object source, float multiplier)
+        {
+            if (source == null)
+            {
+                return;
+            }
+
+            movementSpeedModifiers[source] = Mathf.Max(0.01f, multiplier);
+        }
+
+        public void RemoveMovementSpeedModifier(object source)
+        {
+            if (source != null)
+            {
+                movementSpeedModifiers.Remove(source);
+            }
+        }
+
         public void TakeDamage(float amount)
+        {
+            TakeDamage(amount, null);
+        }
+
+        public void TakeDamage(float amount, IUnitAttackTarget attacker)
         {
             var health = GetComponent<UnitHealth>();
             if (health != null)
             {
                 health.TakeDamage(amount);
+                if (!health.IsDead)
+                {
+                    GetComponent<UnitCommandAgent>()?.TryRetaliate(attacker);
+                }
             }
         }
 

@@ -15,6 +15,16 @@ namespace ProjectS.UI
         private PlayerResourceWallet wallet;
         private ProjectS.RtsMatchController matchController;
         private string productionFeedback;
+        private static readonly Texture2D[] CommandIcons = new Texture2D[6];
+        private static readonly string[] CommandIconPaths =
+        {
+            "Temp/Commands/Command_Move",
+            "Temp/Commands/Command_AttackMove",
+            "Temp/Commands/Command_Patrol",
+            "Temp/Commands/Command_HoldPosition",
+            "Temp/Commands/Command_Stop",
+            "Temp/Commands/Command_Build"
+        };
 
         private const float ResourcePanelX = 12f;
         private const float ResourcePanelY = 12f;
@@ -24,7 +34,9 @@ namespace ProjectS.UI
         private const float SelectionPanelWidth = 360f;
         private const float SelectionPanelHeight = 220f;
         private const float CommandPanelWidth = 420f;
-        private const float CommandPanelHeight = 286f;
+        private const float CommandPanelHeight = 400f;
+        private const float CommandButtonSize = 64f;
+        private const float CommandButtonGap = 8f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntimeHud()
@@ -54,6 +66,11 @@ namespace ProjectS.UI
             if (buildingPlacementService == null)
             {
                 buildingPlacementService = BuildingPlacementService.ActiveInstance;
+            }
+
+            if (commandController != null)
+            {
+                commandController.SetDefaultBuildPlacementService(buildingPlacementService);
             }
 
             if (matchController == null)
@@ -207,52 +224,112 @@ namespace ProjectS.UI
             GUI.Box(rect, string.Empty);
             GUI.Label(new Rect(rect.x + 12f, rect.y + 10f, 320f, 22f), "Commands");
 
-            if (GUI.Button(new Rect(rect.x + 12f, rect.y + 38f, 78f, 28f), "Move"))
+            if (DrawCommandButton(CommandButtonRect(rect, 0), 0, "Move M"))
             {
                 commandController.BeginMoveCommand();
             }
 
-            if (GUI.Button(new Rect(rect.x + 96f, rect.y + 38f, 78f, 28f), "Attack"))
+            if (DrawCommandButton(CommandButtonRect(rect, 1), 1, "Attack A"))
             {
                 commandController.BeginAttackMoveCommand();
             }
 
-            if (GUI.Button(new Rect(rect.x + 180f, rect.y + 38f, 78f, 28f), "Patrol"))
+            if (DrawCommandButton(CommandButtonRect(rect, 2), 2, "Patrol P"))
             {
                 commandController.BeginPatrolCommand();
             }
 
-            if (GUI.Button(new Rect(rect.x + 264f, rect.y + 38f, 78f, 28f), "Hold"))
+            if (DrawCommandButton(CommandButtonRect(rect, 3), 3, "Hold H"))
             {
                 commandController.HoldSelectedUnits();
             }
 
-            if (GUI.Button(new Rect(rect.x + 12f, rect.y + 72f, 78f, 28f), "Stop"))
+            if (DrawCommandButton(CommandButtonRect(rect, 4), 4, "Stop S"))
             {
                 commandController.StopSelectedUnits();
             }
 
-            if (GUI.Button(new Rect(rect.x + 96f, rect.y + 72f, 78f, 28f), "Build")
-                && buildingPlacementService != null)
+            if (DrawCommandButton(CommandButtonRect(rect, 5), 5, "Build B"))
             {
-                commandController.BeginBuildPlacement(buildingPlacementService);
+                commandController.ToggleBuildMenu();
             }
 
             DrawBuildPlacementStatus(rect);
-            DrawCommandProductionButtons(rect);
+            if (commandController.IsBuildMenuOpen)
+            {
+                DrawBuildMenu(rect);
+            }
+            else
+            {
+                DrawCommandProductionButtons(rect);
+            }
         }
 
-        private void DrawBuildPlacementStatus(Rect panelRect)
+        private void DrawBuildMenu(Rect panelRect)
         {
-            if (!commandController.IsBuildPlacementPending)
+            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 190f, 280f, 22f), "Build structure (select a Builder first)");
+            DrawBuildOption(new Rect(panelRect.x + 12f, panelRect.y + 216f, 192f, 44f), BuildingKind.Production, "Combat Production\n150M");
+            DrawBuildOption(new Rect(panelRect.x + 216f, panelRect.y + 216f, 192f, 44f), BuildingKind.SpliterProduction, "Spliter Production\n175M");
+            DrawBuildOption(new Rect(panelRect.x + 12f, panelRect.y + 268f, 192f, 44f), BuildingKind.AutoTurret, "Auto Turret\n125M");
+            DrawBuildOption(new Rect(panelRect.x + 216f, panelRect.y + 268f, 192f, 44f), BuildingKind.SpeedAura, "Speed Aura\n125M/25G");
+            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 322f, 396f, 38f), "Choose a building, then left-click a valid tile. Esc cancels placement.");
+        }
+
+        private void DrawBuildOption(Rect buttonRect, BuildingKind buildingKind, string label)
+        {
+            if (!GUI.Button(buttonRect, label))
             {
                 return;
             }
 
+            if (buildingPlacementService == null || !buildingPlacementService.SelectBuilding(buildingKind))
+            {
+                productionFeedback = buildingPlacementService != null
+                    ? buildingPlacementService.LastPlacementFailureReason
+                    : "No building placement service is available.";
+                return;
+            }
+
+            commandController.BeginBuildPlacement(buildingPlacementService);
+            commandController.CloseBuildMenu();
+        }
+
+        private static bool DrawCommandButton(Rect rect, int iconIndex, string fallbackLabel)
+        {
+            var clicked = GUI.Button(rect, GUIContent.none);
+            if (CommandIcons[iconIndex] == null)
+            {
+                CommandIcons[iconIndex] = UnityEngine.Resources.Load<Texture2D>(CommandIconPaths[iconIndex]);
+            }
+
+            var icon = CommandIcons[iconIndex];
+            if (icon == null)
+            {
+                GUI.Label(rect, fallbackLabel);
+                return clicked;
+            }
+
+            GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, rect.width - 4f, rect.height - 4f), icon, ScaleMode.ScaleToFit, true);
+            return clicked;
+        }
+
+        private static Rect CommandButtonRect(Rect panelRect, int index)
+        {
+            var column = index < 4 ? index : index - 4;
+            var row = index < 4 ? 0 : 1;
+            return new Rect(
+                panelRect.x + 12f + column * (CommandButtonSize + CommandButtonGap),
+                panelRect.y + 38f + row * (CommandButtonSize + CommandButtonGap),
+                CommandButtonSize,
+                CommandButtonSize);
+        }
+
+        private void DrawBuildPlacementStatus(Rect panelRect)
+        {
             var message = commandController.BuildPlacementStatusMessage;
             if (!string.IsNullOrWhiteSpace(message))
             {
-                GUI.Label(new Rect(panelRect.x + 186f, panelRect.y + 72f, 222f, 44f), ShortenFailureReason(message));
+                GUI.Label(new Rect(panelRect.x + 164f, panelRect.y + 110f, 244f, 64f), ShortenFailureReason(message));
             }
         }
 
@@ -267,8 +344,8 @@ namespace ProjectS.UI
                 return;
             }
 
-            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 106f, 170f, 22f), "Production");
-            if (GUI.Button(new Rect(panelRect.x + 330f, panelRect.y + 104f, 78f, 26f), "Rally"))
+            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 190f, 170f, 22f), "Production");
+            if (GUI.Button(new Rect(panelRect.x + 330f, panelRect.y + 188f, 78f, 26f), "Rally"))
             {
                 commandController.BeginRallyPointCommand(productionQueue);
                 productionFeedback = "Click the map to set rally point.";
@@ -286,7 +363,7 @@ namespace ProjectS.UI
                 var column = i % 3;
                 var row = i / 3;
                 var x = panelRect.x + 12f + column * 132f;
-                var y = panelRect.y + 132f + row * 60f;
+                var y = panelRect.y + 216f + row * 60f;
                 var canEnqueue = productionQueue.CanEnqueue(definition, out var failureReason);
                 var buttonLabel = $"{definition.DisplayName}\n{FormatCost(definition.Cost)}";
                 if (GUI.Button(new Rect(x, y, 124f, 44f), buttonLabel))
@@ -312,7 +389,7 @@ namespace ProjectS.UI
                 : productionFeedback;
             if (!string.IsNullOrWhiteSpace(feedback))
             {
-                GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 264f, 396f, 18f), feedback);
+                GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 348f, 396f, 18f), feedback);
             }
         }
 
@@ -426,6 +503,7 @@ namespace ProjectS.UI
             var normalizedReason = failureReason.ToLowerInvariant();
             if (normalizedReason.Contains("left-click")
                 || normalizedReason.Contains("select a builder")
+                || normalizedReason.Contains("friendly builder")
                 || normalizedReason.Contains("move cursor"))
             {
                 return failureReason;

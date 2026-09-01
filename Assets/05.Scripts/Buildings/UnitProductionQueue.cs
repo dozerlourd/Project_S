@@ -24,7 +24,14 @@ namespace ProjectS.Buildings
         private Vector3 rallyPoint;
         private string lastEnqueueFailureReason;
 
-        public IReadOnlyList<UnitProductionDefinition> ProducibleUnits => producibleUnits;
+        public IReadOnlyList<UnitProductionDefinition> ProducibleUnits
+        {
+            get
+            {
+                RemoveUnsupportedDefinitions();
+                return producibleUnits;
+            }
+        }
         public int PendingCount => queue.Count;
         public int QueuedCount => queue.Count + (activeProduction != null ? 1 : 0);
         public int MaxQueueSize => Mathf.Max(1, maxQueueSize);
@@ -74,6 +81,7 @@ namespace ProjectS.Buildings
 
         public bool TryEnqueue(int definitionIndex)
         {
+            RemoveUnsupportedDefinitions();
             if (definitionIndex < 0 || definitionIndex >= producibleUnits.Length)
             {
                 return FailEnqueue($"Invalid production definition index: {definitionIndex}.");
@@ -84,6 +92,7 @@ namespace ProjectS.Buildings
 
         public bool TryEnqueue(PrototypeUnitType unitType)
         {
+            RemoveUnsupportedDefinitions();
             for (var i = 0; i < producibleUnits.Length; i++)
             {
                 var definition = producibleUnits[i];
@@ -127,6 +136,7 @@ namespace ProjectS.Buildings
         public bool CanEnqueue(UnitProductionDefinition definition, out string failureReason)
         {
             ResolveReferences();
+            RemoveUnsupportedDefinitions();
             if (ProjectS.RtsMatchController.ActiveInstance != null
                 && ProjectS.RtsMatchController.ActiveInstance.IsMatchOver)
             {
@@ -137,6 +147,12 @@ namespace ProjectS.Buildings
             if (definition == null)
             {
                 failureReason = "Cannot enqueue production: definition is missing.";
+                return false;
+            }
+
+            if (status != null && status.Kind == BuildingKind.Production && definition.UnitType == PrototypeUnitType.Spliter)
+            {
+                failureReason = "Spliter can only be produced at a Spliter Production building.";
                 return false;
             }
 
@@ -212,6 +228,7 @@ namespace ProjectS.Buildings
             wallet = resourceWallet;
             tilemapWorld = world;
             producibleUnits = definitions ?? new UnitProductionDefinition[0];
+            RemoveUnsupportedDefinitions();
             maxQueueSize = Mathf.Max(1, queueSize);
             spawnOffset = unitSpawnOffset;
             rallyOffset = unitRallyOffset;
@@ -323,6 +340,46 @@ namespace ProjectS.Buildings
             lastEnqueueFailureReason = reason;
             Debug.LogWarning(reason, this);
             return false;
+        }
+
+        private void RemoveUnsupportedDefinitions()
+        {
+            if (status == null)
+            {
+                status = GetComponent<BuildingStatus>();
+            }
+
+            if (status == null || status.Kind != BuildingKind.Production || producibleUnits.Length == 0)
+            {
+                return;
+            }
+
+            var spliterCount = 0;
+            for (var i = 0; i < producibleUnits.Length; i++)
+            {
+                if (producibleUnits[i] != null && producibleUnits[i].UnitType == PrototypeUnitType.Spliter)
+                {
+                    spliterCount++;
+                }
+            }
+
+            if (spliterCount == 0)
+            {
+                return;
+            }
+
+            var filtered = new UnitProductionDefinition[producibleUnits.Length - spliterCount];
+            var targetIndex = 0;
+            for (var i = 0; i < producibleUnits.Length; i++)
+            {
+                var definition = producibleUnits[i];
+                if (definition == null || definition.UnitType != PrototypeUnitType.Spliter)
+                {
+                    filtered[targetIndex++] = definition;
+                }
+            }
+
+            producibleUnits = filtered;
         }
     }
 }

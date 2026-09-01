@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using NUnit.Framework;
 using ProjectS.Units;
 using UnityEngine;
@@ -106,6 +107,34 @@ namespace ProjectS.Tests.PlayMode
 
             Object.Destroy(attacker);
             Object.Destroy(enemy);
+        }
+
+        [UnityTest]
+        public IEnumerator UnitCommandAgent_NewCommandStoresLatestCommandAndCancelsPreviousInteraction()
+        {
+            var unit = CreateMovableUnit("LatestCommandUnit", Vector3.zero);
+            var commandAgent = unit.GetComponent<UnitCommandAgent>();
+            var handler = unit.AddComponent<RecordingInteractionHandler>();
+            var target = new RecordingInteractableTarget(Vector3.right);
+
+            commandAgent.Issue(new UnitCommand(UnitCommandMode.Interact, target.InteractionPoint, null, target, false));
+            yield return null;
+
+            Assert.That(commandAgent.ActionState, Is.EqualTo(UnitActionState.Interacting));
+            Assert.That(handler.AcceptedCount, Is.EqualTo(1));
+            Assert.That(handler.InterruptedCount, Is.EqualTo(0));
+
+            var latestDestination = new Vector3(2f, 0f, 0f);
+            commandAgent.Issue(new UnitCommand(UnitCommandMode.Move, latestDestination, null, false));
+            yield return null;
+
+            Assert.That(commandAgent.LatestCommand.Mode, Is.EqualTo(UnitCommandMode.Move));
+            Assert.That(commandAgent.LatestCommand.Destination, Is.EqualTo(latestDestination));
+            Assert.That(commandAgent.LatestCommandId, Is.EqualTo(2));
+            Assert.That(commandAgent.ActionState, Is.EqualTo(UnitActionState.Moving));
+            Assert.That(handler.InterruptedCount, Is.EqualTo(1));
+
+            Object.Destroy(unit);
         }
 
         [UnityTest]
@@ -250,6 +279,26 @@ namespace ProjectS.Tests.PlayMode
             Object.Destroy(secondWalletObject);
             Object.Destroy(firstWalletObject);
             Object.Destroy(hudObject);
+        }
+
+        [UnityTest]
+        public IEnumerator PlayerResourceWallet_KeepsWalletsForDifferentTeamsWhenInitializedInSequence()
+        {
+            var team1WalletObject = new GameObject("SequentialTeam1Wallet");
+            var team1Wallet = team1WalletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(team1Wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(10, 0));
+
+            var team2WalletObject = new GameObject("SequentialTeam2Wallet");
+            var team2Wallet = team2WalletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(team2Wallet, "Initialize", UnitTeam.Team2, CreateResourceAmount(20, 0));
+
+            yield return null;
+
+            Assert.That(InvokeStatic(PlayerResourceWalletType, "FindForTeam", UnitTeam.Team1), Is.EqualTo(team1Wallet));
+            Assert.That(InvokeStatic(PlayerResourceWalletType, "FindForTeam", UnitTeam.Team2), Is.EqualTo(team2Wallet));
+
+            Object.Destroy(team2WalletObject);
+            Object.Destroy(team1WalletObject);
         }
 
         [UnityTest]
@@ -578,6 +627,35 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator PlayerUnitCommandController_RequiresFriendlyBuilderBeforeEnteringPlacementMode()
+        {
+            var controllerObject = new GameObject("BuilderRequirementController");
+            var controller = controllerObject.AddComponent<PlayerUnitCommandController>();
+            var service = new RecordingBuildPlacementService();
+            var soldier = CreateMovableUnit("NonBuilderSelection", Vector3.zero, UnitTeam.Team1);
+
+            Invoke(controller, "AddSelection", soldier.GetComponent<UnitCommandAgent>());
+            controller.BeginBuildPlacement(service);
+
+            Assert.That(controller.IsBuildPlacementPending, Is.False);
+            Assert.That(controller.BuildPlacementStatusMessage, Does.Contain("friendly builder"));
+            Assert.That(service.PlacementAttemptCount, Is.EqualTo(0));
+
+            Invoke(controller, "ClearSelection");
+            var builder = CreateWorkerUnit("BuilderSelection", Vector3.right);
+            Invoke(controller, "AddSelection", builder.GetComponent<UnitCommandAgent>());
+            controller.BeginBuildPlacement(service);
+
+            Assert.That(controller.IsBuildPlacementPending, Is.True);
+            Assert.That(service.PlacementAttemptCount, Is.EqualTo(0));
+
+            Object.Destroy(builder);
+            Object.Destroy(soldier);
+            Object.Destroy(controllerObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator WorkerGatherController_RepeatsGatherAndDepositIntoTeamWallet()
         {
             var walletObject = new GameObject("GatherWallet");
@@ -616,6 +694,51 @@ namespace ProjectS.Tests.PlayMode
             Object.Destroy(resourceObject);
             Object.Destroy(dropOffObject);
             Object.Destroy(walletObject);
+        }
+
+        [UnityTest]
+        public IEnumerator WorkerGatherController_Team1ManualGatherDepositsWithTeam2WalletPresent()
+        {
+            var team1WalletObject = new GameObject("ManualGatherTeam1Wallet");
+            var team1Wallet = team1WalletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(team1Wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(0, 0));
+            var team2WalletObject = new GameObject("ManualGatherTeam2Wallet");
+            var team2Wallet = team2WalletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(team2Wallet, "Initialize", UnitTeam.Team2, CreateResourceAmount(0, 0));
+            var dropOffObject = CreateDropOff("ManualGatherTeam1DropOff", UnitTeam.Team1, new Vector3(0.35f, 0f, 0f));
+            var resourceObject = CreateResourceNode(
+                "ManualGatherMinerals",
+                Enum.Parse(ResourceTypeType, "Minerals"),
+                20,
+                5,
+                0f,
+                new Vector3(-0.35f, 0f, 0f));
+            var worker = CreateWorkerUnit("ManualGatherWorker", Vector3.zero);
+            var commandAgent = worker.GetComponent<UnitCommandAgent>();
+            var resourceNode = resourceObject.GetComponent(ResourceNodeType);
+            var interactableResource = (IUnitInteractableTarget)resourceNode;
+
+            commandAgent.Issue(new UnitCommand(
+                UnitCommandMode.Interact,
+                interactableResource.InteractionPoint,
+                null,
+                interactableResource,
+                false));
+
+            for (var i = 0; i < 120 && GetInt(team1Wallet, "Minerals") < 5; i++)
+            {
+                yield return null;
+            }
+
+            Assert.That(GetInt(team1Wallet, "Minerals"), Is.GreaterThanOrEqualTo(5));
+            Assert.That(GetInt(team2Wallet, "Minerals"), Is.EqualTo(0));
+            Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.Interact));
+
+            Object.Destroy(worker);
+            Object.Destroy(resourceObject);
+            Object.Destroy(dropOffObject);
+            Object.Destroy(team2WalletObject);
+            Object.Destroy(team1WalletObject);
         }
 
         [UnityTest]
@@ -876,6 +999,60 @@ namespace ProjectS.Tests.PlayMode
         private static GameObject CreateMovableUnit(string name, Vector3 position)
         {
             return CreateMovableUnit(name, position, UnitTeam.Team1);
+        }
+
+        private sealed class RecordingBuildPlacementService : IUnitBuildPlacementService
+        {
+            public Vector2Int DefaultFootprint => Vector2Int.one;
+            public string LastPlacementFailureReason { get; private set; }
+            public int PlacementAttemptCount { get; private set; }
+
+            public IReadOnlyList<UnitBuildPlacementPreviewCell> GetDefaultConstructionSitePreviewCells(Vector3 worldPosition)
+            {
+                return Array.Empty<UnitBuildPlacementPreviewCell>();
+            }
+
+            public bool CanPlaceDefaultConstructionSite(Vector3 worldPosition)
+            {
+                LastPlacementFailureReason = string.Empty;
+                return true;
+            }
+
+            public bool TryPlaceDefaultConstructionSite(Vector3 worldPosition, out IUnitInteractableTarget constructionSite)
+            {
+                PlacementAttemptCount++;
+                constructionSite = null;
+                return false;
+            }
+        }
+
+        private sealed class RecordingInteractionHandler : MonoBehaviour, IUnitInteractionHandler, IUnitCommandInterruptHandler
+        {
+            public int AcceptedCount { get; private set; }
+            public int InterruptedCount { get; private set; }
+
+            public bool TryHandleInteractionCommand(IUnitInteractableTarget target)
+            {
+                AcceptedCount++;
+                return true;
+            }
+
+            public void OnUnitCommandInterrupted()
+            {
+                InterruptedCount++;
+            }
+        }
+
+        private sealed class RecordingInteractableTarget : IUnitInteractableTarget
+        {
+            public RecordingInteractableTarget(Vector3 interactionPoint)
+            {
+                InteractionPoint = interactionPoint;
+            }
+
+            public Vector3 InteractionPoint { get; }
+            public float InteractionRange => 1f;
+            public bool CanInteract(UnitCommandAgent agent) => true;
         }
 
         private static GameObject CreateMovableUnit(string name, Vector3 position, UnitTeam team)
