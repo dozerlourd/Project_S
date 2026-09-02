@@ -17,9 +17,9 @@ namespace ProjectS
     {
         None,
         EnemyMainBaseDestroyed,
-        EnemyEliminated,
+        EnemyBuildingsDestroyed,
         PlayerMainBaseDestroyed,
-        PlayerEliminated
+        PlayerBuildingsDestroyed
     }
 
     public sealed class RtsMatchController : MonoBehaviour
@@ -112,19 +112,11 @@ namespace ProjectS
 
         private bool TryGetDefeatReason(UnitTeam team, bool isPlayer, out RtsMatchEndReason reason)
         {
-            if (!HasLivingMainBase(team))
+            if (!HasLivingBuildings(team))
             {
                 reason = isPlayer
-                    ? RtsMatchEndReason.PlayerMainBaseDestroyed
-                    : RtsMatchEndReason.EnemyMainBaseDestroyed;
-                return true;
-            }
-
-            if (!HasLivingUnits(team))
-            {
-                reason = isPlayer
-                    ? RtsMatchEndReason.PlayerEliminated
-                    : RtsMatchEndReason.EnemyEliminated;
+                    ? RtsMatchEndReason.PlayerBuildingsDestroyed
+                    : RtsMatchEndReason.EnemyBuildingsDestroyed;
                 return true;
             }
 
@@ -132,14 +124,13 @@ namespace ProjectS
             return false;
         }
 
-        private static bool HasLivingMainBase(UnitTeam team)
+        private static bool HasLivingBuildings(UnitTeam team)
         {
             var buildings = BuildingRegistry.GetBuildings(team);
             for (var i = 0; i < buildings.Count; i++)
             {
                 var building = buildings[i];
                 if (building == null
-                    || building.Kind != BuildingKind.MainBase
                     || !building.Completed
                     || !building.gameObject.activeInHierarchy
                     || !building.IsAlive)
@@ -148,27 +139,6 @@ namespace ProjectS
                 }
 
                 return true;
-            }
-
-            return false;
-        }
-
-        private static bool HasLivingUnits(UnitTeam team)
-        {
-            var units = UnitRegistry.GetAgents(team);
-            for (var i = 0; i < units.Count; i++)
-            {
-                var unit = units[i];
-                if (unit == null || !unit.gameObject.activeInHierarchy)
-                {
-                    continue;
-                }
-
-                var target = unit.Status as IUnitAttackTarget;
-                if (target != null && target.IsAlive)
-                {
-                    return true;
-                }
             }
 
             return false;

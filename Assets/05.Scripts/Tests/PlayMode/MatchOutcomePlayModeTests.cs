@@ -43,7 +43,7 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator EnemyMainBaseDestroyed_EndsWithVictoryOnceAndStopsAiActivity()
+        public IEnumerator EnemyBuildingsDestroyed_EndsWithVictoryOnceAndStopsAiActivity()
         {
             var controllerObject = CreateMatchController(out var controller);
             var playerBase = CreateBuilding("VictoryPlayerBase", UnitTeam.Team1, "MainBase", Vector3.left);
@@ -59,15 +59,17 @@ namespace ProjectS.Tests.PlayMode
             Invoke(controller, "ForceEvaluate");
             Assert.That(GetProperty(controller, "Result").ToString(), Is.EqualTo("InProgress"));
 
-            var target = (IUnitAttackTarget)enemyBase.GetComponent(BuildingStatusType);
-            target.TakeDamage(10000f);
+            var enemyBaseTarget = (IUnitAttackTarget)enemyBase.GetComponent(BuildingStatusType);
+            var productionTarget = (IUnitAttackTarget)productionBuilding.GetComponent(BuildingStatusType);
+            enemyBaseTarget.TakeDamage(10000f);
+            productionTarget.TakeDamage(10000f);
 
             yield return null;
             Invoke(controller, "ForceEvaluate");
             Invoke(controller, "ForceEvaluate");
 
             Assert.That(GetProperty(controller, "Result").ToString(), Is.EqualTo("Victory"));
-            Assert.That(GetProperty(controller, "EndReason").ToString(), Is.EqualTo("EnemyMainBaseDestroyed"));
+            Assert.That(GetProperty(controller, "EndReason").ToString(), Is.EqualTo("EnemyBuildingsDestroyed"));
             Assert.That(GetInt(controller, "ResolutionCount"), Is.EqualTo(1));
             Assert.That(ai.enabled, Is.False);
             Assert.That(productionQueue.enabled, Is.False);
@@ -83,7 +85,7 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator EnemyUnitsEliminated_EndsWithVictory()
+        public IEnumerator EnemyUnitsEliminated_DoesNotEndWhileEnemyBuildingsRemain()
         {
             var controllerObject = CreateMatchController(out var controller);
             var playerBase = CreateBuilding("EliminatePlayerBase", UnitTeam.Team1, "MainBase", Vector3.left);
@@ -98,8 +100,8 @@ namespace ProjectS.Tests.PlayMode
             yield return null;
             Invoke(controller, "ForceEvaluate");
 
-            Assert.That(GetProperty(controller, "Result").ToString(), Is.EqualTo("Victory"));
-            Assert.That(GetProperty(controller, "EndReason").ToString(), Is.EqualTo("EnemyEliminated"));
+            Assert.That(GetProperty(controller, "Result").ToString(), Is.EqualTo("InProgress"));
+            Assert.That(GetProperty(controller, "EndReason").ToString(), Is.EqualTo("None"));
 
             Object.Destroy(controllerObject);
             Object.Destroy(playerBase);
@@ -110,7 +112,7 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator PlayerMainBaseDestroyed_EndsWithDefeat()
+        public IEnumerator PlayerBuildingsDestroyed_EndsWithDefeat()
         {
             var controllerObject = CreateMatchController(out var controller);
             var playerBase = CreateBuilding("DefeatPlayerBase", UnitTeam.Team1, "MainBase", Vector3.left);
@@ -126,7 +128,7 @@ namespace ProjectS.Tests.PlayMode
             Invoke(controller, "ForceEvaluate");
 
             Assert.That(GetProperty(controller, "Result").ToString(), Is.EqualTo("Defeat"));
-            Assert.That(GetProperty(controller, "EndReason").ToString(), Is.EqualTo("PlayerMainBaseDestroyed"));
+            Assert.That(GetProperty(controller, "EndReason").ToString(), Is.EqualTo("PlayerBuildingsDestroyed"));
 
             Object.Destroy(controllerObject);
             Object.Destroy(playerBase);

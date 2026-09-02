@@ -499,12 +499,12 @@ namespace ProjectS.UI
             {
                 case ProjectS.RtsMatchEndReason.EnemyMainBaseDestroyed:
                     return "Enemy main base destroyed";
-                case ProjectS.RtsMatchEndReason.EnemyEliminated:
-                    return "Enemy forces eliminated";
+                case ProjectS.RtsMatchEndReason.EnemyBuildingsDestroyed:
+                    return "Enemy buildings destroyed";
                 case ProjectS.RtsMatchEndReason.PlayerMainBaseDestroyed:
                     return "Player main base destroyed";
-                case ProjectS.RtsMatchEndReason.PlayerEliminated:
-                    return "Player forces eliminated";
+                case ProjectS.RtsMatchEndReason.PlayerBuildingsDestroyed:
+                    return "Player buildings destroyed";
                 default:
                     return string.Empty;
             }
