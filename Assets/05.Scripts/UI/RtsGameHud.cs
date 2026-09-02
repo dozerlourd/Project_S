@@ -15,6 +15,7 @@ namespace ProjectS.UI
         private PlayerResourceWallet wallet;
         private ProjectS.RtsMatchController matchController;
         private string productionFeedback;
+        private int selectedPendingProductionIndex;
         private static readonly Texture2D[] CommandIcons = new Texture2D[6];
         private static readonly string[] CommandIconPaths =
         {
@@ -208,7 +209,14 @@ namespace ProjectS.UI
                 $"Rally: {productionQueue.RallyPoint.x:0.0}, {productionQueue.RallyPoint.y:0.0}");
 
             var queueText = BuildPendingQueueText(productionQueue);
-            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 168f, 330f, 42f), queueText);
+            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 168f, 238f, 42f), queueText);
+            if (active != null
+                && GUI.Button(new Rect(panelRect.x + 256f, panelRect.y + 84f, 88f, 26f), "Cancel"))
+            {
+                productionFeedback = productionQueue.TryCancelActiveProduction()
+                    ? $"Cancelled {active.DisplayName}."
+                    : productionQueue.LastCancellationFailureReason;
+            }
         }
 
         private void DrawCommandPanel()
@@ -341,6 +349,7 @@ namespace ProjectS.UI
             if (productionQueue == null)
             {
                 productionFeedback = string.Empty;
+                selectedPendingProductionIndex = 0;
                 return;
             }
 
@@ -384,12 +393,55 @@ namespace ProjectS.UI
                 }
             }
 
+            DrawPendingProductionCancelControls(panelRect, productionQueue);
+
             var feedback = !string.IsNullOrWhiteSpace(productionQueue.LastEnqueueFailureReason)
                 ? productionQueue.LastEnqueueFailureReason
+                : !string.IsNullOrWhiteSpace(productionQueue.LastCancellationFailureReason)
+                    ? productionQueue.LastCancellationFailureReason
                 : productionFeedback;
             if (!string.IsNullOrWhiteSpace(feedback))
             {
                 GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 348f, 396f, 18f), feedback);
+            }
+        }
+
+        private void DrawPendingProductionCancelControls(Rect panelRect, UnitProductionQueue productionQueue)
+        {
+            if (productionQueue.PendingCount <= 0)
+            {
+                selectedPendingProductionIndex = 0;
+                return;
+            }
+
+            selectedPendingProductionIndex = Mathf.Clamp(
+                selectedPendingProductionIndex,
+                0,
+                productionQueue.PendingCount - 1);
+
+            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 320f, 82f, 22f), "Pending");
+            for (var i = 0; i < productionQueue.PendingCount && i < 3; i++)
+            {
+                var pending = productionQueue.GetPendingProduction(i);
+                var label = pending != null ? $"{i + 1}" : "-";
+                if (GUI.Toggle(
+                    new Rect(panelRect.x + 94f + i * 34f, panelRect.y + 320f, 30f, 22f),
+                    selectedPendingProductionIndex == i,
+                    label,
+                    GUI.skin.button))
+                {
+                    selectedPendingProductionIndex = i;
+                }
+            }
+
+            var selectedPending = productionQueue.GetPendingProduction(selectedPendingProductionIndex);
+            var cancelLabel = selectedPending != null ? "Cancel Pending" : "Cancel";
+            if (GUI.Button(new Rect(panelRect.x + 212f, panelRect.y + 318f, 118f, 26f), cancelLabel))
+            {
+                var pendingName = selectedPending != null ? selectedPending.DisplayName : "pending production";
+                productionFeedback = productionQueue.TryCancelPendingProduction(selectedPendingProductionIndex)
+                    ? $"Cancelled {pendingName}."
+                    : productionQueue.LastCancellationFailureReason;
             }
         }
 

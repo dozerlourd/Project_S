@@ -23,6 +23,7 @@ namespace ProjectS.Buildings
         private bool hasRallyPoint;
         private Vector3 rallyPoint;
         private string lastEnqueueFailureReason;
+        private string lastCancellationFailureReason;
 
         public IReadOnlyList<UnitProductionDefinition> ProducibleUnits
         {
@@ -37,6 +38,7 @@ namespace ProjectS.Buildings
         public int MaxQueueSize => Mathf.Max(1, maxQueueSize);
         public UnitProductionDefinition ActiveProduction => activeProduction;
         public string LastEnqueueFailureReason => lastEnqueueFailureReason;
+        public string LastCancellationFailureReason => lastCancellationFailureReason;
         public float ActiveProgress => activeProgress;
         public float ActiveProgress01 => activeProduction != null
             ? Mathf.Clamp01(activeProgress / activeProduction.ProductionTime)
@@ -129,6 +131,7 @@ namespace ProjectS.Buildings
 
             queue.Enqueue(definition);
             lastEnqueueFailureReason = string.Empty;
+            lastCancellationFailureReason = string.Empty;
             TryStartNextProduction();
             return true;
         }
@@ -209,6 +212,57 @@ namespace ProjectS.Buildings
             }
 
             return null;
+        }
+
+        public bool TryCancelActiveProduction()
+        {
+            ResolveReferences();
+            if (activeProduction == null)
+            {
+                return FailCancellation("Cannot cancel production: no active production is running.");
+            }
+
+            var cancelledProduction = activeProduction;
+            if (!TryRefund(cancelledProduction))
+            {
+                return false;
+            }
+
+            activeProduction = null;
+            activeProgress = 0f;
+            lastCancellationFailureReason = string.Empty;
+            lastEnqueueFailureReason = string.Empty;
+            TryStartNextProduction();
+            return true;
+        }
+
+        public bool TryCancelPendingProduction(int index)
+        {
+            ResolveReferences();
+            if (index < 0 || index >= queue.Count)
+            {
+                return FailCancellation($"Cannot cancel pending production: invalid queue index {index}.");
+            }
+
+            var originalQueue = new List<UnitProductionDefinition>(queue);
+            var cancelledProduction = originalQueue[index];
+            if (!TryRefund(cancelledProduction))
+            {
+                return false;
+            }
+
+            queue.Clear();
+            for (var i = 0; i < originalQueue.Count; i++)
+            {
+                if (i != index)
+                {
+                    queue.Enqueue(originalQueue[i]);
+                }
+            }
+
+            lastCancellationFailureReason = string.Empty;
+            lastEnqueueFailureReason = string.Empty;
+            return true;
         }
 
         public void SetRallyPoint(Vector3 point)
@@ -338,6 +392,29 @@ namespace ProjectS.Buildings
         private bool FailEnqueue(string reason)
         {
             lastEnqueueFailureReason = reason;
+            Debug.LogWarning(reason, this);
+            return false;
+        }
+
+        private bool TryRefund(UnitProductionDefinition definition)
+        {
+            if (definition == null || definition.Cost.IsEmpty)
+            {
+                return true;
+            }
+
+            if (wallet == null)
+            {
+                return FailCancellation($"Cannot cancel {definition.DisplayName}: no resource wallet is available.");
+            }
+
+            wallet.Add(definition.Cost);
+            return true;
+        }
+
+        private bool FailCancellation(string reason)
+        {
+            lastCancellationFailureReason = reason;
             Debug.LogWarning(reason, this);
             return false;
         }

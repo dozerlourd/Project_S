@@ -73,7 +73,12 @@ namespace ProjectS
             }
 
             placementService.ConfigureBuildOptions(
-                FindOrCreateBuildingTemplate(templates, "Spliter Production Building Template", BuildingKind.SpliterProduction, true, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f)),
+                ConfigureProductionTemplate(
+                    FindOrCreateBuildingTemplate(templates, "Spliter Production Building Template", BuildingKind.SpliterProduction, true, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f)),
+                    FindRuntimeUnitPrototype(root, "Spliter Prototype"),
+                    new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, FindRuntimeUnitPrototype(root, "Spliter Prototype"), new ResourceAmount(125, 0), 8f) },
+                    new Vector3(2.5f, -0.5f, 0f),
+                    new Vector3(5f, -1f, 0f)),
                 FindOrCreateBuildingTemplate(templates, "Auto Turret Building Template", BuildingKind.AutoTurret, false, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f)),
                 FindOrCreateBuildingTemplate(templates, "Speed Aura Building Template", BuildingKind.SpeedAura, false, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f)));
         }
@@ -84,6 +89,34 @@ namespace ProjectS
             return existing != null
                 ? existing.gameObject
                 : CreateBuildingPrototype(name, kind, false, hasProductionQueue, size, color, parent);
+        }
+
+        private static GameObject ConfigureProductionTemplate(
+            GameObject template,
+            GameObject requiredPrefab,
+            UnitProductionDefinition[] definitions,
+            Vector3 spawnOffset,
+            Vector3 rallyOffset)
+        {
+            if (template == null || requiredPrefab == null)
+            {
+                return template;
+            }
+
+            var queue = template.GetComponent<UnitProductionQueue>();
+            if (queue != null)
+            {
+                queue.Configure(null, ProjectSTilemapWorld.ActiveInstance, definitions, 5, spawnOffset, rallyOffset);
+            }
+
+            return template;
+        }
+
+        private static GameObject FindRuntimeUnitPrototype(Transform setupRoot, string prototypeName)
+        {
+            var prototypes = setupRoot != null ? setupRoot.Find("Runtime Prototypes") : null;
+            var prototype = prototypes != null ? prototypes.Find(prototypeName) : null;
+            return prototype != null ? prototype.gameObject : null;
         }
 
         private void BuildTestSetup()
@@ -173,7 +206,17 @@ namespace ProjectS
             CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team1, playerStart, workerPrototype, soldierPrototype, spliterPrototype, rangerPrototype, root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team2, aiStart, workerPrototype, soldierPrototype, spliterPrototype, rangerPrototype, root.transform, tilemapWorld);
-            CreatePlayerSystems(playerWallet, tilemapWorld, constructionPrototype, productionPrototype, spliterProductionPrototype, autoTurretPrototype, speedAuraPrototype, root.transform);
+            CreatePlayerSystems(
+                playerWallet,
+                tilemapWorld,
+                constructionPrototype,
+                productionPrototype,
+                spliterProductionPrototype,
+                autoTurretPrototype,
+                speedAuraPrototype,
+                combatDefinitions,
+                spliterDefinitions,
+                root.transform);
             CreateAiController(playerStart, root.transform);
         }
 
@@ -185,6 +228,8 @@ namespace ProjectS
             GameObject spliterProductionPrototype,
             GameObject autoTurretPrototype,
             GameObject speedAuraPrototype,
+            UnitProductionDefinition[] combatDefinitions,
+            UnitProductionDefinition[] spliterDefinitions,
             Transform parent)
         {
             var commandController = PlayerUnitCommandController.ActiveInstance ?? FindFirstObjectByType<PlayerUnitCommandController>();
@@ -209,6 +254,19 @@ namespace ProjectS
                 new ResourceAmount(150, 0),
                 8f,
                 new Vector2Int(2, 2));
+
+            ConfigureProductionTemplate(
+                productionPrototype,
+                combatDefinitions != null && combatDefinitions.Length > 0 ? combatDefinitions[0]?.UnitPrefab : null,
+                combatDefinitions,
+                new Vector3(2.5f, -0.5f, 0f),
+                new Vector3(5f, -1f, 0f));
+            ConfigureProductionTemplate(
+                spliterProductionPrototype,
+                spliterDefinitions != null && spliterDefinitions.Length > 0 ? spliterDefinitions[0]?.UnitPrefab : null,
+                spliterDefinitions,
+                new Vector3(2.5f, -0.5f, 0f),
+                new Vector3(5f, -1f, 0f));
             placementService.ConfigureBuildOptions(spliterProductionPrototype, autoTurretPrototype, speedAuraPrototype);
 
             var hud = FindFirstObjectByType<RtsGameHud>();

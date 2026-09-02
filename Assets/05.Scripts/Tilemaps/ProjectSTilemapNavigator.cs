@@ -26,6 +26,12 @@ namespace ProjectS.Tilemaps
             new Vector3Int(-1, -1, 0)
         };
 
+        private readonly CellPriorityQueue open = new CellPriorityQueue();
+        private readonly HashSet<Vector3Int> closed = new HashSet<Vector3Int>();
+        private readonly Dictionary<Vector3Int, Vector3Int> cameFrom = new Dictionary<Vector3Int, Vector3Int>();
+        private readonly Dictionary<Vector3Int, float> gScore = new Dictionary<Vector3Int, float>();
+        private readonly List<Vector3Int> pathCells = new List<Vector3Int>();
+
         public static ProjectSTilemapNavigator ActiveInstance { get; private set; }
 
         public ProjectSTilemapWorld TilemapWorld => tilemapWorld;
@@ -81,19 +87,14 @@ namespace ProjectS.Tilemaps
                 return true;
             }
 
-            var open = new CellPriorityQueue();
-            var openSet = new HashSet<Vector3Int> { start };
-            var cameFrom = new Dictionary<Vector3Int, Vector3Int>();
-            var gScore = new Dictionary<Vector3Int, float> { [start] = 0f };
-            var fScore = new Dictionary<Vector3Int, float> { [start] = Heuristic(start, goal) };
-            var closed = new HashSet<Vector3Int>();
+            ResetSearchState();
             var expandedCells = 0;
-            open.Enqueue(start, fScore[start]);
+            gScore[start] = 0f;
+            open.Enqueue(start, Heuristic(start, goal));
 
             while (open.Count > 0 && expandedCells < maxExpandedCells)
             {
                 var current = open.Dequeue();
-                openSet.Remove(current);
                 if (closed.Contains(current))
                 {
                     continue;
@@ -108,44 +109,22 @@ namespace ProjectS.Tilemaps
                 closed.Add(current);
                 expandedCells++;
 
-                foreach (var neighbor in EnumerateNeighbors(current))
+                for (var i = 0; i < CardinalDirections.Length; i++)
                 {
-                    if (closed.Contains(neighbor)
-                        || !tilemapWorld.IsWalkable(neighbor)
-                        || IsDynamicallyBlocked(neighbor, start, goal, blockedCells))
-                    {
-                        continue;
-                    }
+                    VisitNeighbor(current, current + CardinalDirections[i], start, goal, blockedCells);
+                }
 
-                    if (IsDiagonalMove(current, neighbor)
-                        && !CanMoveDiagonally(current, neighbor, start, goal, blockedCells))
-                    {
-                        continue;
-                    }
+                if (!allowDiagonalMovement)
+                {
+                    continue;
+                }
 
-                    if (!IsCellStepWalkable(current, neighbor, start, goal, blockedCells))
+                for (var i = 0; i < DiagonalDirections.Length; i++)
+                {
+                    var neighbor = current + DiagonalDirections[i];
+                    if (CanMoveDiagonally(current, neighbor, start, goal, blockedCells))
                     {
-                        continue;
-                    }
-
-                    var tentativeScore = gScore[current] + GetStepCost(current, neighbor);
-                    if (gScore.TryGetValue(neighbor, out var knownScore) && tentativeScore >= knownScore)
-                    {
-                        continue;
-                    }
-
-                    cameFrom[neighbor] = current;
-                    gScore[neighbor] = tentativeScore;
-                    var neighborScore = tentativeScore + Heuristic(neighbor, goal);
-                    fScore[neighbor] = neighborScore;
-                    if (!openSet.Contains(neighbor))
-                    {
-                        open.Enqueue(neighbor, neighborScore);
-                        openSet.Add(neighbor);
-                    }
-                    else
-                    {
-                        open.Enqueue(neighbor, neighborScore);
+                        VisitNeighbor(current, neighbor, start, goal, blockedCells);
                     }
                 }
             }
@@ -216,22 +195,38 @@ namespace ProjectS.Tilemaps
             }
         }
 
-        private IEnumerable<Vector3Int> EnumerateNeighbors(Vector3Int cell)
+        private void ResetSearchState()
         {
-            foreach (var direction in CardinalDirections)
+            open.Clear();
+            closed.Clear();
+            cameFrom.Clear();
+            gScore.Clear();
+        }
+
+        private void VisitNeighbor(
+            Vector3Int current,
+            Vector3Int neighbor,
+            Vector3Int start,
+            Vector3Int goal,
+            ICollection<Vector3Int> blockedCells)
+        {
+            if (closed.Contains(neighbor)
+                || !tilemapWorld.IsWalkable(neighbor)
+                || IsDynamicallyBlocked(neighbor, start, goal, blockedCells))
             {
-                yield return cell + direction;
+                return;
             }
 
-            if (!allowDiagonalMovement)
+            var tentativeScore = gScore[current] + GetStepCost(current, neighbor);
+            if (gScore.TryGetValue(neighbor, out var knownScore) && tentativeScore >= knownScore)
             {
-                yield break;
+                return;
             }
 
-            foreach (var direction in DiagonalDirections)
-            {
-                yield return cell + direction;
-            }
+            cameFrom[neighbor] = current;
+            gScore[neighbor] = tentativeScore;
+            var neighborScore = tentativeScore + Heuristic(neighbor, goal);
+            open.Enqueue(neighbor, neighborScore);
         }
 
         private bool CanMoveDiagonally(
@@ -248,21 +243,6 @@ namespace ProjectS.Tilemaps
                 && tilemapWorld.IsWalkable(vertical)
                 && !IsDynamicallyBlocked(horizontal, start, goal, blockedCells)
                 && !IsDynamicallyBlocked(vertical, start, goal, blockedCells);
-        }
-
-        private bool IsCellStepWalkable(
-            Vector3Int from,
-            Vector3Int to,
-            Vector3Int start,
-            Vector3Int goal,
-            ICollection<Vector3Int> blockedCells)
-        {
-            if (IsDynamicallyBlocked(to, start, goal, blockedCells))
-            {
-                return false;
-            }
-
-            return tilemapWorld.IsWalkable(from) && tilemapWorld.IsWalkable(to);
         }
 
         private static bool IsDynamicallyBlocked(
@@ -294,17 +274,17 @@ namespace ProjectS.Tilemaps
 
         private void BuildWorldPath(Dictionary<Vector3Int, Vector3Int> cameFrom, Vector3Int current, List<Vector3> result)
         {
-            var cells = new List<Vector3Int> { current };
+            pathCells.Clear();
+            pathCells.Add(current);
             while (cameFrom.TryGetValue(current, out var previous))
             {
                 current = previous;
-                cells.Add(current);
+                pathCells.Add(current);
             }
 
-            cells.Reverse();
-            foreach (var cell in cells)
+            for (var i = pathCells.Count - 1; i >= 0; i--)
             {
-                result.Add(tilemapWorld.GetCellCenterWorld(cell));
+                result.Add(tilemapWorld.GetCellCenterWorld(pathCells[i]));
             }
         }
 
@@ -324,6 +304,11 @@ namespace ProjectS.Tilemaps
             private readonly List<Entry> entries = new List<Entry>();
 
             public int Count => entries.Count;
+
+            public void Clear()
+            {
+                entries.Clear();
+            }
 
             public void Enqueue(Vector3Int cell, float priority)
             {

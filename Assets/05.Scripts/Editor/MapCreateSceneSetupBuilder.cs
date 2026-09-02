@@ -19,6 +19,9 @@ namespace ProjectS.Editor
         private const string SetupRootName = "ProjectS Match Test Setup";
         private const string MainBasePrefabPath = BuildingPrefabFolder + "/PrototypeMainBase.prefab";
         private const string ProductionPrefabPath = BuildingPrefabFolder + "/PrototypeProductionBuilding.prefab";
+        private const string SpliterProductionPrefabPath = BuildingPrefabFolder + "/PrototypeSpliterProductionBuilding.prefab";
+        private const string AutoTurretPrefabPath = BuildingPrefabFolder + "/PrototypeAutoTurretBuilding.prefab";
+        private const string SpeedAuraPrefabPath = BuildingPrefabFolder + "/PrototypeSpeedAuraBuilding.prefab";
         private const string ConstructionSitePrefabPath = BuildingPrefabFolder + "/PrototypeConstructionSite.prefab";
         private const string WorkerPrefabPath = "Assets/03.Prefabs/Units/B_Worker.prefab";
         private const string SoldierPrefabPath = "Assets/03.Prefabs/Units/B_Soldier.prefab";
@@ -52,6 +55,9 @@ namespace ProjectS.Editor
             var rangerPrefab = LoadRequired<GameObject>(RangerPrefabPath);
             var mainBasePrefab = LoadRequired<GameObject>(MainBasePrefabPath);
             var productionPrefab = LoadRequired<GameObject>(ProductionPrefabPath);
+            var spliterProductionPrefab = LoadRequired<GameObject>(SpliterProductionPrefabPath);
+            var autoTurretPrefab = LoadRequired<GameObject>(AutoTurretPrefabPath);
+            var speedAuraPrefab = LoadRequired<GameObject>(SpeedAuraPrefabPath);
             var constructionSitePrefab = LoadRequired<GameObject>(ConstructionSitePrefabPath);
 
             var workerDefinitions = new[]
@@ -61,8 +67,11 @@ namespace ProjectS.Editor
             var combatDefinitions = new[]
             {
                 CreateProductionDefinition("Soldier", PrototypeUnitType.Soldier, soldierPrefab, new ResourceAmount(100, 0), 7f),
-                CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterPrefab, new ResourceAmount(125, 0), 8f),
                 CreateProductionDefinition("Ranger", PrototypeUnitType.Ranger, rangerPrefab, new ResourceAmount(100, 25), 8f)
+            };
+            var spliterDefinitions = new[]
+            {
+                CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterPrefab, new ResourceAmount(125, 0), 8f)
             };
 
             InstantiateBuilding(
@@ -89,6 +98,42 @@ namespace ProjectS.Editor
                 new Vector3(2.5f, -0.5f, 0f),
                 new Vector3(5f, -1f, 0f),
                 root.transform);
+            InstantiateBuilding(
+                spliterProductionPrefab,
+                "Player Spliter Production",
+                UnitTeam.Team1,
+                BuildingKind.SpliterProduction,
+                Snap(tilemapWorld, playerStart + new Vector3(7f, -3f, 0f)),
+                playerWallet,
+                tilemapWorld,
+                spliterDefinitions,
+                new Vector3(2.5f, -0.5f, 0f),
+                new Vector3(5f, -1f, 0f),
+                root.transform);
+            InstantiateBuilding(
+                autoTurretPrefab,
+                "Player Auto Turret",
+                UnitTeam.Team1,
+                BuildingKind.AutoTurret,
+                Snap(tilemapWorld, playerStart + new Vector3(3f, 3f, 0f)),
+                playerWallet,
+                tilemapWorld,
+                new UnitProductionDefinition[0],
+                Vector3.zero,
+                Vector3.zero,
+                root.transform);
+            InstantiateBuilding(
+                speedAuraPrefab,
+                "Player Speed Aura",
+                UnitTeam.Team1,
+                BuildingKind.SpeedAura,
+                Snap(tilemapWorld, playerStart + new Vector3(-3f, 3f, 0f)),
+                playerWallet,
+                tilemapWorld,
+                new UnitProductionDefinition[0],
+                Vector3.zero,
+                Vector3.zero,
+                root.transform);
 
             InstantiateBuilding(
                 mainBasePrefab,
@@ -114,12 +159,58 @@ namespace ProjectS.Editor
                 new Vector3(-2.5f, 0.5f, 0f),
                 new Vector3(-5f, 1f, 0f),
                 root.transform);
+            InstantiateBuilding(
+                spliterProductionPrefab,
+                "AI Spliter Production",
+                UnitTeam.Team2,
+                BuildingKind.SpliterProduction,
+                Snap(tilemapWorld, aiStart + new Vector3(-7f, 3f, 0f)),
+                aiWallet,
+                tilemapWorld,
+                spliterDefinitions,
+                new Vector3(-2.5f, 0.5f, 0f),
+                new Vector3(-5f, 1f, 0f),
+                root.transform);
+            InstantiateBuilding(
+                autoTurretPrefab,
+                "AI Auto Turret",
+                UnitTeam.Team2,
+                BuildingKind.AutoTurret,
+                Snap(tilemapWorld, aiStart + new Vector3(-3f, -3f, 0f)),
+                aiWallet,
+                tilemapWorld,
+                new UnitProductionDefinition[0],
+                Vector3.zero,
+                Vector3.zero,
+                root.transform);
+            InstantiateBuilding(
+                speedAuraPrefab,
+                "AI Speed Aura",
+                UnitTeam.Team2,
+                BuildingKind.SpeedAura,
+                Snap(tilemapWorld, aiStart + new Vector3(3f, -3f, 0f)),
+                aiWallet,
+                tilemapWorld,
+                new UnitProductionDefinition[0],
+                Vector3.zero,
+                Vector3.zero,
+                root.transform);
 
             CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
             CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team1, playerStart, workerPrefab, soldierPrefab, spliterPrefab, rangerPrefab, root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team2, aiStart, workerPrefab, soldierPrefab, spliterPrefab, rangerPrefab, root.transform, tilemapWorld);
-            CreatePlayerRuntimeSystems(playerWallet, tilemapWorld, constructionSitePrefab, productionPrefab, root.transform);
+            CreatePlayerRuntimeSystems(
+                playerWallet,
+                tilemapWorld,
+                constructionSitePrefab,
+                productionPrefab,
+                spliterProductionPrefab,
+                autoTurretPrefab,
+                speedAuraPrefab,
+                combatDefinitions,
+                spliterDefinitions,
+                root.transform);
             CreateAiController(playerStart, root.transform);
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -133,6 +224,9 @@ namespace ProjectS.Editor
             EnsureFolder("Assets/03.Prefabs", "Buildings");
             CreateBuildingPrefab(MainBasePrefabPath, "PrototypeMainBase", BuildingKind.MainBase, true, true, new Vector2(2.6f, 2.2f));
             CreateBuildingPrefab(ProductionPrefabPath, "PrototypeProductionBuilding", BuildingKind.Production, false, true, new Vector2(2.4f, 2f));
+            CreateBuildingPrefab(SpliterProductionPrefabPath, "PrototypeSpliterProductionBuilding", BuildingKind.SpliterProduction, false, true, new Vector2(2.5f, 2.5f));
+            CreateBuildingPrefab(AutoTurretPrefabPath, "PrototypeAutoTurretBuilding", BuildingKind.AutoTurret, false, false, new Vector2(2.3f, 2.3f));
+            CreateBuildingPrefab(SpeedAuraPrefabPath, "PrototypeSpeedAuraBuilding", BuildingKind.SpeedAura, false, false, new Vector2(2.6f, 2.6f));
             CreateConstructionSitePrefab();
         }
 
@@ -171,6 +265,15 @@ namespace ProjectS.Editor
                     root.AddComponent<UnitProductionQueue>();
                 }
 
+                if (kind == BuildingKind.AutoTurret)
+                {
+                    root.AddComponent<BuildingAutoTurret>();
+                }
+                else if (kind == BuildingKind.SpeedAura)
+                {
+                    root.AddComponent<BuildingSpeedAura>();
+                }
+
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
             finally
@@ -207,6 +310,11 @@ namespace ProjectS.Editor
             ProjectSTilemapWorld tilemapWorld,
             GameObject constructionSitePrefab,
             GameObject productionPrefab,
+            GameObject spliterProductionPrefab,
+            GameObject autoTurretPrefab,
+            GameObject speedAuraPrefab,
+            UnitProductionDefinition[] combatDefinitions,
+            UnitProductionDefinition[] spliterDefinitions,
             Transform parent)
         {
             var runtime = new GameObject("Player Runtime Systems");
@@ -224,12 +332,30 @@ namespace ProjectS.Editor
                 new ResourceAmount(150, 0),
                 8f,
                 new Vector2Int(2, 2));
+            ConfigureProductionPrefab(productionPrefab, wallet, tilemapWorld, combatDefinitions, new Vector3(2.5f, -0.5f, 0f), new Vector3(5f, -1f, 0f));
+            ConfigureProductionPrefab(spliterProductionPrefab, wallet, tilemapWorld, spliterDefinitions, new Vector3(2.5f, -0.5f, 0f), new Vector3(5f, -1f, 0f));
+            placementService.ConfigureBuildOptions(spliterProductionPrefab, autoTurretPrefab, speedAuraPrefab);
 
             var hud = runtime.AddComponent<RtsGameHud>();
             hud.Configure(UnitTeam.Team1, placementService);
 
             var matchController = runtime.AddComponent<ProjectS.RtsMatchController>();
             matchController.Configure(UnitTeam.Team1, UnitTeam.Team2);
+        }
+
+        private static void ConfigureProductionPrefab(
+            GameObject prefab,
+            PlayerResourceWallet wallet,
+            ProjectSTilemapWorld tilemapWorld,
+            UnitProductionDefinition[] definitions,
+            Vector3 spawnOffset,
+            Vector3 rallyOffset)
+        {
+            var queue = prefab != null ? prefab.GetComponent<UnitProductionQueue>() : null;
+            if (queue != null)
+            {
+                queue.Configure(wallet, tilemapWorld, definitions, 5, spawnOffset, rallyOffset);
+            }
         }
 
         private static void CreateAiController(Vector3 fallbackAttackPoint, Transform parent)

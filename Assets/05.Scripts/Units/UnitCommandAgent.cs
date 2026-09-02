@@ -120,8 +120,20 @@ namespace ProjectS.Units
                 return false;
             }
 
-            Issue(new UnitCommand(UnitCommandMode.FocusAttack, attacker.SelectionTransform.position, attacker, false));
-            return true;
+            if (mode == UnitCommandMode.HoldPosition && !IsInAttackRange(attacker))
+            {
+                return false;
+            }
+
+            if (mode == UnitCommandMode.Idle && !IsInDetectionRange(attacker))
+            {
+                return false;
+            }
+
+            priorityTarget = attacker;
+            targetMustStayDetected = true;
+            UpdateTargetEngagement();
+            return priorityTarget != null;
         }
 
         private int BeginNewCommand(UnitCommand command)
@@ -211,9 +223,10 @@ namespace ProjectS.Units
                 return;
             }
 
-            if (actionState == UnitActionState.HoldingPosition && !IsInAttackRange(priorityTarget))
+            if (!CanChasePriorityTarget() && !IsInAttackRange(priorityTarget))
             {
                 ClearTarget();
+                ResumeInterruptedCommand();
                 return;
             }
 
@@ -261,9 +274,7 @@ namespace ProjectS.Units
             }
 
             ScheduleNextScan(false);
-            var scanRange = actionState == UnitActionState.HoldingPosition
-                ? status.AttackRange
-                : status.DetectionRange;
+            var scanRange = status.DetectionRange;
 
             if (!TryAcquireTarget(scanRange, out var target))
             {
@@ -271,7 +282,7 @@ namespace ProjectS.Units
             }
 
             priorityTarget = target;
-            targetMustStayDetected = actionState != UnitActionState.HoldingPosition;
+            targetMustStayDetected = true;
             UpdateTargetEngagement();
         }
 
@@ -315,7 +326,8 @@ namespace ProjectS.Units
         private bool CanAcquireTargetsForCurrentState()
         {
             return priorityTarget == null
-                && (actionState == UnitActionState.AttackMoving
+                && (actionState == UnitActionState.Idle
+                    || actionState == UnitActionState.AttackMoving
                     || actionState == UnitActionState.Patrolling
                     || actionState == UnitActionState.HoldingPosition);
         }
@@ -324,6 +336,10 @@ namespace ProjectS.Units
         {
             switch (mode)
             {
+                case UnitCommandMode.Idle:
+                    actionState = UnitActionState.Idle;
+                    pathAgent.ClearPath();
+                    break;
                 case UnitCommandMode.AttackMove:
                     actionState = UnitActionState.AttackMoving;
                     pathAgent.MoveTo(commandDestination);
@@ -340,10 +356,18 @@ namespace ProjectS.Units
                     actionState = UnitActionState.HoldingPosition;
                     pathAgent.ClearPath();
                     break;
+                case UnitCommandMode.FocusAttack:
+                    CompleteCurrentCommand();
+                    break;
                 default:
                     CompleteCurrentCommand();
                     break;
             }
+        }
+
+        private bool CanChasePriorityTarget()
+        {
+            return mode != UnitCommandMode.HoldPosition;
         }
 
         private bool CanAttack()
@@ -417,6 +441,8 @@ namespace ProjectS.Units
         {
             mode = UnitCommandMode.Idle;
             actionState = UnitActionState.Idle;
+            latestCommand = new UnitCommand(UnitCommandMode.Idle, transform.position, null, false);
+            latestCommandId++;
             ClearTarget();
         }
 

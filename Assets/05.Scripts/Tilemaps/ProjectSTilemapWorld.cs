@@ -25,13 +25,29 @@ namespace ProjectS.Tilemaps
 
         private BoundsInt cachedBounds;
         private bool cacheDirty = true;
+        private int cacheRebuildCount;
+        private int cachedSampleCount;
+        private int sampleCacheHits;
+        private int sampleCacheMisses;
 
         public static ProjectSTilemapWorld ActiveInstance { get; private set; }
 
         public Grid Grid => grid;
         public Tilemap GroundTilemap => groundTilemap;
         public Tilemap StairTilemap => stairTilemap;
-        public BoundsInt CellBounds => useExplicitBounds ? explicitBounds : CalculateTilemapBounds();
+        public BoundsInt CellBounds
+        {
+            get
+            {
+                ResolveReferences();
+                return useExplicitBounds ? explicitBounds : CalculateTilemapBounds();
+            }
+        }
+
+        public int CacheRebuildCount => cacheRebuildCount;
+        public int CachedSampleCount => cachedSampleCount;
+        public int SampleCacheHits => sampleCacheHits;
+        public int SampleCacheMisses => sampleCacheMisses;
 
         private void Awake()
         {
@@ -109,12 +125,18 @@ namespace ProjectS.Tilemaps
                 }
             }
 
+            cachedSampleCount = sampleCache.Count;
+            cacheRebuildCount++;
             cacheDirty = false;
         }
 
         public Vector3Int WorldToCell(Vector3 worldPosition)
         {
-            ResolveReferences();
+            if (grid == null && groundTilemap == null)
+            {
+                ResolveReferences();
+            }
+
             if (grid != null)
             {
                 return grid.WorldToCell(worldPosition);
@@ -127,7 +149,11 @@ namespace ProjectS.Tilemaps
 
         public Vector3 GetCellCenterWorld(Vector3Int cell)
         {
-            ResolveReferences();
+            if (groundTilemap == null && grid == null)
+            {
+                ResolveReferences();
+            }
+
             if (groundTilemap != null)
             {
                 return groundTilemap.GetCellCenterWorld(cell);
@@ -151,10 +177,18 @@ namespace ProjectS.Tilemaps
             if (!ContainsCachedCell(cell))
             {
                 sample = default;
+                sampleCacheMisses++;
                 return false;
             }
 
-            return sampleCache.TryGetValue(cell, out sample);
+            if (sampleCache.TryGetValue(cell, out sample))
+            {
+                sampleCacheHits++;
+                return true;
+            }
+
+            sampleCacheMisses++;
+            return false;
         }
 
         private bool TrySampleUncached(Vector3Int cell, BoundsInt bounds, out ProjectSTileSample sample)
@@ -294,7 +328,6 @@ namespace ProjectS.Tilemaps
 
         private BoundsInt CalculateTilemapBounds()
         {
-            ResolveReferences();
             var hasBounds = false;
             var min = Vector3Int.zero;
             var max = Vector3Int.zero;
