@@ -37,6 +37,7 @@ namespace ProjectS.Units
                 return;
             }
 
+            UnitTargetPriority.RecordRecentAttacker(target, status);
             target.TakeDamage(GetAttackDamage(), status);
             attackEffect?.PlayAttackFlash(target.SelectionTransform.position);
             nextAttackTime = Time.time + GetAttackInterval();

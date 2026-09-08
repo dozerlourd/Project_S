@@ -13,6 +13,7 @@ namespace ProjectS.UI
 
         private PlayerUnitCommandController commandController;
         private PlayerResourceWallet wallet;
+        private SupplyManager supplyManager;
         private ProjectS.RtsMatchController matchController;
         private string productionFeedback;
         private int selectedPendingProductionIndex;
@@ -30,7 +31,7 @@ namespace ProjectS.UI
         private const float ResourcePanelX = 12f;
         private const float ResourcePanelY = 12f;
         private const float ResourcePanelWidth = 260f;
-        private const float ResourcePanelHeight = 64f;
+        private const float ResourcePanelHeight = 88f;
         private const float SelectionPanelX = 12f;
         private const float SelectionPanelWidth = 360f;
         private const float SelectionPanelHeight = 220f;
@@ -86,6 +87,7 @@ namespace ProjectS.UI
             buildingPlacementService = placementService;
             commandController = null;
             wallet = null;
+            supplyManager = null;
         }
 
         private void ResolvePlayerWallet()
@@ -94,6 +96,12 @@ namespace ProjectS.UI
             if (wallet != activeWallet)
             {
                 wallet = activeWallet;
+            }
+
+            var activeSupplyManager = SupplyManager.FindForTeam(playerTeam);
+            if (supplyManager != activeSupplyManager)
+            {
+                supplyManager = activeSupplyManager;
             }
         }
 
@@ -115,9 +123,13 @@ namespace ProjectS.UI
             GUI.Box(new Rect(ResourcePanelX, ResourcePanelY, ResourcePanelWidth, ResourcePanelHeight), string.Empty);
             var minerals = wallet != null ? wallet.Minerals : 0;
             var gas = wallet != null ? wallet.Gas : 0;
+            var currentSupply = supplyManager != null ? supplyManager.CurrentSupply : 0;
+            var maxSupply = supplyManager != null ? supplyManager.MaxSupply : 0;
+            var reservedSupply = supplyManager != null ? supplyManager.ReservedSupply : 0;
             GUI.Label(new Rect(24f, 22f, 120f, 22f), $"Minerals: {minerals}");
             GUI.Label(new Rect(144f, 22f, 100f, 22f), $"Gas: {gas}");
-            GUI.Label(new Rect(24f, 46f, 220f, 22f), $"Team: {playerTeam}");
+            GUI.Label(new Rect(24f, 46f, 220f, 22f), $"Supply: {currentSupply}/{maxSupply}  Reserved: {reservedSupply}");
+            GUI.Label(new Rect(24f, 70f, 220f, 22f), $"Team: {playerTeam}");
         }
 
         private void DrawSelectionPanel()
@@ -374,7 +386,7 @@ namespace ProjectS.UI
                 var x = panelRect.x + 12f + column * 132f;
                 var y = panelRect.y + 216f + row * 60f;
                 var canEnqueue = productionQueue.CanEnqueue(definition, out var failureReason);
-                var buttonLabel = $"{definition.DisplayName}\n{FormatCost(definition.Cost)}";
+                var buttonLabel = $"{definition.DisplayName}\n{FormatCost(definition.Cost)} / {definition.SupplyCost}S";
                 if (GUI.Button(new Rect(x, y, 124f, 44f), buttonLabel))
                 {
                     if (productionQueue.TryEnqueue(i))
@@ -564,6 +576,11 @@ namespace ProjectS.UI
             if (normalizedReason.Contains("insufficient resources"))
             {
                 return "Need resources";
+            }
+
+            if (normalizedReason.Contains("supply"))
+            {
+                return "Need supply";
             }
 
             if (normalizedReason.Contains("resource wallet"))

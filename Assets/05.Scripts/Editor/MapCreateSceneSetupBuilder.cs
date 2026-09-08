@@ -27,6 +27,9 @@ namespace ProjectS.Editor
         private const string SoldierPrefabPath = "Assets/03.Prefabs/Units/B_Soldier.prefab";
         private const string SpliterPrefabPath = "Assets/03.Prefabs/Units/B_Spliter.prefab";
         private const string RangerPrefabPath = "Assets/03.Prefabs/Units/B_Ranger.prefab";
+        private const string TankPrefabPath = "Assets/03.Prefabs/Units/B_Tank.prefab";
+        private const string StrikerPrefabPath = "Assets/03.Prefabs/Units/B_Striker.prefab";
+        private const string SwarmPrefabPath = "Assets/03.Prefabs/Units/B_Swarm.prefab";
         private const string MineralPrefabPath = "Assets/03.Prefabs/Resources/MineralField.prefab";
         private const string GasPrefabPath = "Assets/03.Prefabs/Resources/VespeneGeyser.prefab";
         private const int ResourceSortingOrder = 12;
@@ -53,6 +56,9 @@ namespace ProjectS.Editor
             var soldierPrefab = LoadRequired<GameObject>(SoldierPrefabPath);
             var spliterPrefab = LoadRequired<GameObject>(SpliterPrefabPath);
             var rangerPrefab = LoadRequired<GameObject>(RangerPrefabPath);
+            var tankPrefab = LoadRequired<GameObject>(TankPrefabPath);
+            var strikerPrefab = LoadRequired<GameObject>(StrikerPrefabPath);
+            var swarmPrefab = LoadRequired<GameObject>(SwarmPrefabPath);
             var mainBasePrefab = LoadRequired<GameObject>(MainBasePrefabPath);
             var productionPrefab = LoadRequired<GameObject>(ProductionPrefabPath);
             var spliterProductionPrefab = LoadRequired<GameObject>(SpliterProductionPrefabPath);
@@ -67,7 +73,10 @@ namespace ProjectS.Editor
             var combatDefinitions = new[]
             {
                 CreateProductionDefinition("Soldier", PrototypeUnitType.Soldier, soldierPrefab, new ResourceAmount(100, 0), 7f),
-                CreateProductionDefinition("Ranger", PrototypeUnitType.Ranger, rangerPrefab, new ResourceAmount(100, 25), 8f)
+                CreateProductionDefinition("Ranger", PrototypeUnitType.Ranger, rangerPrefab, new ResourceAmount(100, 25), 8f),
+                CreateProductionDefinition("Tank", PrototypeUnitType.Tank, tankPrefab, new ResourceAmount(150, 0), 10f, 3),
+                CreateProductionDefinition("Striker", PrototypeUnitType.Striker, strikerPrefab, new ResourceAmount(75, 0), 6f),
+                CreateProductionDefinition("Swarm x3", PrototypeUnitType.Swarm, swarmPrefab, new ResourceAmount(120, 0), 8f, 1, 3)
             };
             var spliterDefinitions = new[]
             {
@@ -86,54 +95,6 @@ namespace ProjectS.Editor
                 new Vector3(2.5f, -1.5f, 0f),
                 new Vector3(5f, -2f, 0f),
                 root.transform);
-            InstantiateBuilding(
-                productionPrefab,
-                "Player Production",
-                UnitTeam.Team1,
-                BuildingKind.Production,
-                Snap(tilemapWorld, playerStart + new Vector3(4f, -3f, 0f)),
-                playerWallet,
-                tilemapWorld,
-                combatDefinitions,
-                new Vector3(2.5f, -0.5f, 0f),
-                new Vector3(5f, -1f, 0f),
-                root.transform);
-            InstantiateBuilding(
-                spliterProductionPrefab,
-                "Player Spliter Production",
-                UnitTeam.Team1,
-                BuildingKind.SpliterProduction,
-                Snap(tilemapWorld, playerStart + new Vector3(7f, -3f, 0f)),
-                playerWallet,
-                tilemapWorld,
-                spliterDefinitions,
-                new Vector3(2.5f, -0.5f, 0f),
-                new Vector3(5f, -1f, 0f),
-                root.transform);
-            InstantiateBuilding(
-                autoTurretPrefab,
-                "Player Auto Turret",
-                UnitTeam.Team1,
-                BuildingKind.AutoTurret,
-                Snap(tilemapWorld, playerStart + new Vector3(3f, 3f, 0f)),
-                playerWallet,
-                tilemapWorld,
-                new UnitProductionDefinition[0],
-                Vector3.zero,
-                Vector3.zero,
-                root.transform);
-            InstantiateBuilding(
-                speedAuraPrefab,
-                "Player Speed Aura",
-                UnitTeam.Team1,
-                BuildingKind.SpeedAura,
-                Snap(tilemapWorld, playerStart + new Vector3(-3f, 3f, 0f)),
-                playerWallet,
-                tilemapWorld,
-                new UnitProductionDefinition[0],
-                Vector3.zero,
-                Vector3.zero,
-                root.transform);
 
             InstantiateBuilding(
                 mainBasePrefab,
@@ -147,59 +108,11 @@ namespace ProjectS.Editor
                 new Vector3(-2.5f, 1.5f, 0f),
                 new Vector3(-5f, 2f, 0f),
                 root.transform);
-            InstantiateBuilding(
-                productionPrefab,
-                "AI Production",
-                UnitTeam.Team2,
-                BuildingKind.Production,
-                Snap(tilemapWorld, aiStart + new Vector3(-4f, 3f, 0f)),
-                aiWallet,
-                tilemapWorld,
-                combatDefinitions,
-                new Vector3(-2.5f, 0.5f, 0f),
-                new Vector3(-5f, 1f, 0f),
-                root.transform);
-            InstantiateBuilding(
-                spliterProductionPrefab,
-                "AI Spliter Production",
-                UnitTeam.Team2,
-                BuildingKind.SpliterProduction,
-                Snap(tilemapWorld, aiStart + new Vector3(-7f, 3f, 0f)),
-                aiWallet,
-                tilemapWorld,
-                spliterDefinitions,
-                new Vector3(-2.5f, 0.5f, 0f),
-                new Vector3(-5f, 1f, 0f),
-                root.transform);
-            InstantiateBuilding(
-                autoTurretPrefab,
-                "AI Auto Turret",
-                UnitTeam.Team2,
-                BuildingKind.AutoTurret,
-                Snap(tilemapWorld, aiStart + new Vector3(-3f, -3f, 0f)),
-                aiWallet,
-                tilemapWorld,
-                new UnitProductionDefinition[0],
-                Vector3.zero,
-                Vector3.zero,
-                root.transform);
-            InstantiateBuilding(
-                speedAuraPrefab,
-                "AI Speed Aura",
-                UnitTeam.Team2,
-                BuildingKind.SpeedAura,
-                Snap(tilemapWorld, aiStart + new Vector3(3f, -3f, 0f)),
-                aiWallet,
-                tilemapWorld,
-                new UnitProductionDefinition[0],
-                Vector3.zero,
-                Vector3.zero,
-                root.transform);
 
             CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
             CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
-            CreateStartingUnits(UnitTeam.Team1, playerStart, workerPrefab, soldierPrefab, spliterPrefab, rangerPrefab, root.transform, tilemapWorld);
-            CreateStartingUnits(UnitTeam.Team2, aiStart, workerPrefab, soldierPrefab, spliterPrefab, rangerPrefab, root.transform, tilemapWorld);
+            CreateStartingUnits(UnitTeam.Team1, playerStart, workerPrefab, root.transform, tilemapWorld);
+            CreateStartingUnits(UnitTeam.Team2, aiStart, workerPrefab, root.transform, tilemapWorld);
             CreatePlayerRuntimeSystems(
                 playerWallet,
                 tilemapWorld,
@@ -363,7 +276,8 @@ namespace ProjectS.Editor
             var aiObject = new GameObject("Simple Skirmish AI");
             aiObject.transform.SetParent(parent, false);
             var ai = aiObject.AddComponent<SimpleSkirmishAI>();
-            ai.Configure(UnitTeam.Team2, UnitTeam.Team1, 4, 4, fallbackAttackPoint);
+            ai.Configure(UnitTeam.Team2, UnitTeam.Team1, 3, 7, fallbackAttackPoint);
+            ai.ConfigureTempo(1.5f, 18f);
         }
 
         private static PlayerResourceWallet CreateWallet(
@@ -453,19 +367,15 @@ namespace ProjectS.Editor
             UnitTeam team,
             Vector3 start,
             GameObject workerPrefab,
-            GameObject soldierPrefab,
-            GameObject spliterPrefab,
-            GameObject rangerPrefab,
             Transform parent,
             ProjectSTilemapWorld tilemapWorld)
         {
-            InstantiateUnit(workerPrefab, $"{team} Worker 1", team, start + new Vector3(-1.5f, -1.5f, 0f), parent, tilemapWorld);
-            InstantiateUnit(workerPrefab, $"{team} Worker 2", team, start + new Vector3(-0.5f, -2.5f, 0f), parent, tilemapWorld);
-            InstantiateUnit(workerPrefab, $"{team} Worker 3", team, start + new Vector3(0.5f, -1.5f, 0f), parent, tilemapWorld);
-            InstantiateUnit(soldierPrefab, $"{team} Soldier 1", team, start + new Vector3(3f, 1f, 0f), parent, tilemapWorld);
-            InstantiateUnit(soldierPrefab, $"{team} Soldier 2", team, start + new Vector3(4f, 0f, 0f), parent, tilemapWorld);
-            InstantiateUnit(spliterPrefab, $"{team} Spliter", team, start + new Vector3(3f, -1f, 0f), parent, tilemapWorld);
-            InstantiateUnit(rangerPrefab, $"{team} Ranger", team, start + new Vector3(4f, -2f, 0f), parent, tilemapWorld);
+            var xSign = team == UnitTeam.Team1 ? 1f : -1f;
+            var ySign = team == UnitTeam.Team1 ? -1f : 1f;
+            InstantiateUnit(workerPrefab, $"{team} Worker 1", team, start + new Vector3(-1.5f * xSign, -1.5f * ySign, 0f), parent, tilemapWorld);
+            InstantiateUnit(workerPrefab, $"{team} Worker 2", team, start + new Vector3(-0.5f * xSign, -2.5f * ySign, 0f), parent, tilemapWorld);
+            InstantiateUnit(workerPrefab, $"{team} Worker 3", team, start + new Vector3(0.5f * xSign, -1.5f * ySign, 0f), parent, tilemapWorld);
+            InstantiateUnit(workerPrefab, $"{team} Worker 4", team, start + new Vector3(1.5f * xSign, -2.5f * ySign, 0f), parent, tilemapWorld);
         }
 
         private static void InstantiateUnit(
@@ -494,10 +404,12 @@ namespace ProjectS.Editor
             PrototypeUnitType unitType,
             GameObject prefab,
             ResourceAmount cost,
-            float duration)
+            float duration,
+            int supplyCost = 1,
+            int outputCount = 1)
         {
             var definition = new UnitProductionDefinition();
-            definition.Configure(displayName, unitType, prefab, cost, duration);
+            definition.Configure(displayName, unitType, prefab, cost, duration, supplyCost, outputCount);
             return definition;
         }
 

@@ -35,6 +35,12 @@ namespace ProjectS.AI
             fallbackAttackPoint = attackPoint;
         }
 
+        public void ConfigureTempo(float decisionSeconds, float attackSeconds)
+        {
+            decisionInterval = Mathf.Max(0.1f, decisionSeconds);
+            attackCommandInterval = Mathf.Max(0.1f, attackSeconds);
+        }
+
         private void Update()
         {
             if (ProjectS.RtsMatchController.ActiveInstance != null
@@ -172,13 +178,32 @@ namespace ProjectS.AI
         private Vector3 FindAttackTarget()
         {
             var enemyBuildings = BuildingRegistry.GetBuildings(enemyTeam);
+            BuildingStatus bestBuilding = null;
+            var bestPriority = AttackTargetPriority.Other;
+            var bestDistance = float.PositiveInfinity;
             for (var i = 0; i < enemyBuildings.Count; i++)
             {
                 var building = enemyBuildings[i];
-                if (building != null && building.Completed && building.gameObject.activeInHierarchy)
+                if (building == null || !building.Completed || !building.gameObject.activeInHierarchy)
                 {
-                    return building.transform.position;
+                    continue;
                 }
+
+                var priority = building.TargetPriority;
+                var distance = Vector3.Distance(fallbackAttackPoint, building.transform.position);
+                if (bestBuilding == null
+                    || priority < bestPriority
+                    || (priority == bestPriority && distance < bestDistance))
+                {
+                    bestBuilding = building;
+                    bestPriority = priority;
+                    bestDistance = distance;
+                }
+            }
+
+            if (bestBuilding != null)
+            {
+                return bestBuilding.transform.position;
             }
 
             var enemyUnits = UnitRegistry.GetAgents(enemyTeam);

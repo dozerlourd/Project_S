@@ -61,6 +61,13 @@ namespace ProjectS.Units
         private const float PathStatsPanelTopY = 12f;
         private const float PathStatsPanelWidth = 280f;
         private const float PathStatsPanelHeight = 92f;
+        private const float MinimapPanelWidth = 224f;
+        private const float MinimapPanelTopY = 116f;
+        private const float MinimapPanelMargin = 12f;
+        private const float MinimapBattleInfoHeight = 42f;
+        private const float MinimapMinimumMapHeight = 84f;
+        private const float MinimapCommandPanelTopMargin = CommandPanelHeight + CommandPanelBottomMargin;
+        private const float MinimapToCommandPanelGap = 46f;
         private const string FriendlyBuilderRequiredMessage = "Select a friendly builder before placing.";
 
         public static PlayerUnitCommandController ActiveInstance { get; private set; }
@@ -420,6 +427,61 @@ namespace ProjectS.Units
                 return;
             }
 
+            CommandPointAt(destination, pointCommand);
+        }
+
+        public bool TryHandleMinimapCommand(Vector3 worldPoint, bool isPrimaryButton)
+        {
+            if (isPrimaryButton && pendingPointCommand == PendingPointCommand.None
+                && pendingBuildPlacementService == null && pendingRallyQueue == null)
+            {
+                return false;
+            }
+
+            if (pendingPointCommand != PendingPointCommand.None)
+            {
+                CommandPointAt(worldPoint, pendingPointCommand);
+                pendingPointCommand = PendingPointCommand.None;
+                return true;
+            }
+
+            if (pendingRallyQueue != null)
+            {
+                CommandRallyPointAt(worldPoint);
+                return true;
+            }
+
+            if (pendingBuildPlacementService != null)
+            {
+                if (isPrimaryButton)
+                {
+                    CommandBuildPlacementAt(worldPoint);
+                }
+                else
+                {
+                    CancelBuildPlacement();
+                }
+
+                return true;
+            }
+
+            CommandPointAt(worldPoint, PendingPointCommand.None);
+            return true;
+        }
+
+        private void CommandPointAt(Vector3 worldPoint, PendingPointCommand pointCommand)
+        {
+            if (selectedUnits.Count == 0)
+            {
+                WarnCommandBlockedReason();
+                return;
+            }
+
+            if (!TryGetCommandPoint(worldPoint, out var destination))
+            {
+                return;
+            }
+
             var commandMode = pointCommand == PendingPointCommand.AttackMove
                 ? UnitCommandMode.AttackMove
                 : pointCommand == PendingPointCommand.Patrol
@@ -479,6 +541,21 @@ namespace ProjectS.Units
                 return;
             }
 
+            if (!TryGetBuildPlacementPoint(out var destination))
+            {
+                return;
+            }
+
+            CommandBuildPlacementAt(destination);
+        }
+
+        private void CommandBuildPlacementAt(Vector3 worldPoint)
+        {
+            if (pendingBuildPlacementService == null)
+            {
+                return;
+            }
+
             if (!HasSelectedFriendlyBuilder())
             {
                 buildPlacementFeedback = FriendlyBuilderRequiredMessage;
@@ -486,7 +563,7 @@ namespace ProjectS.Units
                 return;
             }
 
-            if (!TryGetBuildPlacementPoint(out var destination))
+            if (!TryGetBuildPlacementPoint(worldPoint, out var destination))
             {
                 return;
             }
@@ -544,6 +621,16 @@ namespace ProjectS.Units
             }
 
             if (!TryGetCommandPoint(out var destination))
+            {
+                return;
+            }
+
+            CommandRallyPointAt(destination);
+        }
+
+        private void CommandRallyPointAt(Vector3 worldPoint)
+        {
+            if (pendingRallyQueue == null || !TryGetCommandPoint(worldPoint, out var destination))
             {
                 return;
             }
@@ -836,11 +923,18 @@ namespace ProjectS.Units
         private bool TryGetCommandPoint(out Vector3 destination)
         {
             destination = Vector3.zero;
-            if (!TryGetCursorWorldPoint(out destination))
+            if (!TryGetCursorWorldPoint(out var worldPoint))
             {
                 return false;
             }
 
+            return TryGetCommandPoint(worldPoint, out destination);
+        }
+
+        private bool TryGetCommandPoint(Vector3 worldPoint, out Vector3 destination)
+        {
+            destination = worldPoint;
+            destination.z = commandPlaneZ;
             if (navigator != null)
             {
                 if (!navigator.TryGetCommandPoint(destination, out var tilemapDestination))
@@ -857,11 +951,18 @@ namespace ProjectS.Units
         private bool TryGetBuildPlacementPoint(out Vector3 destination)
         {
             destination = Vector3.zero;
-            if (!TryGetCursorWorldPoint(out destination))
+            if (!TryGetCursorWorldPoint(out var worldPoint))
             {
                 return false;
             }
 
+            return TryGetBuildPlacementPoint(worldPoint, out destination);
+        }
+
+        private bool TryGetBuildPlacementPoint(Vector3 worldPoint, out Vector3 destination)
+        {
+            destination = worldPoint;
+            destination.z = commandPlaneZ;
             var tilemapWorld = navigator != null ? navigator.TilemapWorld : null;
             if (tilemapWorld == null)
             {
@@ -1618,7 +1719,8 @@ namespace ProjectS.Units
 
         private static bool IsPointerOverRuntimeHud(Vector2 screenPosition)
         {
-            return IsScreenPointInGuiRect(screenPosition, new Rect(ResourcePanelX, ResourcePanelTopY, ResourcePanelWidth, ResourcePanelHeight))
+            return IsPointerOverMinimapArea(screenPosition)
+                || IsScreenPointInGuiRect(screenPosition, new Rect(ResourcePanelX, ResourcePanelTopY, ResourcePanelWidth, ResourcePanelHeight))
                 || IsScreenPointInGuiRect(
                     screenPosition,
                     new Rect(
@@ -1640,6 +1742,22 @@ namespace ProjectS.Units
                         PathStatsPanelTopY,
                         PathStatsPanelWidth,
                         PathStatsPanelHeight));
+        }
+
+        private static bool IsPointerOverMinimapArea(Vector2 screenPosition)
+        {
+            var availableHeight = Mathf.Min(
+                Screen.height - MinimapPanelTopY - MinimapPanelMargin - MinimapBattleInfoHeight,
+                Screen.height - MinimapCommandPanelTopMargin - MinimapPanelTopY - MinimapToCommandPanelGap);
+            var mapHeight = Mathf.Min(MinimapPanelWidth, availableHeight);
+            if (mapHeight < MinimapMinimumMapHeight)
+            {
+                return false;
+            }
+
+            return IsScreenPointInGuiRect(
+                screenPosition,
+                new Rect(Screen.width - MinimapPanelWidth - MinimapPanelMargin, MinimapPanelTopY, MinimapPanelWidth, mapHeight));
         }
 
         private static bool IsScreenPointInGuiRect(Vector2 screenPosition, Rect guiRect)

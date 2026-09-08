@@ -1060,6 +1060,57 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator WorkerGatherController_ContinuesAtNearestSameTypeNodeAfterTargetDepletes()
+        {
+            var walletObject = new GameObject("ReplacementGatherWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(0, 0));
+            var dropOffObject = CreateDropOff("ReplacementGatherDropOff", UnitTeam.Team1, new Vector3(0.35f, 0f, 0f));
+            var depletedTargetObject = CreateResourceNode(
+                "FirstMinerals",
+                Enum.Parse(ResourceTypeType, "Minerals"),
+                5,
+                5,
+                0f,
+                new Vector3(-0.35f, 0f, 0f));
+            var replacementTargetObject = CreateResourceNode(
+                "NearestReplacementMinerals",
+                Enum.Parse(ResourceTypeType, "Minerals"),
+                10,
+                5,
+                0f,
+                new Vector3(-0.7f, 0f, 0f));
+            var worker = CreateWorkerUnit("ReplacementGatherWorker", Vector3.zero);
+            var commandAgent = worker.GetComponent<UnitCommandAgent>();
+            var depletedTarget = depletedTargetObject.GetComponent(ResourceNodeType);
+            var replacementTarget = replacementTargetObject.GetComponent(ResourceNodeType);
+            var interactableTarget = (IUnitInteractableTarget)depletedTarget;
+
+            commandAgent.Issue(new UnitCommand(
+                UnitCommandMode.Interact,
+                interactableTarget.InteractionPoint,
+                null,
+                interactableTarget,
+                false));
+
+            for (var i = 0; i < 180 && GetInt(wallet, "Minerals") < 15; i++)
+            {
+                yield return null;
+            }
+
+            Assert.That(GetInt(wallet, "Minerals"), Is.GreaterThanOrEqualTo(15));
+            Assert.That(GetBool(depletedTarget, "IsDepleted"), Is.True);
+            Assert.That(GetInt(replacementTarget, "RemainingAmount"), Is.LessThanOrEqualTo(5));
+            Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.Interact));
+
+            Object.Destroy(worker);
+            Object.Destroy(depletedTargetObject);
+            Object.Destroy(replacementTargetObject);
+            Object.Destroy(dropOffObject);
+            Object.Destroy(walletObject);
+        }
+
+        [UnityTest]
         public IEnumerator WorkerGatherController_Team1ManualGatherDepositsWithTeam2WalletPresent()
         {
             var team1WalletObject = new GameObject("ManualGatherTeam1Wallet");

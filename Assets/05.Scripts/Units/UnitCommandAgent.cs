@@ -38,6 +38,7 @@ namespace ProjectS.Units
         private Vector3 focusTargetOffset;
         private bool hasFocusPathTarget;
         private bool targetMustStayDetected;
+        private bool hasExplicitFocusTarget;
         private float nextScanTime;
         private float nextTargetRepathTime;
         private string lastInteractionFailureReason;
@@ -181,6 +182,7 @@ namespace ProjectS.Units
                     break;
                 case UnitCommandMode.FocusAttack:
                     priorityTarget = command.Target;
+                    hasExplicitFocusTarget = priorityTarget != null;
                     focusTargetOffset = command.Target != null
                         ? command.Destination - command.Target.SelectionTransform.position
                         : Vector3.zero;
@@ -290,6 +292,7 @@ namespace ProjectS.Units
         {
             target = null;
             var bestDistance = float.PositiveInfinity;
+            var recentAttacker = UnitTargetPriority.GetRecentAttacker(status);
             var teams = UnitRegistry.AllTeams;
 
             for (var teamIndex = 0; teamIndex < teams.Count; teamIndex++)
@@ -310,7 +313,13 @@ namespace ProjectS.Units
                     }
 
                     var distance = GetTargetDistance(candidate);
-                    if (distance > scanRange || distance >= bestDistance)
+                    if (distance > scanRange
+                        || !UnitTargetPriority.IsPreferredTarget(
+                            candidate,
+                            distance,
+                            target,
+                            bestDistance,
+                            recentAttacker))
                     {
                         continue;
                     }
@@ -325,7 +334,8 @@ namespace ProjectS.Units
 
         private bool CanAcquireTargetsForCurrentState()
         {
-            return priorityTarget == null
+            return !hasExplicitFocusTarget
+                && priorityTarget == null
                 && (actionState == UnitActionState.Idle
                     || actionState == UnitActionState.AttackMoving
                     || actionState == UnitActionState.Patrolling
@@ -452,6 +462,7 @@ namespace ProjectS.Units
             focusTargetOffset = Vector3.zero;
             hasFocusPathTarget = false;
             targetMustStayDetected = false;
+            hasExplicitFocusTarget = false;
             nextTargetRepathTime = 0f;
             SyncPathOccupationOverride();
         }

@@ -52,7 +52,7 @@ namespace ProjectS.Resources
 
             if (targetNode == null || (!targetNode.isActiveAndEnabled && carriedAmount <= 0) || (!targetNode.CanGather() && carriedAmount <= 0))
             {
-                CancelGathering(true);
+                ContinueWithNearestAvailableNode();
                 return;
             }
 
@@ -146,7 +146,7 @@ namespace ProjectS.Resources
         {
             if (targetNode == null || !targetNode.CanGather())
             {
-                CancelGathering();
+                ContinueWithNearestAvailableNode();
                 return;
             }
 
@@ -212,21 +212,41 @@ namespace ProjectS.Resources
             var depositedAmount = carriedAmount;
             var depositedType = carriedType;
             carriedAmount = 0;
-            if (!deposited || targetNode == null || !targetNode.isActiveAndEnabled || !targetNode.CanGather())
+            if (!deposited)
             {
-                if (!deposited)
-                {
-                    Fail("Failed to deposit carried resources.");
-                }
-
+                Fail("Failed to deposit carried resources.");
                 state = GatherState.Idle;
                 commandAgent.Stop();
                 return;
             }
 
             LogGathering($"Deposited {depositedAmount} {depositedType} at {FormatTargetName(targetDropOff)}.");
+            if (targetNode == null || !targetNode.isActiveAndEnabled || !targetNode.CanGather())
+            {
+                ContinueWithNearestAvailableNode();
+                return;
+            }
+
             state = GatherState.MovingToResource;
             LogGathering($"Repeating gather route to {FormatTargetName(targetNode)}.");
+            pathAgent.MoveTo(targetNode.InteractionPoint);
+        }
+
+        private void ContinueWithNearestAvailableNode()
+        {
+            var resourceType = targetNode != null ? targetNode.ResourceType : carriedType;
+            var replacement = ResourceNode.FindNearestAvailable(transform.position, resourceType);
+            if (replacement == null)
+            {
+                CancelGathering(true);
+                return;
+            }
+
+            targetNode = replacement;
+            targetDropOff = null;
+            gatherTimer = 0f;
+            state = GatherState.MovingToResource;
+            LogGathering($"Resource node depleted. Continuing at nearest {resourceType} node {FormatTargetName(targetNode)}.");
             pathAgent.MoveTo(targetNode.InteractionPoint);
         }
 

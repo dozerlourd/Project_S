@@ -10,6 +10,7 @@ namespace ProjectS.Buildings
     public sealed class UnitProductionQueue : MonoBehaviour, IUnitRallyPointService
     {
         [SerializeField] private PlayerResourceWallet wallet;
+        [SerializeField] private SupplyManager supplyManager;
         [SerializeField] private ProjectSTilemapWorld tilemapWorld;
         [SerializeField] private UnitProductionDefinition[] producibleUnits = new UnitProductionDefinition[0];
         [SerializeField, Min(1)] private int maxQueueSize = 5;
@@ -48,6 +49,11 @@ namespace ProjectS.Buildings
         private void Awake()
         {
             ResolveReferences();
+        }
+
+        private void OnDisable()
+        {
+            ReleaseAllSupplyReservations();
         }
 
         private void Update()
@@ -129,6 +135,16 @@ namespace ProjectS.Buildings
                 return FailEnqueue($"Cannot enqueue {definition.DisplayName}: insufficient resources for cost ({definition.Cost}).");
             }
 
+            if (!TryReserveSupply(definition, out failureReason))
+            {
+                if (wallet != null && !definition.Cost.IsEmpty)
+                {
+                    wallet.Add(definition.Cost);
+                }
+
+                return FailEnqueue(failureReason);
+            }
+
             queue.Enqueue(definition);
             lastEnqueueFailureReason = string.Empty;
             lastCancellationFailureReason = string.Empty;
@@ -189,6 +205,12 @@ namespace ProjectS.Buildings
                 return false;
             }
 
+            if (supplyManager != null && !supplyManager.CanReserve(GetRequiredSupply(definition)))
+            {
+                failureReason = $"Cannot enqueue {definition.DisplayName}: insufficient supply ({supplyManager.CurrentSupply + supplyManager.ReservedSupply}/{supplyManager.MaxSupply}).";
+                return false;
+            }
+
             failureReason = string.Empty;
             return true;
         }
@@ -230,6 +252,7 @@ namespace ProjectS.Buildings
 
             activeProduction = null;
             activeProgress = 0f;
+            ReleaseSupplyReservation(cancelledProduction);
             lastCancellationFailureReason = string.Empty;
             lastEnqueueFailureReason = string.Empty;
             TryStartNextProduction();
@@ -250,6 +273,8 @@ namespace ProjectS.Buildings
             {
                 return false;
             }
+
+            ReleaseSupplyReservation(cancelledProduction);
 
             queue.Clear();
             for (var i = 0; i < originalQueue.Count; i++)
@@ -310,27 +335,39 @@ namespace ProjectS.Buildings
                 return;
             }
 
-            var spawnPosition = GetSpawnPosition();
-            var unitObject = Instantiate(definition.UnitPrefab, spawnPosition, Quaternion.identity);
-            unitObject.SetActive(true);
-            var unitStatus = unitObject.GetComponent<PrototypeUnitStatus>();
-            if (unitStatus != null && status != null)
+            var outputCount = definition.UnitsPerProduction;
+            for (var i = 0; i < outputCount; i++)
             {
-                unitStatus.SetTeam(status.Team);
-            }
+                var unitObject = Instantiate(definition.UnitPrefab, GetSpawnPosition(i, outputCount), Quaternion.identity);
+                var unitStatus = unitObject.GetComponent<PrototypeUnitStatus>();
+                if (unitStatus != null && status != null)
+                {
+                    unitStatus.SetTeam(status.Team);
+                    unitStatus.ConfigureSupplyCost(definition.SupplyCost);
+                }
 
-            var commandAgent = unitObject.GetComponent<UnitCommandAgent>();
-            if (commandAgent != null)
-            {
-                commandAgent.Issue(new UnitCommand(UnitCommandMode.Move, RallyPoint, null, false));
+                if (supplyManager != null && !supplyManager.CommitReservation(definition.SupplyCost, unitStatus))
+                {
+                    Debug.LogWarning($"Could not complete supply reservation for {definition.DisplayName}.", this);
+                    ReleaseSupplyReservation(definition);
+                }
+
+                unitObject.SetActive(true);
+
+                var commandAgent = unitObject.GetComponent<UnitCommandAgent>();
+                if (commandAgent != null)
+                {
+                    commandAgent.Issue(new UnitCommand(UnitCommandMode.Move, RallyPoint, null, false));
+                }
             }
 
             TryStartNextProduction();
         }
 
-        private Vector3 GetSpawnPosition()
+        private Vector3 GetSpawnPosition(int outputIndex = 0, int outputCount = 1)
         {
-            var position = transform.position + spawnOffset;
+            var spacing = outputCount > 1 ? 0.65f : 0f;
+            var position = transform.position + spawnOffset + new Vector3((outputIndex - (outputCount - 1) * 0.5f) * spacing, 0f, 0f);
             if (tilemapWorld == null)
             {
                 return position;
@@ -383,6 +420,11 @@ namespace ProjectS.Buildings
                 wallet = PlayerResourceWallet.FindForTeam(status.Team);
             }
 
+            if (status != null && (supplyManager == null || supplyManager.Team != status.Team))
+            {
+                supplyManager = SupplyManager.FindForTeam(status.Team);
+            }
+
             if (tilemapWorld == null)
             {
                 tilemapWorld = ProjectSTilemapWorld.ActiveInstance;
@@ -410,6 +452,59 @@ namespace ProjectS.Buildings
 
             wallet.Add(definition.Cost);
             return true;
+        }
+
+        private bool TryReserveSupply(UnitProductionDefinition definition, out string failureReason)
+        {
+            var requiredSupply = GetRequiredSupply(definition);
+            if (requiredSupply <= 0)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            if (supplyManager == null)
+            {
+                // Standalone test scenes and legacy content can run without the match-level supply system.
+                failureReason = string.Empty;
+                return true;
+            }
+
+            if (!supplyManager.TryReserve(requiredSupply))
+            {
+                failureReason = $"Cannot enqueue {definition.DisplayName}: {supplyManager.LastFailureReason}";
+                return false;
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private void ReleaseSupplyReservation(UnitProductionDefinition definition)
+        {
+            var requiredSupply = GetRequiredSupply(definition);
+            if (requiredSupply > 0)
+            {
+                supplyManager?.ReleaseReservation(requiredSupply);
+            }
+        }
+
+        private static int GetRequiredSupply(UnitProductionDefinition definition)
+        {
+            return definition == null ? 0 : definition.SupplyCost * definition.UnitsPerProduction;
+        }
+
+        private void ReleaseAllSupplyReservations()
+        {
+            ReleaseSupplyReservation(activeProduction);
+            foreach (var definition in queue)
+            {
+                ReleaseSupplyReservation(definition);
+            }
+
+            activeProduction = null;
+            activeProgress = 0f;
+            queue.Clear();
         }
 
         private bool FailCancellation(string reason)

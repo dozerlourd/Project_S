@@ -26,7 +26,10 @@ namespace ProjectS.Units
         Worker,
         Soldier,
         Spliter,
-        Ranger
+        Ranger,
+        Tank,
+        Striker,
+        Swarm
     }
 
     public enum MovementDomain
@@ -102,6 +105,7 @@ namespace ProjectS.Units
         [SerializeField] private float movementSpeed = 3f;
         [SerializeField] private int maxAttackTargets = 1;
         [SerializeField] private Vector2Int occupiedCells = Vector2Int.one;
+        [SerializeField, Min(0)] private int supplyCost = 1;
 
         [Header("Special Status")]
         [SerializeField] private bool hasHealthRegeneration;
@@ -151,6 +155,7 @@ namespace ProjectS.Units
         }
         public int MaxAttackTargets => maxAttackTargets;
         public Vector2Int OccupiedCells => new Vector2Int(Mathf.Max(1, occupiedCells.x), Mathf.Max(1, occupiedCells.y));
+        public int SupplyCost => Mathf.Max(0, supplyCost);
         public bool HasHealthRegeneration => hasHealthRegeneration;
         public float HealthRegenerationAmount => healthRegenerationAmount;
         public bool HasShield => hasShield;
@@ -273,6 +278,11 @@ namespace ProjectS.Units
             {
                 UnitAttackTargetRegistry.Register(this);
             }
+        }
+
+        public void ConfigureSupplyCost(int cost)
+        {
+            supplyCost = Mathf.Max(0, cost);
         }
 
         public void SetMovementSpeedModifier(object source, float multiplier)

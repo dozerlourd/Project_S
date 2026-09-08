@@ -87,6 +87,28 @@ namespace ProjectS.Units
         void TakeDamage(float amount, IUnitAttackTarget attacker);
     }
 
+    public enum AttackTargetPriority
+    {
+        CurrentAttacker,
+        CombatUnit,
+        WorkerUnit,
+        DefensiveBuilding,
+        ProductionBuilding,
+        MainBase,
+        Other
+    }
+
+    public interface IAttackTargetPriorityProvider
+    {
+        AttackTargetPriority TargetPriority { get; }
+    }
+
+    public interface IRecentAttackerTarget
+    {
+        bool TryGetRecentAttacker(float maxAge, out IUnitAttackTarget attacker);
+        void RecordRecentAttacker(IUnitAttackTarget attacker);
+    }
+
     public readonly struct UnitCommand
     {
         public readonly UnitCommandMode Mode;

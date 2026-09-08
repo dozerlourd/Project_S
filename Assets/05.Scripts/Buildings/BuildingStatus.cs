@@ -1,4 +1,5 @@
 using ProjectS.Units;
+using ProjectS.Resources;
 using UnityEngine;
 
 namespace ProjectS.Buildings
@@ -14,12 +15,13 @@ namespace ProjectS.Buildings
         Other
     }
 
-    public sealed class BuildingStatus : MonoBehaviour, IUnitAttackTarget
+    public sealed class BuildingStatus : MonoBehaviour, IUnitAttackTarget, IAttackTargetPriorityProvider
     {
         [SerializeField] private UnitTeam team = UnitTeam.Team1;
         [SerializeField] private BuildingKind kind = BuildingKind.MainBase;
         [SerializeField] private Vector2Int footprint = new Vector2Int(2, 2);
         [SerializeField] private bool completed = true;
+        [SerializeField, Min(0)] private int supplyProvided;
 
         private BuildingHealth health;
         private Collider2D attackCollider;
@@ -28,11 +30,13 @@ namespace ProjectS.Buildings
         public BuildingKind Kind => kind;
         public Vector2Int Footprint => new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
         public bool Completed => completed;
+        public int SupplyProvided => Mathf.Max(0, supplyProvided);
         public string SelectionName => kind.ToString();
         public Transform SelectionTransform => transform;
         public GameObject SelectionGameObject => gameObject;
         public bool IsAlive => completed && (health == null || !health.IsDestroyed);
         public Collider2D AttackCollider => attackCollider != null ? attackCollider : GetComponent<Collider2D>();
+        public AttackTargetPriority TargetPriority => GetTargetPriority(kind);
 
         private void Awake()
         {
@@ -46,16 +50,19 @@ namespace ProjectS.Buildings
             EnsureHealth();
             BuildingRegistry.Register(this);
             UnitAttackTargetRegistry.Register(this);
+            SyncSupplyProvider();
         }
 
         private void OnDisable()
         {
             BuildingRegistry.Unregister(this);
             UnitAttackTargetRegistry.Unregister(this);
+            SupplyManager.FindForTeam(team)?.UnregisterBuilding(this);
         }
 
         public void Initialize(UnitTeam ownerTeam, BuildingKind buildingKind, Vector2Int occupiedFootprint, bool isCompleted)
         {
+            SupplyManager.FindForTeam(team)?.UnregisterBuilding(this);
             if (isActiveAndEnabled)
             {
                 BuildingRegistry.Unregister(this);
@@ -74,6 +81,7 @@ namespace ProjectS.Buildings
             {
                 BuildingRegistry.Register(this);
                 UnitAttackTargetRegistry.Register(this);
+                SyncSupplyProvider();
             }
         }
 
@@ -85,7 +93,14 @@ namespace ProjectS.Buildings
             if (isActiveAndEnabled)
             {
                 UnitAttackTargetRegistry.Register(this);
+                SyncSupplyProvider();
             }
+        }
+
+        public void ConfigureSupplyProvided(int amount)
+        {
+            supplyProvided = Mathf.Max(0, amount);
+            SyncSupplyProvider();
         }
 
         public void TakeDamage(float amount)
@@ -101,7 +116,19 @@ namespace ProjectS.Buildings
 
         public void TakeDamage(float amount, IUnitAttackTarget attacker)
         {
-            TakeDamage(amount);
+            if (!completed || amount <= 0f)
+            {
+                return;
+            }
+
+            EnsureHealth();
+            if (health == null || health.IsDestroyed)
+            {
+                return;
+            }
+
+            UnitTargetPriority.RecordRecentAttacker(this, attacker);
+            health.TakeDamage(amount);
         }
 
         private void ResolveReferences()
@@ -127,6 +154,40 @@ namespace ProjectS.Buildings
             if (health == null)
             {
                 health = gameObject.AddComponent<BuildingHealth>();
+            }
+        }
+
+        private static AttackTargetPriority GetTargetPriority(BuildingKind buildingKind)
+        {
+            switch (buildingKind)
+            {
+                case BuildingKind.AutoTurret:
+                    return AttackTargetPriority.DefensiveBuilding;
+                case BuildingKind.Production:
+                case BuildingKind.SpliterProduction:
+                    return AttackTargetPriority.ProductionBuilding;
+                case BuildingKind.MainBase:
+                    return AttackTargetPriority.MainBase;
+                default:
+                    return AttackTargetPriority.Other;
+            }
+        }
+
+        private void SyncSupplyProvider()
+        {
+            var supplyManager = SupplyManager.FindForTeam(team);
+            if (supplyManager == null)
+            {
+                return;
+            }
+
+            if (completed)
+            {
+                supplyManager.RegisterBuilding(this, SupplyProvided);
+            }
+            else
+            {
+                supplyManager.UnregisterBuilding(this);
             }
         }
     }

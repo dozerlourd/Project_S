@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using ProjectS.Tilemaps;
+using ProjectS.UI;
 
 namespace ProjectS
 {
@@ -17,6 +18,9 @@ namespace ProjectS
         [Header("Keyboard Movement")]
         [SerializeField] private bool enableKeyboardMovement = true;
         [SerializeField] private float keyboardMoveSpeed = 24f;
+
+        [Header("Mouse Drag Movement")]
+        [SerializeField] private bool enableMiddleMouseDrag = true;
 
         [Header("Rotation")]
         [SerializeField] private bool enableKeyboardRotation;
@@ -36,12 +40,28 @@ namespace ProjectS
         [SerializeField] private float mapPlaneZ;
 
         private float targetOrthographicSize;
+        private bool isMiddleMouseDragging;
+        private Vector3 previousMouseDragGroundPoint;
+
+        public Camera TargetCamera
+        {
+            get
+            {
+                ResolveCamera();
+                return targetCamera;
+            }
+        }
 
         private void Awake()
         {
             ResolveCamera();
             ResolveMapRoot();
             targetOrthographicSize = targetCamera != null ? targetCamera.orthographicSize : maxOrthographicSize;
+            if (targetCamera != null)
+            {
+                targetCamera.orthographicSize = Mathf.Min(targetCamera.orthographicSize, GetMaximumOrthographicSizeForMap());
+            }
+
             ClampPositionToBounds();
         }
 
@@ -70,6 +90,7 @@ namespace ProjectS
 
             RotateCamera();
             MoveCamera();
+            UpdateMiddleMouseDrag();
             UpdateZoomTarget();
             ApplyZoom();
             ClampPositionToBounds();
@@ -89,6 +110,21 @@ namespace ProjectS
             }
         }
 
+        public bool TryMoveToWorldPoint(Vector3 worldPoint)
+        {
+            ResolveCamera();
+            if (targetCamera == null)
+            {
+                return false;
+            }
+
+            var currentLookPoint = GetCameraCenterGroundPoint();
+            var correction = worldPoint - currentLookPoint;
+            transform.position += new Vector3(correction.x, correction.y, 0f);
+            ClampPositionToBounds();
+            return true;
+        }
+
         private void MoveCamera()
         {
             var moveInput = Vector2.zero;
@@ -104,6 +140,43 @@ namespace ProjectS
 
             var moveDirection = new Vector3(moveInput.x, moveInput.y, 0f);
             transform.position += moveDirection * GetMoveSpeed() * Time.deltaTime;
+        }
+
+        private void UpdateMiddleMouseDrag()
+        {
+            if (!enableMiddleMouseDrag || Mouse.current == null)
+            {
+                isMiddleMouseDragging = false;
+                return;
+            }
+
+            var mouse = Mouse.current;
+            var screenPosition = mouse.position.ReadValue();
+            if (mouse.middleButton.wasPressedThisFrame)
+            {
+                isMiddleMouseDragging = !RtsMinimap.IsScreenPointOverMinimap(screenPosition)
+                    && TryGetGroundPointFromScreenPosition(screenPosition, out previousMouseDragGroundPoint);
+            }
+
+            if (!isMiddleMouseDragging || !mouse.middleButton.isPressed)
+            {
+                if (mouse.middleButton.wasReleasedThisFrame)
+                {
+                    isMiddleMouseDragging = false;
+                }
+
+                return;
+            }
+
+            if (!TryGetGroundPointFromScreenPosition(screenPosition, out var currentGroundPoint))
+            {
+                return;
+            }
+
+            var correction = previousMouseDragGroundPoint - currentGroundPoint;
+            transform.position += new Vector3(correction.x, correction.y, 0f);
+            ClampPositionToBounds();
+            TryGetGroundPointFromScreenPosition(screenPosition, out previousMouseDragGroundPoint);
         }
 
         private void RotateCamera()
@@ -263,9 +336,11 @@ namespace ProjectS
 
         private void ApplyZoom()
         {
-            targetCamera.orthographicSize = zoomSmoothing <= 0f
+            var requestedSize = zoomSmoothing <= 0f
                 ? targetOrthographicSize
                 : Mathf.Lerp(targetCamera.orthographicSize, targetOrthographicSize, 1f - Mathf.Exp(-zoomSmoothing * Time.deltaTime));
+
+            targetCamera.orthographicSize = Mathf.Min(requestedSize, GetMaximumOrthographicSizeForMap());
         }
 
         private void ClampPositionToBounds()
@@ -280,13 +355,17 @@ namespace ProjectS
                 return;
             }
 
-            boundsMin -= Vector2.one * boundsPadding;
-            boundsMax += Vector2.one * boundsPadding;
+            ApplyBoundsPadding(ref boundsMin, ref boundsMax);
 
             var lookPoint = GetCameraCenterGroundPoint();
+            if (!TryGetViewportGroundOffsets(lookPoint, out var viewportMin, out var viewportMax))
+            {
+                return;
+            }
+
             var clampedLookPoint = new Vector3(
-                Mathf.Clamp(lookPoint.x, boundsMin.x, boundsMax.x),
-                Mathf.Clamp(lookPoint.y, boundsMin.y, boundsMax.y),
+                ClampToViewportBounds(lookPoint.x, viewportMin.x, viewportMax.x, boundsMin.x, boundsMax.x),
+                ClampToViewportBounds(lookPoint.y, viewportMin.y, viewportMax.y, boundsMin.y, boundsMax.y),
                 lookPoint.z);
             var correction = clampedLookPoint - lookPoint;
 
@@ -294,6 +373,82 @@ namespace ProjectS
             {
                 transform.position += new Vector3(correction.x, correction.y, 0f);
             }
+        }
+
+        private float GetMaximumOrthographicSizeForMap()
+        {
+            if (!useMovementBounds || targetCamera == null || !targetCamera.orthographic ||
+                !TryGetTilemapWorldBounds(out var boundsMin, out var boundsMax))
+            {
+                return maxOrthographicSize;
+            }
+
+            ApplyBoundsPadding(ref boundsMin, ref boundsMax);
+
+            var lookPoint = GetCameraCenterGroundPoint();
+            if (!TryGetViewportGroundOffsets(lookPoint, out var viewportMin, out var viewportMax))
+            {
+                return maxOrthographicSize;
+            }
+
+            var viewportSize = viewportMax - viewportMin;
+            var currentSize = Mathf.Max(targetCamera.orthographicSize, 0.01f);
+            var maxSize = maxOrthographicSize;
+
+            if (viewportSize.x > 0.001f)
+            {
+                maxSize = Mathf.Min(maxSize, currentSize * ((boundsMax.x - boundsMin.x) / viewportSize.x));
+            }
+
+            if (viewportSize.y > 0.001f)
+            {
+                maxSize = Mathf.Min(maxSize, currentSize * ((boundsMax.y - boundsMin.y) / viewportSize.y));
+            }
+
+            return Mathf.Max(0.01f, maxSize);
+        }
+
+        private void ApplyBoundsPadding(ref Vector2 boundsMin, ref Vector2 boundsMax)
+        {
+            var maximumPadding = Mathf.Min((boundsMax.x - boundsMin.x) * 0.5f, (boundsMax.y - boundsMin.y) * 0.5f);
+            var padding = Mathf.Min(boundsPadding, Mathf.Max(0f, maximumPadding));
+            boundsMin += Vector2.one * padding;
+            boundsMax -= Vector2.one * padding;
+        }
+
+        private bool TryGetViewportGroundOffsets(Vector3 lookPoint, out Vector2 viewportMin, out Vector2 viewportMax)
+        {
+            viewportMin = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            viewportMax = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            var groundPlane = new Plane(Vector3.forward, new Vector3(0f, 0f, mapPlaneZ));
+
+            foreach (var viewportCorner in ViewportCorners)
+            {
+                var ray = targetCamera.ViewportPointToRay(viewportCorner);
+                if (!groundPlane.Raycast(ray, out var enter))
+                {
+                    return false;
+                }
+
+                var groundPoint = ray.GetPoint(enter);
+                var offset = new Vector2(groundPoint.x - lookPoint.x, groundPoint.y - lookPoint.y);
+                viewportMin = Vector2.Min(viewportMin, offset);
+                viewportMax = Vector2.Max(viewportMax, offset);
+            }
+
+            return true;
+        }
+
+        private static float ClampToViewportBounds(float lookCoordinate, float viewportMin, float viewportMax, float boundsMin, float boundsMax)
+        {
+            var minimumLookCoordinate = boundsMin - viewportMin;
+            var maximumLookCoordinate = boundsMax - viewportMax;
+            if (minimumLookCoordinate > maximumLookCoordinate)
+            {
+                return (minimumLookCoordinate + maximumLookCoordinate) * 0.5f;
+            }
+
+            return Mathf.Clamp(lookCoordinate, minimumLookCoordinate, maximumLookCoordinate);
         }
 
         private Vector3 GetCameraCenterGroundPoint()
@@ -310,6 +465,33 @@ namespace ProjectS
                 ? ray.GetPoint(enter)
                 : transform.position;
         }
+
+        private bool TryGetGroundPointFromScreenPosition(Vector2 screenPosition, out Vector3 groundPoint)
+        {
+            groundPoint = default;
+            if (targetCamera == null)
+            {
+                return false;
+            }
+
+            var ray = targetCamera.ScreenPointToRay(screenPosition);
+            var groundPlane = new Plane(Vector3.forward, new Vector3(0f, 0f, mapPlaneZ));
+            if (!groundPlane.Raycast(ray, out var enter))
+            {
+                return false;
+            }
+
+            groundPoint = ray.GetPoint(enter);
+            return true;
+        }
+
+        private static readonly Vector3[] ViewportCorners =
+        {
+            new(0f, 0f, 0f),
+            new(0f, 1f, 0f),
+            new(1f, 0f, 0f),
+            new(1f, 1f, 0f)
+        };
 
         private bool TryGetTilemapWorldBounds(out Vector2 boundsMin, out Vector2 boundsMax)
         {

@@ -171,6 +171,39 @@ namespace ProjectS.Tilemaps
                 && cell.y < bounds.yMax;
         }
 
+        public bool TryGetWorldBounds(out Bounds worldBounds)
+        {
+            ResolveReferences();
+            var cellBounds = CellBounds;
+            if (cellBounds.size.x < 1 || cellBounds.size.y < 1)
+            {
+                worldBounds = default;
+                return false;
+            }
+
+            var min = GetCellCornerWorld(new Vector3Int(cellBounds.xMin, cellBounds.yMin, 0));
+            var max = GetCellCornerWorld(new Vector3Int(cellBounds.xMax, cellBounds.yMax, 0));
+            var size = max - min;
+            if (Mathf.Approximately(size.x, 0f) || Mathf.Approximately(size.y, 0f))
+            {
+                worldBounds = default;
+                return false;
+            }
+
+            worldBounds = new Bounds((min + max) * 0.5f, new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), 0f));
+            return true;
+        }
+
+        private Vector3 GetCellCornerWorld(Vector3Int cell)
+        {
+            if (groundTilemap != null)
+            {
+                return groundTilemap.CellToWorld(cell);
+            }
+
+            return grid != null ? grid.CellToWorld(cell) : cell;
+        }
+
         public bool TrySample(Vector3Int cell, out ProjectSTileSample sample)
         {
             EnsureNavigationCache();
