@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using ProjectS.Resources;
 using ProjectS.Units;
 using UnityEngine;
@@ -15,6 +16,7 @@ namespace ProjectS.Buildings
         [SerializeField, Min(0)] private int supplyCost = 1;
         [SerializeField, Min(0.1f)] private float productionTime = 6f;
         [SerializeField, Min(1)] private int unitsPerProduction = 1;
+        [SerializeField] private UnitProductionRequirement[] requirements = new UnitProductionRequirement[0];
 
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? unitType.ToString() : displayName;
         public PrototypeUnitType UnitType => unitType;
@@ -23,6 +25,7 @@ namespace ProjectS.Buildings
         public int SupplyCost => Mathf.Max(0, supplyCost);
         public float ProductionTime => Mathf.Max(0.1f, productionTime);
         public int UnitsPerProduction => Mathf.Max(1, unitsPerProduction);
+        public IReadOnlyList<UnitProductionRequirement> Requirements => requirements;
 
         public void Configure(
             string name,
@@ -31,7 +34,8 @@ namespace ProjectS.Buildings
             ResourceAmount resourceCost,
             float duration,
             int requiredSupply = 1,
-            int outputCount = 1)
+            int outputCount = 1,
+            UnitProductionRequirement[] productionRequirements = null)
         {
             displayName = name;
             unitType = type;
@@ -40,6 +44,7 @@ namespace ProjectS.Buildings
             productionTime = Mathf.Max(0.1f, duration);
             supplyCost = Mathf.Max(0, requiredSupply);
             unitsPerProduction = Mathf.Max(1, outputCount);
+            requirements = productionRequirements ?? new UnitProductionRequirement[0];
         }
     }
 }

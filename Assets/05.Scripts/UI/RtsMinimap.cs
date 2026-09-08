@@ -8,12 +8,10 @@ namespace ProjectS.UI
     public sealed class RtsMinimap : MonoBehaviour
     {
         private const float PanelWidth = 224f;
-        private const float PanelTop = 116f;
         private const float PanelMargin = 12f;
         private const float BattleInfoHeight = 42f;
-        private const float MinimumMapHeight = 84f;
-        private const float CommandPanelTopMargin = 412f;
-        private const float MapToCommandPanelGap = 46f;
+        private const float MapHeight = 144f;
+        private const float MapToInfoGap = 8f;
         private const float UnitSize = 4f;
         private const float BuildingSize = 8f;
 
@@ -30,6 +28,7 @@ namespace ProjectS.UI
         private bool isDraggingCamera;
 
         public static RtsMinimap ActiveInstance { get; private set; }
+        public static float BottomRightReservedWidth => PanelWidth + PanelMargin + 8f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntimeMinimap()
@@ -117,17 +116,9 @@ namespace ProjectS.UI
 
         private static bool TryGetMapRect(out Rect mapRect)
         {
-            var availableHeight = Mathf.Min(
-                Screen.height - PanelTop - PanelMargin - BattleInfoHeight,
-                Screen.height - CommandPanelTopMargin - PanelTop - MapToCommandPanelGap);
-            var mapHeight = Mathf.Min(PanelWidth, availableHeight);
-            if (mapHeight < MinimumMapHeight)
-            {
-                mapRect = default;
-                return false;
-            }
-
-            mapRect = new Rect(Screen.width - PanelWidth - PanelMargin, PanelTop, PanelWidth, mapHeight);
+            var x = Screen.width - PanelWidth - PanelMargin;
+            var y = Screen.height - PanelMargin - BattleInfoHeight - MapToInfoGap - MapHeight;
+            mapRect = new Rect(x, y, PanelWidth, MapHeight);
             return true;
         }
 
@@ -210,7 +201,7 @@ namespace ProjectS.UI
 
         private void DrawBattleInfo(Rect mapRect)
         {
-            var infoRect = new Rect(mapRect.x, mapRect.yMax + 8f, mapRect.width, BattleInfoHeight - 4f);
+            var infoRect = new Rect(mapRect.x, mapRect.yMax + MapToInfoGap, mapRect.width, BattleInfoHeight - 4f);
             GUI.Box(infoRect, string.Empty);
             GUI.Label(new Rect(infoRect.x + 8f, infoRect.y + 3f, infoRect.width - 16f, 18f),
                 $"Player  U {CountActiveUnits(playerTeam)}  B {CountActiveBuildings(playerTeam)}");

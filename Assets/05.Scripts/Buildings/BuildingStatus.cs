@@ -9,6 +9,7 @@ namespace ProjectS.Buildings
         MainBase,
         Production,
         ResourceDropOff,
+        SupplyDepot,
         SpliterProduction,
         AutoTurret,
         SpeedAura,
@@ -71,6 +72,10 @@ namespace ProjectS.Buildings
 
             team = ownerTeam;
             kind = buildingKind;
+            if (buildingKind == BuildingKind.SupplyDepot && supplyProvided == 0)
+            {
+                supplyProvided = 10;
+            }
             footprint = new Vector2Int(Mathf.Max(1, occupiedFootprint.x), Mathf.Max(1, occupiedFootprint.y));
             completed = isCompleted;
             ResolveReferences();

@@ -39,35 +39,13 @@ namespace ProjectS.Units
         private IUnitRallyPointService pendingRallyQueue;
         private string buildPlacementFeedback;
         private bool isBuildMenuOpen;
+        private bool waitForBuildPlacementMouseRelease;
         private bool isLeftMousePressed;
         private bool isDraggingSelection;
         private bool warnedMissingCamera;
         private bool warnedNoSelectedUnits;
         private static Sprite fallbackRingSprite;
 
-        private const float ResourcePanelX = 12f;
-        private const float ResourcePanelTopY = 12f;
-        private const float ResourcePanelWidth = 260f;
-        private const float ResourcePanelHeight = 64f;
-        private const float SelectionPanelX = 12f;
-        private const float SelectionPanelBottomMargin = 12f;
-        private const float SelectionPanelWidth = 360f;
-        private const float SelectionPanelHeight = 220f;
-        private const float CommandPanelRightMargin = 12f;
-        private const float CommandPanelBottomMargin = 12f;
-        private const float CommandPanelWidth = 420f;
-        private const float CommandPanelHeight = 400f;
-        private const float PathStatsPanelRightMargin = 12f;
-        private const float PathStatsPanelTopY = 12f;
-        private const float PathStatsPanelWidth = 280f;
-        private const float PathStatsPanelHeight = 92f;
-        private const float MinimapPanelWidth = 224f;
-        private const float MinimapPanelTopY = 116f;
-        private const float MinimapPanelMargin = 12f;
-        private const float MinimapBattleInfoHeight = 42f;
-        private const float MinimapMinimumMapHeight = 84f;
-        private const float MinimapCommandPanelTopMargin = CommandPanelHeight + CommandPanelBottomMargin;
-        private const float MinimapToCommandPanelGap = 46f;
         private const string FriendlyBuilderRequiredMessage = "Select a friendly builder before placing.";
 
         public static PlayerUnitCommandController ActiveInstance { get; private set; }
@@ -75,6 +53,7 @@ namespace ProjectS.Units
         public IReadOnlyList<UnitCommandAgent> SelectedUnits => selectedUnits;
         public IPlayerSelectableTarget PrimarySelection { get; private set; }
         public bool IsBuildPlacementPending => pendingBuildPlacementService != null;
+        public bool IsRallyPointPending => pendingRallyQueue != null;
         public bool IsBuildMenuOpen => isBuildMenuOpen;
         public string BuildPlacementStatusMessage
         {
@@ -83,6 +62,11 @@ namespace ProjectS.Units
                 if (pendingBuildPlacementService == null)
                 {
                     return buildPlacementFeedback;
+                }
+
+                if (waitForBuildPlacementMouseRelease)
+                {
+                    return "Release the current click, then left-click a tile to place.";
                 }
 
                 if (!HasSelectedFriendlyBuilder())
@@ -98,6 +82,29 @@ namespace ProjectS.Units
                 return pendingBuildPlacementService.CanPlaceDefaultConstructionSite(destination)
                     ? "Left-click to place. Right-click or Esc to cancel."
                     : pendingBuildPlacementService.LastPlacementFailureReason;
+            }
+        }
+
+        public string PendingCommandStatusMessage
+        {
+            get
+            {
+                if (pendingRallyQueue != null)
+                {
+                    return "Rally: select a map destination.";
+                }
+
+                switch (pendingPointCommand)
+                {
+                    case PendingPointCommand.Move:
+                        return "Move: select a map destination.";
+                    case PendingPointCommand.AttackMove:
+                        return "Attack Move: select a map destination.";
+                    case PendingPointCommand.Patrol:
+                        return "Patrol: select a map destination.";
+                    default:
+                        return BuildPlacementStatusMessage;
+                }
             }
         }
 
@@ -143,6 +150,7 @@ namespace ProjectS.Units
         private void Update()
         {
             ResolveSceneReferences();
+            PruneInvalidSelection();
 
             var mouse = Mouse.current;
             if (mouse == null)
@@ -150,19 +158,34 @@ namespace ProjectS.Units
                 return;
             }
 
-            if (mouse.leftButton.wasPressedThisFrame)
+            // A build menu click can otherwise be completed as a map placement on the same release.
+            var ignoreCurrentLeftClick = waitForBuildPlacementMouseRelease && pendingBuildPlacementService != null;
+            if (ignoreCurrentLeftClick)
             {
-                BeginLeftMouseInteraction(mouse.position.ReadValue());
+                isLeftMousePressed = false;
+                isDraggingSelection = false;
+                if (!mouse.leftButton.isPressed)
+                {
+                    waitForBuildPlacementMouseRelease = false;
+                }
             }
-
-            if (mouse.leftButton.isPressed)
+            else
             {
-                UpdateLeftMouseInteraction(mouse.position.ReadValue());
-            }
+                waitForBuildPlacementMouseRelease = false;
+                if (mouse.leftButton.wasPressedThisFrame)
+                {
+                    BeginLeftMouseInteraction(mouse.position.ReadValue());
+                }
 
-            if (mouse.leftButton.wasReleasedThisFrame)
-            {
-                EndLeftMouseInteraction(mouse.position.ReadValue());
+                if (mouse.leftButton.isPressed)
+                {
+                    UpdateLeftMouseInteraction(mouse.position.ReadValue());
+                }
+
+                if (mouse.leftButton.wasReleasedThisFrame)
+                {
+                    EndLeftMouseInteraction(mouse.position.ReadValue());
+                }
             }
 
             if (mouse.rightButton.wasPressedThisFrame)
@@ -432,6 +455,11 @@ namespace ProjectS.Units
 
         public bool TryHandleMinimapCommand(Vector3 worldPoint, bool isPrimaryButton)
         {
+            if (pendingBuildPlacementService != null && waitForBuildPlacementMouseRelease)
+            {
+                return true;
+            }
+
             if (isPrimaryButton && pendingPointCommand == PendingPointCommand.None
                 && pendingBuildPlacementService == null && pendingRallyQueue == null)
             {
@@ -578,6 +606,7 @@ namespace ProjectS.Units
                     constructionSite,
                     false));
                 pendingBuildPlacementService = null;
+                waitForBuildPlacementMouseRelease = false;
                 buildPlacementFeedback = string.Empty;
                 return;
             }
@@ -589,6 +618,7 @@ namespace ProjectS.Units
         {
             pendingBuildPlacementService = null;
             pendingRallyQueue = null;
+            waitForBuildPlacementMouseRelease = false;
             buildPlacementFeedback = string.Empty;
         }
 
@@ -687,6 +717,7 @@ namespace ProjectS.Units
             }
 
             pendingBuildPlacementService = placementService;
+            waitForBuildPlacementMouseRelease = Mouse.current != null && Mouse.current.leftButton.isPressed;
             buildPlacementFeedback = string.Empty;
         }
 
@@ -1242,6 +1273,25 @@ namespace ProjectS.Units
             RefreshTargetHighlights();
         }
 
+        private void PruneInvalidSelection()
+        {
+            for (var i = selectedUnits.Count - 1; i >= 0; i--)
+            {
+                if (selectedUnits[i] == null || !selectedUnits[i].gameObject.activeInHierarchy)
+                {
+                    selectedUnits.RemoveAt(i);
+                }
+            }
+
+            if (PrimarySelection == null
+                || (PrimarySelection.SelectionGameObject != null && PrimarySelection.SelectionGameObject.activeInHierarchy))
+            {
+                return;
+            }
+
+            ClearSelection();
+        }
+
         private void SelectControlGroup(int index)
         {
             ClearSelection();
@@ -1719,51 +1769,21 @@ namespace ProjectS.Units
 
         private static bool IsPointerOverRuntimeHud(Vector2 screenPosition)
         {
-            return IsPointerOverMinimapArea(screenPosition)
-                || IsScreenPointInGuiRect(screenPosition, new Rect(ResourcePanelX, ResourcePanelTopY, ResourcePanelWidth, ResourcePanelHeight))
-                || IsScreenPointInGuiRect(
-                    screenPosition,
-                    new Rect(
-                        SelectionPanelX,
-                        Screen.height - SelectionPanelHeight - SelectionPanelBottomMargin,
-                        SelectionPanelWidth,
-                        SelectionPanelHeight))
-                || IsScreenPointInGuiRect(
-                    screenPosition,
-                    new Rect(
-                        Screen.width - CommandPanelWidth - CommandPanelRightMargin,
-                        Screen.height - CommandPanelHeight - CommandPanelBottomMargin,
-                        CommandPanelWidth,
-                        CommandPanelHeight))
-                || IsScreenPointInGuiRect(
-                    screenPosition,
-                    new Rect(
-                        Screen.width - PathStatsPanelWidth - PathStatsPanelRightMargin,
-                        PathStatsPanelTopY,
-                        PathStatsPanelWidth,
-                        PathStatsPanelHeight));
-        }
+            var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
 
-        private static bool IsPointerOverMinimapArea(Vector2 screenPosition)
-        {
-            var availableHeight = Mathf.Min(
-                Screen.height - MinimapPanelTopY - MinimapPanelMargin - MinimapBattleInfoHeight,
-                Screen.height - MinimapCommandPanelTopMargin - MinimapPanelTopY - MinimapToCommandPanelGap);
-            var mapHeight = Mathf.Min(MinimapPanelWidth, availableHeight);
-            if (mapHeight < MinimapMinimumMapHeight)
+            // Keep command input independent from the UI assembly. These bounds mirror the runtime HUD layout.
+            if (new Rect(12f, 12f, 260f, 88f).Contains(guiPosition))
             {
-                return false;
+                return true;
             }
 
-            return IsScreenPointInGuiRect(
-                screenPosition,
-                new Rect(Screen.width - MinimapPanelWidth - MinimapPanelMargin, MinimapPanelTopY, MinimapPanelWidth, mapHeight));
-        }
+            var minimapRect = new Rect(Screen.width - 236f, Screen.height - 206f, 224f, 144f);
+            if (minimapRect.Contains(guiPosition))
+            {
+                return true;
+            }
 
-        private static bool IsScreenPointInGuiRect(Vector2 screenPosition, Rect guiRect)
-        {
-            var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
-            return guiRect.Contains(guiPosition);
+            return guiPosition.y >= Screen.height - 128f;
         }
 
         private static string FormatInteractableTargetName(IUnitInteractableTarget target)

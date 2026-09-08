@@ -16,6 +16,7 @@ namespace ProjectS.Tests.PlayMode
         private const float MovementSpeed = 3f;
         private const float MovementTolerance = 0.0025f;
         private static readonly Type PlayerResourceWalletType = GetGameplayType("ProjectS.Resources.PlayerResourceWallet");
+        private static readonly Type SupplyManagerType = GetGameplayType("ProjectS.Resources.SupplyManager");
         private static readonly Type ResourceAmountType = GetGameplayType("ProjectS.Resources.ResourceAmount");
         private static readonly Type ResourceNodeType = GetGameplayType("ProjectS.Resources.ResourceNode");
         private static readonly Type ResourceTypeType = GetGameplayType("ProjectS.Resources.ResourceType");
@@ -25,6 +26,7 @@ namespace ProjectS.Tests.PlayMode
         private static readonly Type BuildingPlacementServiceType = GetGameplayType("ProjectS.Buildings.BuildingPlacementService");
         private static readonly Type ResourceDropOffType = GetGameplayType("ProjectS.Buildings.ResourceDropOff");
         private static readonly Type UnitProductionDefinitionType = GetGameplayType("ProjectS.Buildings.UnitProductionDefinition");
+        private static readonly Type UnitProductionRequirementType = GetGameplayType("ProjectS.Buildings.UnitProductionRequirement");
         private static readonly Type UnitProductionQueueType = GetGameplayType("ProjectS.Buildings.UnitProductionQueue");
         private static readonly Type BuildingAutoTurretType = GetGameplayType("ProjectS.Buildings.BuildingAutoTurret");
         private static readonly Type BuildingSpeedAuraType = GetGameplayType("ProjectS.Buildings.BuildingSpeedAura");
@@ -337,6 +339,73 @@ namespace ProjectS.Tests.PlayMode
 
             Object.Destroy(defender);
             Object.Destroy(enemy);
+        }
+
+        [UnityTest]
+        public IEnumerator TacticalCommandController_UsesSharedModesAndHudStateLabels()
+        {
+            var controllerObject = new GameObject("TacticalCommandController");
+            var controller = controllerObject.AddComponent<PlayerUnitCommandController>();
+            var unit = CreateMovableUnit("TacticalCommandUnit", Vector3.zero);
+            var commandAgent = unit.GetComponent<UnitCommandAgent>();
+            GetPrivateField<List<UnitCommandAgent>>(controller, "selectedUnits").Add(commandAgent);
+            var selectedUnits = new List<UnitCommandAgent> { commandAgent };
+
+            controller.BeginMoveCommand();
+            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Move: select a map destination."));
+            Assert.That(controller.TryHandleMinimapCommand(new Vector3(3f, 0f, 0f), true), Is.True);
+            Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.Move));
+            Assert.That((string)InvokeStatic(RtsGameHudType, "DescribeSelectedCommands", selectedUnits),
+                Is.EqualTo("Command: Move | State: Moving"));
+
+            controller.BeginAttackMoveCommand();
+            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Attack Move: select a map destination."));
+            Assert.That(controller.TryHandleMinimapCommand(new Vector3(4f, 0f, 0f), true), Is.True);
+            Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.AttackMove));
+            Assert.That((string)InvokeStatic(RtsGameHudType, "DescribeSelectedCommands", selectedUnits),
+                Is.EqualTo("Command: Attack Move | State: Advancing"));
+
+            controller.BeginPatrolCommand();
+            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Patrol: select a map destination."));
+            Assert.That(controller.TryHandleMinimapCommand(new Vector3(5f, 0f, 0f), true), Is.True);
+            Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.Patrol));
+            Assert.That((string)InvokeStatic(RtsGameHudType, "DescribeSelectedCommands", selectedUnits),
+                Is.EqualTo("Command: Patrol | State: Patrolling"));
+
+            controller.HoldSelectedUnits();
+            Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.HoldPosition));
+            Assert.That((string)InvokeStatic(RtsGameHudType, "DescribeSelectedCommands", selectedUnits),
+                Is.EqualTo("Command: Hold | State: Holding"));
+
+            controller.StopSelectedUnits();
+            Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.Idle));
+            Assert.That((string)InvokeStatic(RtsGameHudType, "DescribeSelectedCommands", selectedUnits),
+                Is.EqualTo("Command: Idle | State: Idle"));
+
+            Object.Destroy(unit);
+            Object.Destroy(controllerObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator TacticalCommandController_SetsRallyPointThroughTheSharedPointCommandFlow()
+        {
+            var controllerObject = new GameObject("RallyPointCommandController");
+            var controller = controllerObject.AddComponent<PlayerUnitCommandController>();
+            var rallyService = new RecordingRallyPointService();
+            var rallyPoint = new Vector3(6f, 2f, 0f);
+
+            controller.BeginRallyPointCommand(rallyService);
+
+            Assert.That(controller.IsRallyPointPending, Is.True);
+            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Rally: select a map destination."));
+            Assert.That(controller.TryHandleMinimapCommand(rallyPoint, true), Is.True);
+            Assert.That(rallyService.SetCount, Is.EqualTo(1));
+            Assert.That(rallyService.Point, Is.EqualTo(rallyPoint));
+            Assert.That(controller.IsRallyPointPending, Is.False);
+
+            Object.Destroy(controllerObject);
+            yield return null;
         }
 
         [UnityTest]
@@ -785,6 +854,50 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator ConstructionSite_ExpandedMainBaseRegistersAsNearestResourceDropOff()
+        {
+            var walletObject = new GameObject("ExpansionWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(500, 100));
+            var builder = CreateWorkerUnit("ExpansionBuilder", Vector3.left);
+
+            var mainBasePrefab = new GameObject("ExpansionMainBasePrefab");
+            mainBasePrefab.SetActive(false);
+            mainBasePrefab.AddComponent<BoxCollider2D>().isTrigger = true;
+            var prefabStatus = mainBasePrefab.AddComponent(BuildingStatusType);
+            Invoke(prefabStatus, "Initialize", UnitTeam.Team1, Enum.Parse(BuildingKindType, "MainBase"), new Vector2Int(3, 3), true);
+            mainBasePrefab.AddComponent(ResourceDropOffType);
+
+            var createArguments = new[]
+            {
+                (object)new Vector3(24f, 20f, 0f), UnitTeam.Team1, wallet, null, null, mainBasePrefab,
+                Enum.Parse(BuildingKindType, "MainBase"), CreateResourceAmount(350, 75), 0.1f, new Vector2Int(3, 3), null
+            };
+
+            Assert.That((bool)ConstructionSiteType.GetMethod("TryCreate").Invoke(null, createArguments), Is.True);
+            var site = (Component)createArguments[10];
+            Assert.That((bool)Invoke(site, "TryContribute", builder.GetComponent<UnitCommandAgent>(), GetFloat(site, "BuildTime")), Is.True);
+            yield return null;
+
+            var dropOff = (Component)InvokeStatic(
+                ResourceDropOffType,
+                "FindNearest",
+                UnitTeam.Team1,
+                new Vector3(24.5f, 20f, 0f));
+            Assert.That(dropOff, Is.Not.Null);
+            Assert.That(dropOff.gameObject.name, Does.StartWith("ExpansionMainBasePrefab"));
+            Assert.That((bool)Invoke(dropOff, "TryDeposit", UnitTeam.Team1, CreateResourceAmount(15, 3)), Is.True);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(165));
+            Assert.That(GetInt(wallet, "Gas"), Is.EqualTo(28));
+
+            Object.Destroy(site.gameObject);
+            Object.Destroy(dropOff.gameObject);
+            Object.Destroy(mainBasePrefab);
+            Object.Destroy(builder);
+            Object.Destroy(walletObject);
+        }
+
+        [UnityTest]
         public IEnumerator ConstructionSite_TryCreateFailsWithoutWalletForNonFreeCost()
         {
             LogAssert.Expect(LogType.Warning, "Cannot place MainBase construction site: no resource wallet is available for Team1.");
@@ -1057,6 +1170,60 @@ namespace ProjectS.Tests.PlayMode
             Object.Destroy(resourceObject);
             Object.Destroy(dropOffObject);
             Object.Destroy(walletObject);
+        }
+
+        [UnityTest]
+        public IEnumerator ConstructionSite_SupplyDepotCompletionAddsSupplyAndDisableRemovesIt()
+        {
+            var supplyObject = new GameObject("SupplyDepotManager");
+            var supplyManager = supplyObject.AddComponent(SupplyManagerType);
+            Invoke(supplyManager, "Initialize", UnitTeam.Team1);
+
+            var walletObject = new GameObject("SupplyDepotWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(200, 0));
+            var builder = CreateWorkerUnit("SupplyDepotBuilder", Vector3.left);
+
+            var completedPrefab = new GameObject("SupplyDepotCompletedPrefab");
+            completedPrefab.SetActive(false);
+            completedPrefab.AddComponent<BoxCollider2D>().isTrigger = true;
+            var completedStatus = completedPrefab.AddComponent(BuildingStatusType);
+            Invoke(completedStatus, "Initialize", UnitTeam.Team1, Enum.Parse(BuildingKindType, "SupplyDepot"), Vector2Int.one, true);
+
+            var createArguments = new[]
+            {
+                (object)new Vector3(35f, 20f, 0f),
+                UnitTeam.Team1,
+                wallet,
+                null,
+                null,
+                completedPrefab,
+                Enum.Parse(BuildingKindType, "SupplyDepot"),
+                CreateResourceAmount(100, 0),
+                0.1f,
+                Vector2Int.one,
+                null
+            };
+
+            Assert.That((bool)ConstructionSiteType.GetMethod("TryCreate").Invoke(null, createArguments), Is.True);
+            var site = (Component)createArguments[10];
+            Assert.That((bool)Invoke(site, "TryContribute", builder.GetComponent<UnitCommandAgent>(), GetFloat(site, "BuildTime")), Is.True);
+
+            yield return null;
+
+            var supplyDepot = GameObject.Find("SupplyDepotCompletedPrefab(Clone)");
+            Assert.That(supplyDepot, Is.Not.Null);
+            Assert.That(GetInt(supplyManager, "MaxSupply"), Is.EqualTo(10));
+
+            supplyDepot.SetActive(false);
+            Assert.That(GetInt(supplyManager, "MaxSupply"), Is.EqualTo(0));
+
+            Object.Destroy(site.gameObject);
+            Object.Destroy(supplyDepot);
+            Object.Destroy(completedPrefab);
+            Object.Destroy(builder);
+            Object.Destroy(walletObject);
+            Object.Destroy(supplyObject);
         }
 
         [UnityTest]
@@ -1461,6 +1628,99 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator UnitProductionQueue_UsesConfiguredBuildingRequirementWithoutRegisteringGlobalUnlocks()
+        {
+            var walletObject = new GameObject("RequirementWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 0));
+            var productionBuilding = CreateProductionBuilding("RequirementProductionBuilding", UnitTeam.Team1, Vector3.zero);
+            var unitPrefab = CreateUnitPrefab("RequirementWorkerPrefab", PrototypeUnitType.Worker);
+            var requirement = Activator.CreateInstance(UnitProductionRequirementType);
+            Invoke(requirement, "ConfigureCompletedBuilding", Enum.Parse(BuildingKindType, "SupplyDepot"), 1);
+            var requirements = Array.CreateInstance(UnitProductionRequirementType, 1);
+            requirements.SetValue(requirement, 0);
+            var definition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(
+                definition,
+                "Configure",
+                "Requirement Worker",
+                PrototypeUnitType.Worker,
+                unitPrefab,
+                CreateResourceAmount(25, 0),
+                10f,
+                1,
+                1,
+                requirements);
+            var definitions = Array.CreateInstance(UnitProductionDefinitionType, 1);
+            definitions.SetValue(definition, 0);
+            var queue = productionBuilding.AddComponent(UnitProductionQueueType);
+            Invoke(queue, "Configure", wallet, null, definitions, 2, Vector3.right, Vector3.right * 2f);
+
+            LogAssert.Expect(
+                LogType.Warning,
+                "Cannot enqueue Requirement Worker: requires 1 completed SupplyDepot building(s).");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Worker), Is.False);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(100));
+
+            var prerequisiteBuilding = new GameObject("RequirementSupplyDepot");
+            var prerequisiteStatus = prerequisiteBuilding.AddComponent(BuildingStatusType);
+            Invoke(prerequisiteStatus, "Initialize", UnitTeam.Team1, Enum.Parse(BuildingKindType, "SupplyDepot"), Vector2Int.one, true);
+
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Worker), Is.True);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(75));
+
+            Object.Destroy(unitPrefab);
+            Object.Destroy(prerequisiteBuilding);
+            Object.Destroy(productionBuilding);
+            Object.Destroy(walletObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator UnitProductionQueue_DisableRefundsActiveAndPendingProductionAndReleasesSupply()
+        {
+            var supplyObject = new GameObject("DisableProductionSupply");
+            var supplyManager = supplyObject.AddComponent(SupplyManagerType);
+            Invoke(supplyManager, "Initialize", UnitTeam.Team1);
+            var walletObject = new GameObject("DisableProductionWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 10));
+            var productionBuilding = CreateProductionBuilding("DisableProductionBuilding", UnitTeam.Team1, Vector3.zero);
+            Invoke(productionBuilding.GetComponent(BuildingStatusType), "ConfigureSupplyProvided", 10);
+            var workerPrefab = CreateUnitPrefab("DisableProductionWorkerPrefab", PrototypeUnitType.Worker);
+            var soldierPrefab = CreateUnitPrefab("DisableProductionSoldierPrefab", PrototypeUnitType.Soldier);
+            var workerDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(workerDefinition, "Configure", "Disable Worker", PrototypeUnitType.Worker, workerPrefab, CreateResourceAmount(10, 0), 10f, 1, 1, null);
+            var soldierDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(soldierDefinition, "Configure", "Disable Soldier", PrototypeUnitType.Soldier, soldierPrefab, CreateResourceAmount(20, 5), 10f, 2, 1, null);
+            var definitions = Array.CreateInstance(UnitProductionDefinitionType, 2);
+            definitions.SetValue(workerDefinition, 0);
+            definitions.SetValue(soldierDefinition, 1);
+            var queue = productionBuilding.AddComponent(UnitProductionQueueType);
+            Invoke(queue, "Configure", wallet, null, definitions, 3, Vector3.right, Vector3.right * 2f);
+
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Worker), Is.True);
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Soldier), Is.True);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(70));
+            Assert.That(GetInt(wallet, "Gas"), Is.EqualTo(5));
+            Assert.That(GetInt(supplyManager, "ReservedSupply"), Is.EqualTo(3));
+
+            productionBuilding.SetActive(false);
+
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(100));
+            Assert.That(GetInt(wallet, "Gas"), Is.EqualTo(10));
+            Assert.That(GetInt(supplyManager, "ReservedSupply"), Is.EqualTo(0));
+            Assert.That(GetInt(queue, "QueuedCount"), Is.EqualTo(0));
+
+            Object.Destroy(workerPrefab);
+            Object.Destroy(soldierPrefab);
+            Object.Destroy(productionBuilding);
+            Object.Destroy(walletObject);
+            Object.Destroy(supplyObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator UnitProductionQueue_ProducedUnitMovesToConfiguredRallyPoint()
         {
             var walletObject = new GameObject("RallyProductionWallet");
@@ -1660,6 +1920,18 @@ namespace ProjectS.Tests.PlayMode
                 PlacementAttemptCount++;
                 constructionSite = null;
                 return false;
+            }
+        }
+
+        private sealed class RecordingRallyPointService : IUnitRallyPointService
+        {
+            public int SetCount { get; private set; }
+            public Vector3 Point { get; private set; }
+
+            public void SetRallyPoint(Vector3 point)
+            {
+                SetCount++;
+                Point = point;
             }
         }
 

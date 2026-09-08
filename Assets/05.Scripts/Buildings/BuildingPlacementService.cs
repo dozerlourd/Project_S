@@ -17,6 +17,9 @@ namespace ProjectS.Buildings
         [SerializeField] private GameObject spliterProductionBuildingPrefab;
         [SerializeField] private GameObject autoTurretBuildingPrefab;
         [SerializeField] private GameObject speedAuraBuildingPrefab;
+        [SerializeField] private GameObject supplyDepotBuildingPrefab;
+        [SerializeField] private GameObject resourceDropOffBuildingPrefab;
+        [SerializeField] private GameObject mainBaseBuildingPrefab;
         [SerializeField] private BuildingKind defaultBuildingKind = BuildingKind.MainBase;
         [SerializeField] private ResourceAmount defaultCost = new ResourceAmount(150, 0);
         [SerializeField, Min(0.1f)] private float defaultBuildTime = 8f;
@@ -148,17 +151,25 @@ namespace ProjectS.Buildings
         public void ConfigureBuildOptions(
             GameObject spliterProductionPrefab,
             GameObject autoTurretPrefab,
-            GameObject speedAuraPrefab)
+            GameObject speedAuraPrefab,
+            GameObject supplyDepotPrefab = null,
+            GameObject resourceDropOffPrefab = null,
+            GameObject mainBasePrefab = null)
         {
             spliterProductionBuildingPrefab = spliterProductionPrefab;
             autoTurretBuildingPrefab = autoTurretPrefab;
             speedAuraBuildingPrefab = speedAuraPrefab;
+            supplyDepotBuildingPrefab = supplyDepotPrefab;
+            resourceDropOffBuildingPrefab = resourceDropOffPrefab;
+            mainBaseBuildingPrefab = mainBasePrefab;
         }
 
         public bool SelectBuilding(BuildingKind buildingKind)
         {
             switch (buildingKind)
             {
+                case BuildingKind.MainBase:
+                    return SelectConfiguredBuilding(buildingKind, mainBaseBuildingPrefab, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3));
                 case BuildingKind.Production:
                     if (combatProductionBuildingPrefab == null)
                     {
@@ -179,6 +190,10 @@ namespace ProjectS.Buildings
                     return SelectConfiguredBuilding(buildingKind, autoTurretBuildingPrefab, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2));
                 case BuildingKind.SpeedAura:
                     return SelectConfiguredBuilding(buildingKind, speedAuraBuildingPrefab, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2));
+                case BuildingKind.SupplyDepot:
+                    return SelectConfiguredBuilding(buildingKind, supplyDepotBuildingPrefab, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2));
+                case BuildingKind.ResourceDropOff:
+                    return SelectConfiguredBuilding(buildingKind, resourceDropOffBuildingPrefab, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2));
                 default:
                     LastPlacementFailureReason = $"Building type {buildingKind} is not available.";
                     return false;

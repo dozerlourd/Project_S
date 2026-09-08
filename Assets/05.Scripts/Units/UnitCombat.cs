@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ProjectS.Units
@@ -11,6 +12,7 @@ namespace ProjectS.Units
         private TemporaryAttackEffect attackEffect;
         private Collider2D attackCollider;
         private float nextAttackTime;
+        private readonly List<IUnitAttackTarget> attackTargets = new List<IUnitAttackTarget>();
 
         private void Awake()
         {
@@ -37,10 +39,99 @@ namespace ProjectS.Units
                 return;
             }
 
-            UnitTargetPriority.RecordRecentAttacker(target, status);
-            target.TakeDamage(GetAttackDamage(), status);
+            ApplyAttack(target);
             attackEffect?.PlayAttackFlash(target.SelectionTransform.position);
             nextAttackTime = Time.time + GetAttackInterval();
+        }
+
+        private void ApplyAttack(IUnitAttackTarget primaryTarget)
+        {
+            CollectAttackTargets(primaryTarget);
+            for (var i = 0; i < attackTargets.Count; i++)
+            {
+                var target = attackTargets[i];
+                UnitTargetPriority.RecordRecentAttacker(target, status);
+                target.TakeDamage(GetAttackDamage(target), status);
+            }
+        }
+
+        private void CollectAttackTargets(IUnitAttackTarget primaryTarget)
+        {
+            attackTargets.Clear();
+            if (!IsValidEnemyTarget(primaryTarget))
+            {
+                return;
+            }
+
+            attackTargets.Add(primaryTarget);
+            if (!HasAreaAttack())
+            {
+                return;
+            }
+
+            var center = primaryTarget.SelectionTransform.position;
+            var maxTargets = Mathf.Max(1, status.MaxAttackTargets);
+            var radiusSquared = status.AttackArea * status.AttackArea;
+            var allTargets = UnitAttackTargetRegistry.All;
+            for (var i = 0; i < allTargets.Count; i++)
+            {
+                var candidate = allTargets[i];
+                if (candidate == primaryTarget
+                    || !IsValidEnemyTarget(candidate)
+                    || (candidate.SelectionTransform.position - center).sqrMagnitude > radiusSquared)
+                {
+                    continue;
+                }
+
+                attackTargets.Add(candidate);
+            }
+
+            attackTargets.Sort((left, right) => CompareTargets(primaryTarget, center, left, right));
+            if (attackTargets.Count > maxTargets)
+            {
+                attackTargets.RemoveRange(maxTargets, attackTargets.Count - maxTargets);
+            }
+        }
+
+        private bool HasAreaAttack()
+        {
+            return (status.AttackTargetType == AttackTargetType.AreaAttack || status.HasAreaAttack)
+                && status.AttackArea > 0f
+                && status.MaxAttackTargets > 1;
+        }
+
+        private bool IsValidEnemyTarget(IUnitAttackTarget target)
+        {
+            return target != null
+                && target.IsAlive
+                && target.Team != status.Team
+                && target.SelectionTransform != null
+                && target.SelectionGameObject != null
+                && target.SelectionGameObject.activeInHierarchy;
+        }
+
+        private static int CompareTargets(
+            IUnitAttackTarget primaryTarget,
+            Vector3 center,
+            IUnitAttackTarget left,
+            IUnitAttackTarget right)
+        {
+            if (left == primaryTarget)
+            {
+                return right == primaryTarget ? 0 : -1;
+            }
+
+            if (right == primaryTarget)
+            {
+                return 1;
+            }
+
+            var leftDistance = (left.SelectionTransform.position - center).sqrMagnitude;
+            var rightDistance = (right.SelectionTransform.position - center).sqrMagnitude;
+            var distanceComparison = leftDistance.CompareTo(rightDistance);
+            return distanceComparison != 0
+                ? distanceComparison
+                : left.SelectionGameObject.GetInstanceID().CompareTo(right.SelectionGameObject.GetInstanceID());
         }
 
         private bool CanAttack()
@@ -75,9 +166,13 @@ namespace ProjectS.Units
             return Vector3.Distance(transform.position, target.SelectionTransform.position) <= status.AttackRange;
         }
 
-        private float GetAttackDamage()
+        private float GetAttackDamage(IUnitAttackTarget target)
         {
-            return Mathf.Max(status.PhysicalAttackPower, status.MagicalAttackPower);
+            var baseDamage = Mathf.Max(status.PhysicalAttackPower, status.MagicalAttackPower);
+            var targetStatus = target as PrototypeUnitStatus;
+            return targetStatus == null
+                ? baseDamage
+                : baseDamage * UnitCombatRules.GetDamageMultiplier(status.UnitType, targetStatus.UnitType);
         }
 
         private float GetAttackInterval()

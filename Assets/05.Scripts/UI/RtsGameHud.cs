@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using ProjectS.Buildings;
 using ProjectS.Resources;
 using ProjectS.Units;
@@ -15,6 +16,7 @@ namespace ProjectS.UI
         private PlayerResourceWallet wallet;
         private SupplyManager supplyManager;
         private ProjectS.RtsMatchController matchController;
+        private UnitProductionQueue displayedProductionQueue;
         private string productionFeedback;
         private int selectedPendingProductionIndex;
         private static readonly Texture2D[] CommandIcons = new Texture2D[6];
@@ -32,13 +34,17 @@ namespace ProjectS.UI
         private const float ResourcePanelY = 12f;
         private const float ResourcePanelWidth = 260f;
         private const float ResourcePanelHeight = 88f;
-        private const float SelectionPanelX = 12f;
-        private const float SelectionPanelWidth = 360f;
-        private const float SelectionPanelHeight = 220f;
-        private const float CommandPanelWidth = 420f;
-        private const float CommandPanelHeight = 400f;
-        private const float CommandButtonSize = 64f;
-        private const float CommandButtonGap = 8f;
+        private const float BottomPanelMargin = 10f;
+        private const float BottomPanelGap = 8f;
+        private const float BottomPanelHeight = 118f;
+        private const float SelectionPanelMinWidth = 220f;
+        private const float SelectionPanelMaxWidth = 300f;
+        private const float CommandPanelMinWidth = 280f;
+        private const float CommandPanelMaxWidth = 360f;
+        private const float CommandButtonMaxSize = 46f;
+        private const float CommandButtonGap = 5f;
+
+        public static RtsGameHud ActiveInstance { get; private set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntimeHud()
@@ -79,6 +85,21 @@ namespace ProjectS.UI
             {
                 matchController = ProjectS.RtsMatchController.ActiveInstance;
             }
+
+            ResolveDisplayedProductionQueue();
+        }
+
+        private void Awake()
+        {
+            ActiveInstance = this;
+        }
+
+        private void OnDestroy()
+        {
+            if (ActiveInstance == this)
+            {
+                ActiveInstance = null;
+            }
         }
 
         public void Configure(UnitTeam team, BuildingPlacementService placementService)
@@ -88,6 +109,7 @@ namespace ProjectS.UI
             commandController = null;
             wallet = null;
             supplyManager = null;
+            displayedProductionQueue = null;
         }
 
         private void ResolvePlayerWallet()
@@ -108,14 +130,47 @@ namespace ProjectS.UI
         private void OnGUI()
         {
             DrawResourcePanel();
-            DrawSelectionPanel();
-            DrawCommandPanel();
+            var bottomLayout = CalculateBottomLayout();
+            DrawSelectionPanel(bottomLayout.selectionRect);
+            DrawCommandPanel(bottomLayout.commandRect, bottomLayout.contextRect);
             if (showPathStats)
             {
                 DrawPathStatsPanel();
             }
 
             DrawMatchResultOverlay();
+        }
+
+        private static BottomHudLayout CalculateBottomLayout()
+        {
+            var availableWidth = Mathf.Max(0f, Screen.width - BottomPanelMargin - RtsMinimap.BottomRightReservedWidth);
+            var selectionWidth = Mathf.Clamp(availableWidth * 0.24f, SelectionPanelMinWidth, SelectionPanelMaxWidth);
+            var commandWidth = Mathf.Clamp(availableWidth * 0.3f, CommandPanelMinWidth, CommandPanelMaxWidth);
+            var contextWidth = Mathf.Max(0f, availableWidth - selectionWidth - commandWidth - BottomPanelGap * 2f);
+            var y = Screen.height - BottomPanelHeight - BottomPanelMargin;
+            var selectionRect = new Rect(BottomPanelMargin, y, selectionWidth, BottomPanelHeight);
+            var commandRect = new Rect(selectionRect.xMax + BottomPanelGap, y, commandWidth, BottomPanelHeight);
+            var contextRect = new Rect(commandRect.xMax + BottomPanelGap, y, contextWidth, BottomPanelHeight);
+            return new BottomHudLayout(selectionRect, commandRect, contextRect);
+        }
+
+        public bool IsPointerOverInteractiveHud(Vector2 screenPosition)
+        {
+            var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
+            if (new Rect(ResourcePanelX, ResourcePanelY, ResourcePanelWidth, ResourcePanelHeight).Contains(guiPosition))
+            {
+                return true;
+            }
+
+            var bottomLayout = CalculateBottomLayout();
+            if (bottomLayout.selectionRect.Contains(guiPosition) || bottomLayout.commandRect.Contains(guiPosition))
+            {
+                return true;
+            }
+
+            var hasContextPanel = (commandController != null && commandController.IsBuildMenuOpen)
+                || displayedProductionQueue != null;
+            return hasContextPanel && bottomLayout.contextRect.Contains(guiPosition);
         }
 
         private void DrawResourcePanel()
@@ -132,32 +187,34 @@ namespace ProjectS.UI
             GUI.Label(new Rect(24f, 70f, 220f, 22f), $"Team: {playerTeam}");
         }
 
-        private void DrawSelectionPanel()
+        private void DrawSelectionPanel(Rect rect)
         {
             if (commandController == null)
             {
                 return;
             }
 
-            var rect = new Rect(SelectionPanelX, Screen.height - SelectionPanelHeight - 12f, SelectionPanelWidth, SelectionPanelHeight);
             GUI.Box(rect, string.Empty);
 
             var selectedUnits = commandController.SelectedUnits;
             var selection = commandController.PrimarySelection;
             if (selectedUnits.Count > 1)
             {
-                GUI.Label(new Rect(rect.x + 12f, rect.y + 12f, 320f, 22f), $"Selected Units: {selectedUnits.Count}");
+                GUI.Label(new Rect(rect.x + 10f, rect.y + 10f, rect.width - 20f, 22f), $"Selected Units: {selectedUnits.Count}");
+                GUI.Label(
+                    new Rect(rect.x + 10f, rect.y + 34f, rect.width - 20f, 22f),
+                    DescribeSelectedCommands(selectedUnits));
                 return;
             }
 
             if (selection == null)
             {
-                GUI.Label(new Rect(rect.x + 12f, rect.y + 12f, 320f, 22f), "No Selection");
+                GUI.Label(new Rect(rect.x + 10f, rect.y + 10f, rect.width - 20f, 22f), "No Selection");
                 return;
             }
 
-            GUI.Label(new Rect(rect.x + 12f, rect.y + 12f, 320f, 22f), selection.SelectionName);
-            GUI.Label(new Rect(rect.x + 12f, rect.y + 36f, 320f, 22f), $"Team: {selection.Team}");
+            GUI.Label(new Rect(rect.x + 10f, rect.y + 10f, rect.width - 20f, 22f), selection.SelectionName);
+            GUI.Label(new Rect(rect.x + 10f, rect.y + 32f, rect.width - 20f, 22f), $"Team: {selection.Team}");
 
             var selectionObject = selection.SelectionGameObject;
             if (selectionObject == null)
@@ -168,7 +225,7 @@ namespace ProjectS.UI
             var health = selectionObject.GetComponent<UnitHealth>();
             if (health != null)
             {
-                GUI.Label(new Rect(rect.x + 12f, rect.y + 60f, 320f, 22f), $"HP: {health.CurrentHealth:0}/{health.MaxHealth:0}");
+                GUI.Label(new Rect(rect.x + 10f, rect.y + 54f, rect.width - 20f, 22f), $"HP: {health.CurrentHealth:0}/{health.MaxHealth:0}");
             }
             else
             {
@@ -176,7 +233,7 @@ namespace ProjectS.UI
                 if (buildingHealth != null)
                 {
                     GUI.Label(
-                        new Rect(rect.x + 12f, rect.y + 60f, 320f, 22f),
+                        new Rect(rect.x + 10f, rect.y + 54f, rect.width - 20f, 22f),
                         $"HP: {buildingHealth.CurrentHealth:0}/{buildingHealth.MaxHealth:0}");
                 }
             }
@@ -185,114 +242,158 @@ namespace ProjectS.UI
             if (constructionSite != null && !constructionSite.Completed)
             {
                 GUI.Label(
-                    new Rect(rect.x + 12f, rect.y + 84f, 320f, 22f),
+                    new Rect(rect.x + 10f, rect.y + 76f, rect.width - 20f, 22f),
                     $"Build: {constructionSite.BuildProgress01 * 100f:0}%");
+                return;
+            }
+
+            var commandAgent = selectionObject.GetComponent<UnitCommandAgent>();
+            if (commandAgent != null)
+            {
+                GUI.Label(
+                    new Rect(rect.x + 10f, rect.y + 76f, rect.width - 20f, 22f),
+                    DescribeSelectedCommands(selectedUnits));
                 return;
             }
 
             var productionQueue = selectionObject.GetComponent<UnitProductionQueue>();
             if (productionQueue != null)
             {
-                DrawProductionStatus(rect, productionQueue);
+                var activeProduction = productionQueue.ActiveProduction;
+                var productionLabel = activeProduction != null
+                    ? $"Producing: {activeProduction.DisplayName} {productionQueue.ActiveProgress01 * 100f:0}%"
+                    : "Production: Idle";
+                var rallyPoint = productionQueue.RallyPoint;
+                GUI.Label(new Rect(rect.x + 10f, rect.y + 76f, rect.width - 20f, 22f), productionLabel);
+                GUI.Label(
+                    new Rect(rect.x + 10f, rect.y + 98f, rect.width - 20f, 22f),
+                    $"Rally: {rallyPoint.x:0.0}, {rallyPoint.y:0.0}");
             }
         }
 
-        private void DrawProductionStatus(Rect panelRect, UnitProductionQueue productionQueue)
+        public static string DescribeSelectedCommands(IReadOnlyList<UnitCommandAgent> units)
         {
-            var active = productionQueue.ActiveProduction;
-            var progressLabel = active != null
-                ? $"Producing: {active.DisplayName} ({productionQueue.ActiveProgress01 * 100f:0}%)"
-                : "Production: Idle";
-            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 84f, 320f, 22f), progressLabel);
-            if (active != null)
+            UnitCommandMode? mode = null;
+            UnitActionState? state = null;
+            var hasMixedMode = false;
+            var hasMixedState = false;
+            var liveCount = 0;
+
+            if (units != null)
             {
-                var barRect = new Rect(panelRect.x + 12f, panelRect.y + 106f, 220f, 14f);
-                GUI.Box(barRect, string.Empty);
-                DrawFilledRect(
-                    new Rect(barRect.x + 2f, barRect.y + 2f, (barRect.width - 4f) * productionQueue.ActiveProgress01, barRect.height - 4f),
-                    new Color(0.35f, 0.78f, 0.42f, 0.9f));
+                for (var i = 0; i < units.Count; i++)
+                {
+                    var unit = units[i];
+                    if (unit == null)
+                    {
+                        continue;
+                    }
+
+                    liveCount++;
+                    if (mode == null)
+                    {
+                        mode = unit.Mode;
+                    }
+                    else if (mode.Value != unit.Mode)
+                    {
+                        hasMixedMode = true;
+                    }
+
+                    if (state == null)
+                    {
+                        state = unit.ActionState;
+                    }
+                    else if (state.Value != unit.ActionState)
+                    {
+                        hasMixedState = true;
+                    }
+                }
             }
 
-            GUI.Label(
-                new Rect(panelRect.x + 12f, panelRect.y + 124f, 320f, 22f),
-                $"Queue: {productionQueue.QueuedCount}/{productionQueue.MaxQueueSize}  Pending: {productionQueue.PendingCount}");
-            GUI.Label(
-                new Rect(panelRect.x + 12f, panelRect.y + 146f, 320f, 22f),
-                $"Rally: {productionQueue.RallyPoint.x:0.0}, {productionQueue.RallyPoint.y:0.0}");
-
-            var queueText = BuildPendingQueueText(productionQueue);
-            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 168f, 238f, 42f), queueText);
-            if (active != null
-                && GUI.Button(new Rect(panelRect.x + 256f, panelRect.y + 84f, 88f, 26f), "Cancel"))
+            if (liveCount == 0)
             {
-                productionFeedback = productionQueue.TryCancelActiveProduction()
-                    ? $"Cancelled {active.DisplayName}."
-                    : productionQueue.LastCancellationFailureReason;
+                return "Command: None";
             }
+
+            var modeLabel = hasMixedMode ? "Mixed" : FormatCommandMode(mode.Value);
+            var stateLabel = hasMixedState ? "Mixed" : FormatActionState(state.Value);
+            return $"Command: {modeLabel} | State: {stateLabel}";
         }
 
-        private void DrawCommandPanel()
+        private void DrawCommandPanel(Rect commandRect, Rect contextRect)
         {
             if (commandController == null || IsMatchOver())
             {
                 return;
             }
 
-            var width = CommandPanelWidth;
-            var height = CommandPanelHeight;
-            var rect = new Rect(Screen.width - width - 12f, Screen.height - height - 12f, width, height);
-            GUI.Box(rect, string.Empty);
-            GUI.Label(new Rect(rect.x + 12f, rect.y + 10f, 320f, 22f), "Commands");
+            GUI.Box(commandRect, string.Empty);
 
-            if (DrawCommandButton(CommandButtonRect(rect, 0), 0, "Move M"))
+            if (DrawCommandButton(CommandButtonRect(commandRect, 0), 0, "Move M"))
             {
                 commandController.BeginMoveCommand();
             }
 
-            if (DrawCommandButton(CommandButtonRect(rect, 1), 1, "Attack A"))
+            if (DrawCommandButton(CommandButtonRect(commandRect, 1), 1, "Attack Move A"))
             {
                 commandController.BeginAttackMoveCommand();
             }
 
-            if (DrawCommandButton(CommandButtonRect(rect, 2), 2, "Patrol P"))
+            if (DrawCommandButton(CommandButtonRect(commandRect, 2), 2, "Patrol P"))
             {
                 commandController.BeginPatrolCommand();
             }
 
-            if (DrawCommandButton(CommandButtonRect(rect, 3), 3, "Hold H"))
+            if (DrawCommandButton(CommandButtonRect(commandRect, 3), 3, "Hold H"))
             {
                 commandController.HoldSelectedUnits();
             }
 
-            if (DrawCommandButton(CommandButtonRect(rect, 4), 4, "Stop S"))
+            if (DrawCommandButton(CommandButtonRect(commandRect, 4), 4, "Stop S"))
             {
                 commandController.StopSelectedUnits();
             }
 
-            if (DrawCommandButton(CommandButtonRect(rect, 5), 5, "Build B"))
+            if (DrawCommandButton(CommandButtonRect(commandRect, 5), 5, "Build B"))
             {
                 commandController.ToggleBuildMenu();
             }
 
-            DrawBuildPlacementStatus(rect);
+            DrawPendingCommandStatus(commandRect);
             if (commandController.IsBuildMenuOpen)
             {
-                DrawBuildMenu(rect);
+                DrawBuildMenu(contextRect);
             }
             else
             {
-                DrawCommandProductionButtons(rect);
+                DrawProductionPanel(contextRect);
             }
         }
 
         private void DrawBuildMenu(Rect panelRect)
         {
-            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 190f, 280f, 22f), "Build structure (select a Builder first)");
-            DrawBuildOption(new Rect(panelRect.x + 12f, panelRect.y + 216f, 192f, 44f), BuildingKind.Production, "Combat Production\n150M");
-            DrawBuildOption(new Rect(panelRect.x + 216f, panelRect.y + 216f, 192f, 44f), BuildingKind.SpliterProduction, "Spliter Production\n175M");
-            DrawBuildOption(new Rect(panelRect.x + 12f, panelRect.y + 268f, 192f, 44f), BuildingKind.AutoTurret, "Auto Turret\n125M");
-            DrawBuildOption(new Rect(panelRect.x + 216f, panelRect.y + 268f, 192f, 44f), BuildingKind.SpeedAura, "Speed Aura\n125M/25G");
-            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 322f, 396f, 38f), "Choose a building, then left-click a valid tile. Esc cancels placement.");
+            GUI.Box(panelRect, string.Empty);
+            GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 6f, panelRect.width - 16f, 20f), "Build structure");
+            var buttonGap = 6f;
+            var columns = panelRect.width >= 560f ? 5 : panelRect.width >= 420f ? 3 : 2;
+            var buttonWidth = (panelRect.width - 16f - buttonGap * (columns - 1)) / columns;
+            var buttonHeight = columns == 4 ? 46f : 28f;
+            DrawBuildOption(BuildOptionRect(panelRect, 0, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.Production, columns == 4 ? "Combat\n150M" : "Combat 150M");
+            DrawBuildOption(BuildOptionRect(panelRect, 1, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.SpliterProduction, columns == 4 ? "Spliter\n175M" : "Spliter 175M");
+            DrawBuildOption(BuildOptionRect(panelRect, 2, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.AutoTurret, columns == 4 ? "Turret\n125M" : "Turret 125M");
+            DrawBuildOption(BuildOptionRect(panelRect, 3, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.SpeedAura, columns == 4 ? "Speed\n125M/25G" : "Speed 125M/25G");
+            DrawBuildOption(BuildOptionRect(panelRect, 4, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.SupplyDepot, columns == 5 ? "Supply\n100M" : "Supply 100M");
+            DrawBuildOption(BuildOptionRect(panelRect, 5, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.ResourceDropOff, columns >= 5 ? "Drop-off\n100M" : "Drop-off 100M");
+            DrawBuildOption(BuildOptionRect(panelRect, 6, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.MainBase, columns >= 5 ? "Main Base\n350M/75G" : "Main Base 350M/75G");
+            var rowCount = Mathf.CeilToInt(7f / columns);
+            GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 30f + rowCount * (buttonHeight + 4f), panelRect.width - 16f, 20f), "Choose a tile to place. Esc cancels.");
+        }
+
+        private static Rect BuildOptionRect(Rect panelRect, int index, int columns, float width, float height, float gap)
+        {
+            var column = index % columns;
+            var row = index / columns;
+            return new Rect(panelRect.x + 8f + column * (width + gap), panelRect.y + 28f + row * (height + 4f), width, height);
         }
 
         private void DrawBuildOption(Rect buttonRect, BuildingKind buildingKind, string label)
@@ -311,7 +412,6 @@ namespace ProjectS.UI
             }
 
             commandController.BeginBuildPlacement(buildingPlacementService);
-            commandController.CloseBuildMenu();
         }
 
         private static bool DrawCommandButton(Rect rect, int iconIndex, string fallbackLabel)
@@ -335,29 +435,59 @@ namespace ProjectS.UI
 
         private static Rect CommandButtonRect(Rect panelRect, int index)
         {
-            var column = index < 4 ? index : index - 4;
-            var row = index < 4 ? 0 : 1;
+            var availableWidth = panelRect.width - 16f - CommandButtonGap * 5f;
+            var buttonSize = Mathf.Min(CommandButtonMaxSize, availableWidth / 6f);
             return new Rect(
-                panelRect.x + 12f + column * (CommandButtonSize + CommandButtonGap),
-                panelRect.y + 38f + row * (CommandButtonSize + CommandButtonGap),
-                CommandButtonSize,
-                CommandButtonSize);
+                panelRect.x + 8f + index * (buttonSize + CommandButtonGap),
+                panelRect.y + 8f,
+                buttonSize,
+                buttonSize);
         }
 
-        private void DrawBuildPlacementStatus(Rect panelRect)
+        private static string FormatCommandMode(UnitCommandMode mode)
         {
-            var message = commandController.BuildPlacementStatusMessage;
-            if (!string.IsNullOrWhiteSpace(message))
+            switch (mode)
             {
-                GUI.Label(new Rect(panelRect.x + 164f, panelRect.y + 110f, 244f, 64f), ShortenFailureReason(message));
+                case UnitCommandMode.AttackMove:
+                    return "Attack Move";
+                case UnitCommandMode.FocusAttack:
+                    return "Focus Attack";
+                case UnitCommandMode.HoldPosition:
+                    return "Hold";
+                default:
+                    return mode.ToString();
             }
         }
 
-        private void DrawCommandProductionButtons(Rect panelRect)
+        private static string FormatActionState(UnitActionState state)
         {
-            var selection = commandController.PrimarySelection;
-            var selectionObject = selection != null ? selection.SelectionGameObject : null;
-            var productionQueue = selectionObject != null ? selectionObject.GetComponent<UnitProductionQueue>() : null;
+            switch (state)
+            {
+                case UnitActionState.AttackMoving:
+                    return "Advancing";
+                case UnitActionState.ChasingTarget:
+                    return "Chasing";
+                case UnitActionState.AttackingTarget:
+                    return "Attacking";
+                case UnitActionState.HoldingPosition:
+                    return "Holding";
+                default:
+                    return state.ToString();
+            }
+        }
+
+        private void DrawPendingCommandStatus(Rect panelRect)
+        {
+            var message = commandController.PendingCommandStatusMessage;
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 62f, panelRect.width - 16f, 42f), ShortenFailureReason(message));
+            }
+        }
+
+        private void DrawProductionPanel(Rect panelRect)
+        {
+            var productionQueue = ResolveDisplayedProductionQueue();
             if (productionQueue == null)
             {
                 productionFeedback = string.Empty;
@@ -365,15 +495,36 @@ namespace ProjectS.UI
                 return;
             }
 
-            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 190f, 170f, 22f), "Production");
-            if (GUI.Button(new Rect(panelRect.x + 330f, panelRect.y + 188f, 78f, 26f), "Rally"))
+            GUI.Box(panelRect, string.Empty);
+            var active = productionQueue.ActiveProduction;
+            var activeLabel = active != null ? $"{active.DisplayName} {productionQueue.ActiveProgress01 * 100f:0}%" : "Production idle";
+            GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 6f, panelRect.width - 174f, 20f), activeLabel);
+            if (GUI.Button(new Rect(panelRect.x + panelRect.width - 158f, panelRect.y + 4f, 72f, 24f), "Rally"))
             {
                 commandController.BeginRallyPointCommand(productionQueue);
                 productionFeedback = "Click the map to set rally point.";
             }
+            if (active != null && GUI.Button(new Rect(panelRect.x + panelRect.width - 80f, panelRect.y + 4f, 72f, 24f), "Cancel"))
+            {
+                productionFeedback = productionQueue.TryCancelActiveProduction()
+                    ? $"Cancelled {active.DisplayName}."
+                    : productionQueue.LastCancellationFailureReason;
+            }
+
+            if (active != null)
+            {
+                var barRect = new Rect(panelRect.x + 8f, panelRect.y + 28f, panelRect.width - 16f, 8f);
+                GUI.Box(barRect, string.Empty);
+                DrawFilledRect(new Rect(barRect.x + 1f, barRect.y + 1f, (barRect.width - 2f) * productionQueue.ActiveProgress01, barRect.height - 2f), new Color(0.35f, 0.78f, 0.42f, 0.9f));
+            }
 
             var definitions = productionQueue.ProducibleUnits;
-            for (var i = 0; i < definitions.Count && i < 6; i++)
+            var buttonSize = CommandButtonMaxSize;
+            var buttonGap = CommandButtonGap;
+            var visibleButtonCount = Mathf.Min(
+                definitions.Count,
+                Mathf.FloorToInt((panelRect.width - 16f + buttonGap) / (buttonSize + buttonGap)));
+            for (var i = 0; i < visibleButtonCount; i++)
             {
                 var definition = definitions[i];
                 if (definition == null)
@@ -381,13 +532,10 @@ namespace ProjectS.UI
                     continue;
                 }
 
-                var column = i % 3;
-                var row = i / 3;
-                var x = panelRect.x + 12f + column * 132f;
-                var y = panelRect.y + 216f + row * 60f;
-                var canEnqueue = productionQueue.CanEnqueue(definition, out var failureReason);
-                var buttonLabel = $"{definition.DisplayName}\n{FormatCost(definition.Cost)} / {definition.SupplyCost}S";
-                if (GUI.Button(new Rect(x, y, 124f, 44f), buttonLabel))
+                var x = panelRect.x + 8f + i * (buttonSize + buttonGap);
+                var y = panelRect.y + 42f;
+                var buttonLabel = $"{definition.DisplayName}\n{FormatCost(definition.Cost)}";
+                if (GUI.Button(new Rect(x, y, buttonSize, buttonSize), buttonLabel))
                 {
                     if (productionQueue.TryEnqueue(i))
                     {
@@ -399,10 +547,6 @@ namespace ProjectS.UI
                     }
                 }
 
-                if (!canEnqueue)
-                {
-                    GUI.Label(new Rect(x, y + 45f, 124f, 18f), ShortenFailureReason(failureReason));
-                }
             }
 
             DrawPendingProductionCancelControls(panelRect, productionQueue);
@@ -412,10 +556,29 @@ namespace ProjectS.UI
                 : !string.IsNullOrWhiteSpace(productionQueue.LastCancellationFailureReason)
                     ? productionQueue.LastCancellationFailureReason
                 : productionFeedback;
-            if (!string.IsNullOrWhiteSpace(feedback))
+            if (productionQueue.PendingCount <= 0 && !string.IsNullOrWhiteSpace(feedback))
             {
-                GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 348f, 396f, 18f), feedback);
+                GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 92f, panelRect.width - 16f, 20f), ShortenFailureReason(feedback));
             }
+        }
+
+        private UnitProductionQueue ResolveDisplayedProductionQueue()
+        {
+            if (commandController != null)
+            {
+                var selection = commandController.PrimarySelection;
+                var selectionObject = selection != null ? selection.SelectionGameObject : null;
+                displayedProductionQueue = selectionObject != null
+                    ? selectionObject.GetComponent<UnitProductionQueue>()
+                    : null;
+            }
+
+            if (displayedProductionQueue != null && !displayedProductionQueue.isActiveAndEnabled)
+            {
+                displayedProductionQueue = null;
+            }
+
+            return displayedProductionQueue;
         }
 
         private void DrawPendingProductionCancelControls(Rect panelRect, UnitProductionQueue productionQueue)
@@ -431,13 +594,13 @@ namespace ProjectS.UI
                 0,
                 productionQueue.PendingCount - 1);
 
-            GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 320f, 82f, 22f), "Pending");
+            GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 88f, 64f, 22f), "Pending");
             for (var i = 0; i < productionQueue.PendingCount && i < 3; i++)
             {
                 var pending = productionQueue.GetPendingProduction(i);
                 var label = pending != null ? $"{i + 1}" : "-";
                 if (GUI.Toggle(
-                    new Rect(panelRect.x + 94f + i * 34f, panelRect.y + 320f, 30f, 22f),
+                    new Rect(panelRect.x + 72f + i * 30f, panelRect.y + 88f, 26f, 22f),
                     selectedPendingProductionIndex == i,
                     label,
                     GUI.skin.button))
@@ -448,7 +611,7 @@ namespace ProjectS.UI
 
             var selectedPending = productionQueue.GetPendingProduction(selectedPendingProductionIndex);
             var cancelLabel = selectedPending != null ? "Cancel Pending" : "Cancel";
-            if (GUI.Button(new Rect(panelRect.x + 212f, panelRect.y + 318f, 118f, 26f), cancelLabel))
+            if (GUI.Button(new Rect(panelRect.x + 170f, panelRect.y + 88f, 116f, 22f), cancelLabel))
             {
                 var pendingName = selectedPending != null ? selectedPending.DisplayName : "pending production";
                 productionFeedback = productionQueue.TryCancelPendingProduction(selectedPendingProductionIndex)
@@ -632,6 +795,20 @@ namespace ProjectS.UI
             GUI.color = color;
             GUI.DrawTexture(rect, Texture2D.whiteTexture);
             GUI.color = previousColor;
+        }
+
+        private readonly struct BottomHudLayout
+        {
+            public readonly Rect selectionRect;
+            public readonly Rect commandRect;
+            public readonly Rect contextRect;
+
+            public BottomHudLayout(Rect selectionRect, Rect commandRect, Rect contextRect)
+            {
+                this.selectionRect = selectionRect;
+                this.commandRect = commandRect;
+                this.contextRect = contextRect;
+            }
         }
     }
 }

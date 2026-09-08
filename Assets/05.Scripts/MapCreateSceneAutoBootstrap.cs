@@ -19,6 +19,7 @@ namespace ProjectS
         private const int ResourceSortingOrder = 12;
         private const int UnitSortingOrder = 20;
         private const int MainBaseSupplyProvided = 20;
+        private const int SupplyDepotSupplyProvided = 10;
 
         private static Sprite squareSprite;
 
@@ -63,6 +64,8 @@ namespace ProjectS
         private void UpgradeExistingSetup(Transform root)
         {
             EnsureSupplyManagers(root);
+            GetStartPositions(ProjectSTilemapWorld.ActiveInstance, out var playerStart, out var aiStart);
+            CreateExpansionResourceClusters(playerStart, aiStart, root, ProjectSTilemapWorld.ActiveInstance);
             var placementService = FindFirstObjectByType<BuildingPlacementService>();
             if (placementService == null)
             {
@@ -85,7 +88,15 @@ namespace ProjectS
                     new Vector3(2.5f, -0.5f, 0f),
                     new Vector3(5f, -1f, 0f)),
                 FindOrCreateBuildingTemplate(templates, "Auto Turret Building Template", BuildingKind.AutoTurret, false, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f)),
-                FindOrCreateBuildingTemplate(templates, "Speed Aura Building Template", BuildingKind.SpeedAura, false, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f)));
+                FindOrCreateBuildingTemplate(templates, "Speed Aura Building Template", BuildingKind.SpeedAura, false, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f)),
+                FindOrCreateBuildingTemplate(templates, "Supply Depot Building Template", BuildingKind.SupplyDepot, false, new Vector2(2.2f, 2.2f), new Color(0.78f, 0.62f, 0.24f, 1f)),
+                FindOrCreateBuildingTemplate(templates, "Resource Drop-off Building Template", BuildingKind.ResourceDropOff, false, new Vector2(2.2f, 2.2f), new Color(0.28f, 0.68f, 0.48f, 1f)),
+                ConfigureProductionTemplate(
+                    FindOrCreateBuildingTemplate(templates, "Main Base Building Template", BuildingKind.MainBase, true, new Vector2(2.6f, 2.2f), new Color(0.28f, 0.52f, 0.76f, 1f)),
+                    GetRequiredUnitPrefab(PrototypeUnitType.Worker),
+                    new[] { CreateProductionDefinition("Worker", PrototypeUnitType.Worker, GetRequiredUnitPrefab(PrototypeUnitType.Worker), new ResourceAmount(50, 0), 5f, 1) },
+                    new Vector3(2.5f, -1.5f, 0f),
+                    new Vector3(5f, -2f, 0f)));
         }
 
         private static GameObject FindOrCreateBuildingTemplate(Transform parent, string name, BuildingKind kind, bool hasProductionQueue, Vector2 size, Color color)
@@ -93,7 +104,14 @@ namespace ProjectS
             var existing = parent.Find(name);
             return existing != null
                 ? existing.gameObject
-                : CreateBuildingPrototype(name, kind, false, hasProductionQueue, size, color, parent);
+                : CreateBuildingPrototype(
+                    name,
+                    kind,
+                    kind == BuildingKind.MainBase || kind == BuildingKind.ResourceDropOff,
+                    hasProductionQueue,
+                    size,
+                    color,
+                    parent);
         }
 
         private static GameObject ConfigureProductionTemplate(
@@ -156,6 +174,8 @@ namespace ProjectS
             var spliterProductionPrototype = CreateBuildingPrototype("Spliter Production Building Prototype", BuildingKind.SpliterProduction, false, true, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f), prototypeRoot.transform);
             var autoTurretPrototype = CreateBuildingPrototype("Auto Turret Building Prototype", BuildingKind.AutoTurret, false, false, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f), prototypeRoot.transform);
             var speedAuraPrototype = CreateBuildingPrototype("Speed Aura Building Prototype", BuildingKind.SpeedAura, false, false, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f), prototypeRoot.transform);
+            var supplyDepotPrototype = CreateBuildingPrototype("Supply Depot Building Prototype", BuildingKind.SupplyDepot, false, false, new Vector2(2.2f, 2.2f), new Color(0.78f, 0.62f, 0.24f, 1f), prototypeRoot.transform);
+            var resourceDropOffPrototype = CreateBuildingPrototype("Resource Drop-off Building Prototype", BuildingKind.ResourceDropOff, true, false, new Vector2(2.2f, 2.2f), new Color(0.28f, 0.68f, 0.48f, 1f), prototypeRoot.transform);
             var constructionPrototype = CreateConstructionSitePrototype(prototypeRoot.transform);
 
             var workerDefinitions = new[]
@@ -172,11 +192,14 @@ namespace ProjectS
             };
             var spliterDefinitions = new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterUnitPrefab, new ResourceAmount(125, 0), 8f, 3) };
 
+            ConfigureProductionTemplate(mainBasePrototype, workerUnitPrefab, workerDefinitions, new Vector3(2.5f, -1.5f, 0f), new Vector3(5f, -2f, 0f));
+
             InstantiateBuilding(mainBasePrototype, "Player Main Base", UnitTeam.Team1, BuildingKind.MainBase, playerStart, playerWallet, tilemapWorld, workerDefinitions, new Vector3(2.5f, -1.5f, 0f), new Vector3(5f, -2f, 0f), root.transform);
             InstantiateBuilding(mainBasePrototype, "AI Main Base", UnitTeam.Team2, BuildingKind.MainBase, aiStart, aiWallet, tilemapWorld, workerDefinitions, new Vector3(-2.5f, 1.5f, 0f), new Vector3(-5f, 2f, 0f), root.transform);
 
             CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
             CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
+            CreateExpansionResourceClusters(playerStart, aiStart, root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team1, playerStart, workerUnitPrefab, root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team2, aiStart, workerUnitPrefab, root.transform, tilemapWorld);
             CreatePlayerSystems(
@@ -187,10 +210,13 @@ namespace ProjectS
                 spliterProductionPrototype,
                 autoTurretPrototype,
                 speedAuraPrototype,
+                supplyDepotPrototype,
+                resourceDropOffPrototype,
+                mainBasePrototype,
                 combatDefinitions,
                 spliterDefinitions,
                 root.transform);
-            CreateAiController(playerStart, root.transform);
+            CreateAiController(playerStart, aiWallet, tilemapWorld, constructionPrototype, productionPrototype, spliterProductionPrototype, autoTurretPrototype, speedAuraPrototype, supplyDepotPrototype, resourceDropOffPrototype, mainBasePrototype, root.transform);
         }
 
         private GameObject GetRequiredUnitPrefab(PrototypeUnitType unitType)
@@ -239,6 +265,9 @@ namespace ProjectS
             GameObject spliterProductionPrototype,
             GameObject autoTurretPrototype,
             GameObject speedAuraPrototype,
+            GameObject supplyDepotPrototype,
+            GameObject resourceDropOffPrototype,
+            GameObject mainBasePrototype,
             UnitProductionDefinition[] combatDefinitions,
             UnitProductionDefinition[] spliterDefinitions,
             Transform parent)
@@ -278,7 +307,7 @@ namespace ProjectS
                 spliterDefinitions,
                 new Vector3(2.5f, -0.5f, 0f),
                 new Vector3(5f, -1f, 0f));
-            placementService.ConfigureBuildOptions(spliterProductionPrototype, autoTurretPrototype, speedAuraPrototype);
+            placementService.ConfigureBuildOptions(spliterProductionPrototype, autoTurretPrototype, speedAuraPrototype, supplyDepotPrototype, resourceDropOffPrototype, mainBasePrototype);
 
             var hud = FindFirstObjectByType<RtsGameHud>();
             if (hud == null)
@@ -290,12 +319,34 @@ namespace ProjectS
             EnsureMatchController(parent);
         }
 
-        private static void CreateAiController(Vector3 fallbackAttackPoint, Transform parent)
+        private static void CreateAiController(
+            Vector3 fallbackAttackPoint,
+            PlayerResourceWallet wallet,
+            ProjectSTilemapWorld tilemapWorld,
+            GameObject constructionPrototype,
+            GameObject productionPrototype,
+            GameObject spliterProductionPrototype,
+            GameObject autoTurretPrototype,
+            GameObject speedAuraPrototype,
+            GameObject supplyDepotPrototype,
+            GameObject resourceDropOffPrototype,
+            GameObject mainBasePrototype,
+            Transform parent)
         {
             var aiObject = CreateChild(parent, "Simple Skirmish AI");
             var ai = aiObject.AddComponent<SimpleSkirmishAI>();
             ai.Configure(UnitTeam.Team2, UnitTeam.Team1, 3, 7, fallbackAttackPoint);
             ai.ConfigureTempo(1.5f, 18f);
+
+            var templates = aiObject.AddComponent<AiBuildingTemplateRegistry>();
+            templates.Configure(UnitTeam.Team2, wallet, tilemapWorld, constructionPrototype);
+            templates.RegisterTemplate(BuildingKind.Production, productionPrototype, new ResourceAmount(150, 0), 8f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.SpliterProduction, spliterProductionPrototype, new ResourceAmount(175, 0), 9f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.AutoTurret, autoTurretPrototype, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.SpeedAura, speedAuraPrototype, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.SupplyDepot, supplyDepotPrototype, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.ResourceDropOff, resourceDropOffPrototype, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.MainBase, mainBasePrototype, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3));
         }
 
         private static void EnsureMatchController(Transform parent)
@@ -371,6 +422,7 @@ namespace ProjectS
 
             var status = root.AddComponent<BuildingStatus>();
             status.Initialize(UnitTeam.Team1, kind, Vector2Int.CeilToInt(size), true);
+            status.ConfigureSupplyProvided(GetSupplyProvided(kind));
             if (dropOff)
             {
                 root.AddComponent<ResourceDropOff>();
@@ -440,7 +492,7 @@ namespace ProjectS
             if (status != null)
             {
                 status.Initialize(team, kind, kind == BuildingKind.MainBase ? new Vector2Int(3, 3) : new Vector2Int(2, 2), true);
-                status.ConfigureSupplyProvided(kind == BuildingKind.MainBase ? MainBaseSupplyProvided : 0);
+                status.ConfigureSupplyProvided(GetSupplyProvided(kind));
             }
 
             var productionQueue = building.GetComponent<UnitProductionQueue>();
@@ -450,7 +502,50 @@ namespace ProjectS
             }
         }
 
+        private static int GetSupplyProvided(BuildingKind kind)
+        {
+            return kind == BuildingKind.MainBase
+                ? MainBaseSupplyProvided
+                : kind == BuildingKind.SupplyDepot ? SupplyDepotSupplyProvided : 0;
+        }
+
         private static void CreateResourceCluster(Vector3 center, Transform parent, ProjectSTilemapWorld tilemapWorld)
+        {
+            CreateResourceCluster("Home", center, parent, tilemapWorld);
+        }
+
+        private static void CreateExpansionResourceClusters(
+            Vector3 playerStart,
+            Vector3 aiStart,
+            Transform parent,
+            ProjectSTilemapWorld tilemapWorld)
+        {
+            var center = Vector3.Lerp(playerStart, aiStart, 0.5f);
+            var direction = aiStart - playerStart;
+            var lateral = new Vector3(-direction.y, direction.x, 0f).normalized * 6f;
+            CreateExpansionResourceClusterIfMissing("Expansion Alpha", center + lateral, parent, tilemapWorld);
+            CreateExpansionResourceClusterIfMissing("Expansion Beta", center - lateral, parent, tilemapWorld);
+        }
+
+        private static void CreateExpansionResourceClusterIfMissing(
+            string label,
+            Vector3 center,
+            Transform parent,
+            ProjectSTilemapWorld tilemapWorld)
+        {
+            if (parent.Find($"{label} Mineral Field 1") != null)
+            {
+                return;
+            }
+
+            CreateResourceCluster(label, Snap(tilemapWorld, center), parent, tilemapWorld);
+        }
+
+        private static void CreateResourceCluster(
+            string label,
+            Vector3 center,
+            Transform parent,
+            ProjectSTilemapWorld tilemapWorld)
         {
             var offsets = new[]
             {
@@ -462,10 +557,10 @@ namespace ProjectS
 
             for (var i = 0; i < offsets.Length; i++)
             {
-                CreateResourceNode($"Mineral Field {i + 1}", ResourceType.Minerals, center + offsets[i], parent, tilemapWorld);
+                CreateResourceNode($"{label} Mineral Field {i + 1}", ResourceType.Minerals, center + offsets[i], parent, tilemapWorld);
             }
 
-            CreateResourceNode("Vespene Geyser", ResourceType.Gas, center + new Vector3(3f, 0f, 0f), parent, tilemapWorld);
+            CreateResourceNode($"{label} Vespene Geyser", ResourceType.Gas, center + new Vector3(3f, 0f, 0f), parent, tilemapWorld);
         }
 
         private static void CreateResourceNode(

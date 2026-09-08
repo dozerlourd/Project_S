@@ -53,7 +53,7 @@ namespace ProjectS.Buildings
 
         private void OnDisable()
         {
-            ReleaseAllSupplyReservations();
+            CancelAllProduction();
         }
 
         private void Update()
@@ -118,15 +118,6 @@ namespace ProjectS.Buildings
             ResolveReferences();
             if (!CanEnqueue(definition, out var failureReason))
             {
-                if (definition != null
-                    && wallet != null
-                    && !definition.Cost.IsEmpty
-                    && failureReason.Contains("insufficient resources")
-                    && !wallet.CanAfford(definition.Cost))
-                {
-                    wallet.TrySpend(definition.Cost);
-                }
-
                 return FailEnqueue(failureReason);
             }
 
@@ -185,6 +176,17 @@ namespace ProjectS.Buildings
             {
                 failureReason = "Cannot enqueue production: building is not completed.";
                 return false;
+            }
+
+            var requirements = definition.Requirements;
+            for (var i = 0; i < requirements.Count; i++)
+            {
+                var requirement = requirements[i];
+                if (requirement != null && !requirement.IsMet(status.Team))
+                {
+                    failureReason = requirement.GetFailureReason(definition);
+                    return false;
+                }
             }
 
             if (QueuedCount >= MaxQueueSize)
@@ -288,6 +290,23 @@ namespace ProjectS.Buildings
             lastCancellationFailureReason = string.Empty;
             lastEnqueueFailureReason = string.Empty;
             return true;
+        }
+
+        public void CancelAllProduction()
+        {
+            ResolveReferences();
+            CancelAndRefund(activeProduction);
+            activeProduction = null;
+            activeProgress = 0f;
+
+            foreach (var definition in queue)
+            {
+                CancelAndRefund(definition);
+            }
+
+            queue.Clear();
+            lastEnqueueFailureReason = string.Empty;
+            lastCancellationFailureReason = string.Empty;
         }
 
         public void SetRallyPoint(Vector3 point)
@@ -494,17 +513,15 @@ namespace ProjectS.Buildings
             return definition == null ? 0 : definition.SupplyCost * definition.UnitsPerProduction;
         }
 
-        private void ReleaseAllSupplyReservations()
+        private void CancelAndRefund(UnitProductionDefinition definition)
         {
-            ReleaseSupplyReservation(activeProduction);
-            foreach (var definition in queue)
+            if (definition == null)
             {
-                ReleaseSupplyReservation(definition);
+                return;
             }
 
-            activeProduction = null;
-            activeProgress = 0f;
-            queue.Clear();
+            TryRefund(definition);
+            ReleaseSupplyReservation(definition);
         }
 
         private bool FailCancellation(string reason)
