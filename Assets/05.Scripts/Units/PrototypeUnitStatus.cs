@@ -135,7 +135,7 @@ namespace ProjectS.Units
         public UnitGrade Grade => grade;
         public AttackTargetType AttackTargetType => attackTargetType;
         public float MaxHealth => maxHealth;
-        public float PhysicalAttackPower => physicalAttackPower;
+        public float PhysicalAttackPower => physicalAttackPower + UnitUpgradeStatModifiers.GetAttackDamageBonus(team);
         public float MagicalAttackPower => magicalAttackPower;
         public float AttackRange => attackRange;
         public float DetectionRange => Mathf.Max(attackRange, detectionRange);
@@ -150,7 +150,7 @@ namespace ProjectS.Units
                     multiplier *= Mathf.Max(0.01f, modifier);
                 }
 
-                return movementSpeed * multiplier;
+                return movementSpeed * UnitUpgradeStatModifiers.GetMovementSpeedMultiplier(team) * multiplier;
             }
         }
         public int MaxAttackTargets => maxAttackTargets;

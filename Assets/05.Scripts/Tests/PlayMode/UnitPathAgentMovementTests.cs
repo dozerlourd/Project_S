@@ -20,6 +20,9 @@ namespace ProjectS.Tests.PlayMode
         private static readonly Type ResourceAmountType = GetGameplayType("ProjectS.Resources.ResourceAmount");
         private static readonly Type ResourceNodeType = GetGameplayType("ProjectS.Resources.ResourceNode");
         private static readonly Type ResourceTypeType = GetGameplayType("ProjectS.Resources.ResourceType");
+        private static readonly Type ResourceTilemapNodeSynchronizerType = GetGameplayType("ProjectS.Resources.ResourceTilemapNodeSynchronizer");
+        private static readonly Type UnitUpgradeDefinitionType = GetGameplayType("ProjectS.Upgrades.UnitUpgradeDefinition");
+        private static readonly Type TeamUpgradeResearchType = GetGameplayType("ProjectS.Upgrades.TeamUpgradeResearch");
         private static readonly Type BuildingStatusType = GetGameplayType("ProjectS.Buildings.BuildingStatus");
         private static readonly Type BuildingKindType = GetGameplayType("ProjectS.Buildings.BuildingKind");
         private static readonly Type ConstructionSiteType = GetGameplayType("ProjectS.Buildings.ConstructionSite");
@@ -148,6 +151,143 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(path, Is.Empty);
 
             Object.Destroy(worldObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ResourceNodeSprites_AreAvailableToRuntimeFallback()
+        {
+            var sprites = UnityEngine.Resources.LoadAll<Sprite>("ResourceNodes");
+            Sprite minerals = null;
+            Sprite gas = null;
+            for (var i = 0; i < sprites.Length; i++)
+            {
+                if (sprites[i].name == "ResourceNodes_Minerals")
+                {
+                    minerals = sprites[i];
+                }
+                else if (sprites[i].name == "ResourceNodes_Gas")
+                {
+                    gas = sprites[i];
+                }
+            }
+
+            Assert.That(minerals, Is.Not.Null);
+            Assert.That(gas, Is.Not.Null);
+            Assert.That(minerals, Is.Not.EqualTo(gas));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ResourceTilemap_SynchronizesResourceNodes_WithoutChangingNavigationOrBuildability()
+        {
+            var resourceCell = new Vector3Int(1, 0, 0);
+            var gasCell = new Vector3Int(2, 0, 0);
+            var worldObject = CreateNavigationTestWorld(
+                "ResourceTilemapWorld",
+                RectCells(0, -1, 5, 3),
+                new HashSet<Vector3Int>(),
+                out var tilemapWorld,
+                out _);
+            var resourceObject = new GameObject("Resource");
+            resourceObject.transform.SetParent(worldObject.transform, false);
+            var resourceTilemap = resourceObject.AddComponent<Tilemap>();
+            resourceObject.AddComponent<TilemapRenderer>();
+            var mineralsTile = ScriptableObject.CreateInstance<ResourceTile>();
+            mineralsTile.Configure(ResourceTileType.Minerals, 1800, 9, 1.1f, 0.9f);
+            var gasTile = ScriptableObject.CreateInstance<ResourceTile>();
+            gasTile.Configure(ResourceTileType.Gas, 2600, 7, 1.7f, 1.1f);
+            resourceTilemap.SetTile(resourceCell, mineralsTile);
+            resourceTilemap.SetTile(gasCell, gasTile);
+
+            var synchronizer = resourceObject.AddComponent(ResourceTilemapNodeSynchronizerType);
+            Invoke(synchronizer, "Configure", resourceTilemap, null);
+            tilemapWorld.ResolveReferences();
+            tilemapWorld.MarkNavigationCacheDirty();
+            tilemapWorld.RebuildNavigationCache();
+            yield return null;
+
+            Assert.That(GetInt(synchronizer, "GeneratedNodeCount"), Is.EqualTo(2));
+            Assert.That(tilemapWorld.IsWalkable(resourceCell), Is.True);
+            Assert.That(tilemapWorld.IsBuildable(resourceCell), Is.True);
+            var gasNode = (Component)InvokeStatic(
+                ResourceNodeType,
+                "FindNearestAvailable",
+                tilemapWorld.GetCellCenterWorld(gasCell),
+                Enum.Parse(ResourceTypeType, "Gas"));
+            Assert.That(gasNode, Is.Not.Null);
+            Assert.That(GetProperty(gasNode, "ResourceType").ToString(), Is.EqualTo("Gas"));
+            Assert.That(GetInt(gasNode, "RemainingAmount"), Is.EqualTo(2600));
+            Assert.That(GetInt(gasNode, "GatherAmountPerTrip"), Is.EqualTo(7));
+            Assert.That(GetFloat(gasNode, "GatherDuration"), Is.EqualTo(1.7f));
+            Assert.That(GetFloat(gasNode, "InteractionRange"), Is.EqualTo(1.1f));
+
+            Object.Destroy(mineralsTile);
+            Object.Destroy(gasTile);
+            Object.Destroy(worldObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator TeamUpgradeResearch_AppliesCompletedUpgradesToOnlyItsTeam()
+        {
+            var walletObject = new GameObject("UpgradeWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(200, 100));
+            var teamOneUnit = CreateMovableUnit("UpgradeTeamOneUnit", Vector3.zero, UnitTeam.Team1);
+            var teamTwoUnit = CreateMovableUnit("UpgradeTeamTwoUnit", Vector3.right, UnitTeam.Team2);
+            var weaponUpgrade = ScriptableObject.CreateInstance(UnitUpgradeDefinitionType);
+            Invoke(
+                weaponUpgrade,
+                "Configure",
+                "Test Weapon Upgrade",
+                UnitUpgradeKind.AttackDamage,
+                CreateResourceAmount(20, 10),
+                0.05f,
+                4f);
+            var movementUpgrade = ScriptableObject.CreateInstance(UnitUpgradeDefinitionType);
+            Invoke(
+                movementUpgrade,
+                "Configure",
+                "Test Movement Upgrade",
+                UnitUpgradeKind.MovementSpeed,
+                CreateResourceAmount(30, 20),
+                0.05f,
+                0.2f);
+            var definitions = Array.CreateInstance(UnitUpgradeDefinitionType, 2);
+            definitions.SetValue(weaponUpgrade, 0);
+            definitions.SetValue(movementUpgrade, 1);
+            var researchObject = new GameObject("Team One Upgrades");
+            var research = researchObject.AddComponent(TeamUpgradeResearchType);
+            Invoke(research, "Configure", UnitTeam.Team1, wallet, definitions);
+
+            Assert.That((bool)Invoke(research, "TryStartResearch", 0), Is.True);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(180));
+            Assert.That(GetInt(wallet, "Gas"), Is.EqualTo(90));
+            for (var i = 0; i < 120 && GetProperty(research, "ActiveDefinition") != null; i++)
+            {
+                yield return null;
+            }
+
+            Assert.That(GetFloat(teamOneUnit.GetComponent<PrototypeUnitStatus>(), "PhysicalAttackPower"), Is.EqualTo(14f));
+            Assert.That(GetFloat(teamTwoUnit.GetComponent<PrototypeUnitStatus>(), "PhysicalAttackPower"), Is.EqualTo(10f));
+            Assert.That((bool)Invoke(research, "TryStartResearch", 1), Is.True);
+            for (var i = 0; i < 120 && GetProperty(research, "ActiveDefinition") != null; i++)
+            {
+                yield return null;
+            }
+
+            Assert.That(GetFloat(teamOneUnit.GetComponent<PrototypeUnitStatus>(), "MovementSpeed"), Is.EqualTo(MovementSpeed * 1.2f));
+            Assert.That(GetFloat(teamTwoUnit.GetComponent<PrototypeUnitStatus>(), "MovementSpeed"), Is.EqualTo(MovementSpeed));
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(150));
+            Assert.That(GetInt(wallet, "Gas"), Is.EqualTo(70));
+
+            Object.Destroy(researchObject);
+            Object.Destroy(weaponUpgrade);
+            Object.Destroy(movementUpgrade);
+            Object.Destroy(teamOneUnit);
+            Object.Destroy(teamTwoUnit);
+            Object.Destroy(walletObject);
             yield return null;
         }
 
@@ -352,21 +492,21 @@ namespace ProjectS.Tests.PlayMode
             var selectedUnits = new List<UnitCommandAgent> { commandAgent };
 
             controller.BeginMoveCommand();
-            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Move: select a map destination."));
+            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Move: select a map destination. Esc cancels."));
             Assert.That(controller.TryHandleMinimapCommand(new Vector3(3f, 0f, 0f), true), Is.True);
             Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.Move));
             Assert.That((string)InvokeStatic(RtsGameHudType, "DescribeSelectedCommands", selectedUnits),
                 Is.EqualTo("Command: Move | State: Moving"));
 
             controller.BeginAttackMoveCommand();
-            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Attack Move: select a map destination."));
+            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Attack Move: select a map destination. Esc cancels."));
             Assert.That(controller.TryHandleMinimapCommand(new Vector3(4f, 0f, 0f), true), Is.True);
             Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.AttackMove));
             Assert.That((string)InvokeStatic(RtsGameHudType, "DescribeSelectedCommands", selectedUnits),
                 Is.EqualTo("Command: Attack Move | State: Advancing"));
 
             controller.BeginPatrolCommand();
-            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Patrol: select a map destination."));
+            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Patrol: select a map destination. Esc cancels."));
             Assert.That(controller.TryHandleMinimapCommand(new Vector3(5f, 0f, 0f), true), Is.True);
             Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.Patrol));
             Assert.That((string)InvokeStatic(RtsGameHudType, "DescribeSelectedCommands", selectedUnits),
@@ -398,7 +538,7 @@ namespace ProjectS.Tests.PlayMode
             controller.BeginRallyPointCommand(rallyService);
 
             Assert.That(controller.IsRallyPointPending, Is.True);
-            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Rally: select a map destination."));
+            Assert.That(controller.PendingCommandStatusMessage, Is.EqualTo("Rally: select a map destination. Esc cancels."));
             Assert.That(controller.TryHandleMinimapCommand(rallyPoint, true), Is.True);
             Assert.That(rallyService.SetCount, Is.EqualTo(1));
             Assert.That(rallyService.Point, Is.EqualTo(rallyPoint));
@@ -1132,6 +1272,43 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator PlayerUnitCommandController_ClosesBuildMenuAfterPlacementCancellationAndSelectionChange()
+        {
+            var controllerObject = new GameObject("BuildMenuCloseController");
+            var controller = controllerObject.AddComponent<PlayerUnitCommandController>();
+            var builder = CreateWorkerUnit("BuildMenuBuilder", Vector3.zero);
+            var secondBuilder = CreateWorkerUnit("BuildMenuSecondBuilder", Vector3.right);
+            var service = new RecordingBuildPlacementService
+            {
+                ShouldSucceed = true,
+                ConstructionSite = new RecordingInteractableTarget(Vector3.one)
+            };
+
+            Invoke(controller, "AddSelection", builder.GetComponent<UnitCommandAgent>());
+            controller.ToggleBuildMenu();
+            controller.BeginBuildPlacement(service);
+            Assert.That(controller.IsBuildMenuOpen, Is.True);
+            Assert.That(controller.TryHandleMinimapCommand(Vector3.one, true), Is.True);
+            Assert.That(controller.IsBuildPlacementPending, Is.False);
+            Assert.That(controller.IsBuildMenuOpen, Is.False);
+
+            controller.ToggleBuildMenu();
+            controller.BeginBuildPlacement(service);
+            controller.CancelBuildPlacement();
+            Assert.That(controller.IsBuildMenuOpen, Is.False);
+            Assert.That(controller.IsBuildPlacementPending, Is.False);
+
+            controller.ToggleBuildMenu();
+            Invoke(controller, "AddSelection", secondBuilder.GetComponent<UnitCommandAgent>());
+            Assert.That(controller.IsBuildMenuOpen, Is.False);
+
+            Object.Destroy(secondBuilder);
+            Object.Destroy(builder);
+            Object.Destroy(controllerObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator WorkerGatherController_RepeatsGatherAndDepositIntoTeamWallet()
         {
             var walletObject = new GameObject("GatherWallet");
@@ -1414,6 +1591,62 @@ namespace ProjectS.Tests.PlayMode
             Object.Destroy(productionBuilding);
             Object.Destroy(walletObject);
             DestroyObjectsStartingWith(producedNamePrefix);
+        }
+
+        [UnityTest]
+        public IEnumerator RtsGameHud_ProductionHotkeyQueuesOnlyTheRequestedSlotOnce()
+        {
+            var walletObject = new GameObject("ProductionHotkeyWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 0));
+            var productionBuilding = CreateProductionBuilding("ProductionHotkeyBuilding", UnitTeam.Team1, Vector3.zero);
+            var workerPrefab = CreateUnitPrefab("ProductionHotkeyWorker", PrototypeUnitType.Worker);
+            var soldierPrefab = CreateUnitPrefab("ProductionHotkeySoldier", PrototypeUnitType.Soldier);
+            var workerDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            var soldierDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(
+                workerDefinition,
+                "Configure",
+                "Hotkey Worker",
+                PrototypeUnitType.Worker,
+                workerPrefab,
+                CreateResourceAmount(25, 0),
+                10f);
+            Invoke(
+                soldierDefinition,
+                "Configure",
+                "Hotkey Soldier",
+                PrototypeUnitType.Soldier,
+                soldierPrefab,
+                CreateResourceAmount(35, 0),
+                10f);
+            var definitions = Array.CreateInstance(UnitProductionDefinitionType, 2);
+            definitions.SetValue(workerDefinition, 0);
+            definitions.SetValue(soldierDefinition, 1);
+            var queue = productionBuilding.AddComponent(UnitProductionQueueType);
+            Invoke(
+                queue,
+                "Configure",
+                wallet,
+                null,
+                definitions,
+                3,
+                new Vector3(0.5f, 0f, 0f),
+                new Vector3(1f, 0f, 0f));
+            var hudObject = new GameObject("ProductionHotkeyHud");
+            var hud = hudObject.AddComponent(RtsGameHudType);
+
+            Assert.That((bool)Invoke(hud, "TryQueueProduction", queue, 1), Is.True);
+            Assert.That(GetProperty(queue, "ActiveProduction"), Is.EqualTo(soldierDefinition));
+            Assert.That(GetInt(queue, "QueuedCount"), Is.EqualTo(1));
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(65));
+
+            Object.Destroy(hudObject);
+            Object.Destroy(soldierPrefab);
+            Object.Destroy(workerPrefab);
+            Object.Destroy(productionBuilding);
+            Object.Destroy(walletObject);
+            yield return null;
         }
 
         [UnityTest]
@@ -1903,6 +2136,8 @@ namespace ProjectS.Tests.PlayMode
             public Vector2Int DefaultFootprint => Vector2Int.one;
             public string LastPlacementFailureReason { get; private set; }
             public int PlacementAttemptCount { get; private set; }
+            public bool ShouldSucceed { get; set; }
+            public IUnitInteractableTarget ConstructionSite { get; set; }
 
             public IReadOnlyList<UnitBuildPlacementPreviewCell> GetDefaultConstructionSitePreviewCells(Vector3 worldPosition)
             {
@@ -1918,8 +2153,8 @@ namespace ProjectS.Tests.PlayMode
             public bool TryPlaceDefaultConstructionSite(Vector3 worldPosition, out IUnitInteractableTarget constructionSite)
             {
                 PlacementAttemptCount++;
-                constructionSite = null;
-                return false;
+                constructionSite = ShouldSucceed ? ConstructionSite : null;
+                return constructionSite != null;
             }
         }
 
@@ -2281,7 +2516,11 @@ namespace ProjectS.Tests.PlayMode
 
         private static System.Reflection.MethodInfo FindMethod(Type targetType, string methodName, object[] arguments)
         {
-            var methods = targetType.GetMethods();
+            var methods = targetType.GetMethods(
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Static
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic);
             for (var i = 0; i < methods.Length; i++)
             {
                 var method = methods[i];

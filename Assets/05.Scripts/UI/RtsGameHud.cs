@@ -2,7 +2,9 @@ using System.Collections.Generic;
 using ProjectS.Buildings;
 using ProjectS.Resources;
 using ProjectS.Units;
+using ProjectS.Upgrades;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace ProjectS.UI
 {
@@ -17,9 +19,32 @@ namespace ProjectS.UI
         private SupplyManager supplyManager;
         private ProjectS.RtsMatchController matchController;
         private UnitProductionQueue displayedProductionQueue;
+        private TeamUpgradeResearch displayedUpgradeResearch;
         private string productionFeedback;
+        private string upgradeFeedback;
         private int selectedPendingProductionIndex;
+        private bool showUpgradeResearch;
         private static readonly Texture2D[] CommandIcons = new Texture2D[6];
+        private static readonly Key[] ContextHotkeys =
+        {
+            Key.Q,
+            Key.E,
+            Key.R,
+            Key.T,
+            Key.Y,
+            Key.U,
+            Key.I
+        };
+        private static readonly BuildingKind[] BuildMenuBuildings =
+        {
+            BuildingKind.Production,
+            BuildingKind.SpliterProduction,
+            BuildingKind.AutoTurret,
+            BuildingKind.SpeedAura,
+            BuildingKind.SupplyDepot,
+            BuildingKind.ResourceDropOff,
+            BuildingKind.MainBase
+        };
         private static readonly string[] CommandIconPaths =
         {
             "Temp/Commands/Command_Move",
@@ -33,7 +58,7 @@ namespace ProjectS.UI
         private const float ResourcePanelX = 12f;
         private const float ResourcePanelY = 12f;
         private const float ResourcePanelWidth = 260f;
-        private const float ResourcePanelHeight = 88f;
+        private const float ResourcePanelHeight = 112f;
         private const float BottomPanelMargin = 10f;
         private const float BottomPanelGap = 8f;
         private const float BottomPanelHeight = 118f;
@@ -87,11 +112,46 @@ namespace ProjectS.UI
             }
 
             ResolveDisplayedProductionQueue();
+            displayedUpgradeResearch = TeamUpgradeResearch.FindForTeam(playerTeam);
+            HandleContextHotkeys();
         }
 
         private void Awake()
         {
             ActiveInstance = this;
+        }
+
+        private void HandleContextHotkeys()
+        {
+            if (commandController == null || IsMatchOver() || showUpgradeResearch || IsContextHotkeyModifierPressed())
+            {
+                return;
+            }
+
+            var keyboard = Keyboard.current;
+            if (keyboard == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < ContextHotkeys.Length; i++)
+            {
+                if (!keyboard[ContextHotkeys[i]].wasPressedThisFrame)
+                {
+                    continue;
+                }
+
+                if (commandController.IsBuildMenuOpen)
+                {
+                    TryBeginBuildPlacement(i);
+                }
+                else
+                {
+                    TryQueueProduction(ResolveDisplayedProductionQueue(), i);
+                }
+
+                return;
+            }
         }
 
         private void OnDestroy()
@@ -110,6 +170,8 @@ namespace ProjectS.UI
             wallet = null;
             supplyManager = null;
             displayedProductionQueue = null;
+            displayedUpgradeResearch = null;
+            showUpgradeResearch = false;
         }
 
         private void ResolvePlayerWallet()
@@ -185,6 +247,11 @@ namespace ProjectS.UI
             GUI.Label(new Rect(144f, 22f, 100f, 22f), $"Gas: {gas}");
             GUI.Label(new Rect(24f, 46f, 220f, 22f), $"Supply: {currentSupply}/{maxSupply}  Reserved: {reservedSupply}");
             GUI.Label(new Rect(24f, 70f, 220f, 22f), $"Team: {playerTeam}");
+            var research = TeamUpgradeResearch.FindForTeam(playerTeam);
+            var researchLabel = research != null && research.ActiveDefinition != null
+                ? $"Research: {research.ActiveDefinition.DisplayName} {research.ActiveProgress01 * 100f:0}%"
+                : "Research: Idle";
+            GUI.Label(new Rect(24f, 94f, 236f, 18f), researchLabel);
         }
 
         private void DrawSelectionPanel(Rect rect)
@@ -250,8 +317,15 @@ namespace ProjectS.UI
             var commandAgent = selectionObject.GetComponent<UnitCommandAgent>();
             if (commandAgent != null)
             {
+                var unitStatus = selectionObject.GetComponent<PrototypeUnitStatus>();
+                if (unitStatus != null)
+                {
+                    GUI.Label(
+                        new Rect(rect.x + 10f, rect.y + 76f, rect.width - 20f, 22f),
+                        $"ATK: {unitStatus.PhysicalAttackPower:0.0}  Move: {unitStatus.MovementSpeed:0.00}");
+                }
                 GUI.Label(
-                    new Rect(rect.x + 10f, rect.y + 76f, rect.width - 20f, 22f),
+                    new Rect(rect.x + 10f, rect.y + 98f, rect.width - 20f, 20f),
                     DescribeSelectedCommands(selectedUnits));
                 return;
             }
@@ -378,14 +452,14 @@ namespace ProjectS.UI
             var columns = panelRect.width >= 560f ? 5 : panelRect.width >= 420f ? 3 : 2;
             var buttonWidth = (panelRect.width - 16f - buttonGap * (columns - 1)) / columns;
             var buttonHeight = columns == 4 ? 46f : 28f;
-            DrawBuildOption(BuildOptionRect(panelRect, 0, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.Production, columns == 4 ? "Combat\n150M" : "Combat 150M");
-            DrawBuildOption(BuildOptionRect(panelRect, 1, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.SpliterProduction, columns == 4 ? "Spliter\n175M" : "Spliter 175M");
-            DrawBuildOption(BuildOptionRect(panelRect, 2, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.AutoTurret, columns == 4 ? "Turret\n125M" : "Turret 125M");
-            DrawBuildOption(BuildOptionRect(panelRect, 3, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.SpeedAura, columns == 4 ? "Speed\n125M/25G" : "Speed 125M/25G");
-            DrawBuildOption(BuildOptionRect(panelRect, 4, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.SupplyDepot, columns == 5 ? "Supply\n100M" : "Supply 100M");
-            DrawBuildOption(BuildOptionRect(panelRect, 5, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.ResourceDropOff, columns >= 5 ? "Drop-off\n100M" : "Drop-off 100M");
-            DrawBuildOption(BuildOptionRect(panelRect, 6, columns, buttonWidth, buttonHeight, buttonGap), BuildingKind.MainBase, columns >= 5 ? "Main Base\n350M/75G" : "Main Base 350M/75G");
-            var rowCount = Mathf.CeilToInt(7f / columns);
+            DrawBuildOption(BuildOptionRect(panelRect, 0, columns, buttonWidth, buttonHeight, buttonGap), 0, columns == 4 ? "Combat\n150M" : "Combat 150M");
+            DrawBuildOption(BuildOptionRect(panelRect, 1, columns, buttonWidth, buttonHeight, buttonGap), 1, columns == 4 ? "Spliter\n175M" : "Spliter 175M");
+            DrawBuildOption(BuildOptionRect(panelRect, 2, columns, buttonWidth, buttonHeight, buttonGap), 2, columns == 4 ? "Turret\n125M" : "Turret 125M");
+            DrawBuildOption(BuildOptionRect(panelRect, 3, columns, buttonWidth, buttonHeight, buttonGap), 3, columns == 4 ? "Speed\n125M/25G" : "Speed 125M/25G");
+            DrawBuildOption(BuildOptionRect(panelRect, 4, columns, buttonWidth, buttonHeight, buttonGap), 4, columns == 5 ? "Supply\n100M" : "Supply 100M");
+            DrawBuildOption(BuildOptionRect(panelRect, 5, columns, buttonWidth, buttonHeight, buttonGap), 5, columns >= 5 ? "Drop-off\n100M" : "Drop-off 100M");
+            DrawBuildOption(BuildOptionRect(panelRect, 6, columns, buttonWidth, buttonHeight, buttonGap), 6, columns >= 5 ? "Main Base\n350M/75G" : "Main Base 350M/75G");
+            var rowCount = Mathf.CeilToInt(BuildMenuBuildings.Length / (float)columns);
             GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 30f + rowCount * (buttonHeight + 4f), panelRect.width - 16f, 20f), "Choose a tile to place. Esc cancels.");
         }
 
@@ -396,22 +470,57 @@ namespace ProjectS.UI
             return new Rect(panelRect.x + 8f + column * (width + gap), panelRect.y + 28f + row * (height + 4f), width, height);
         }
 
-        private void DrawBuildOption(Rect buttonRect, BuildingKind buildingKind, string label)
+        private void DrawBuildOption(Rect buttonRect, int hotkeyIndex, string label)
         {
-            if (!GUI.Button(buttonRect, label))
+            if (!GUI.Button(buttonRect, WithHotkeyLabel(label, hotkeyIndex)))
             {
                 return;
             }
 
-            if (buildingPlacementService == null || !buildingPlacementService.SelectBuilding(buildingKind))
+            TryBeginBuildPlacement(hotkeyIndex);
+        }
+
+        private bool TryBeginBuildPlacement(int hotkeyIndex)
+        {
+            if (hotkeyIndex < 0 || hotkeyIndex >= BuildMenuBuildings.Length)
+            {
+                return false;
+            }
+
+            if (buildingPlacementService == null || !buildingPlacementService.SelectBuilding(BuildMenuBuildings[hotkeyIndex]))
             {
                 productionFeedback = buildingPlacementService != null
                     ? buildingPlacementService.LastPlacementFailureReason
                     : "No building placement service is available.";
-                return;
+                return false;
             }
 
             commandController.BeginBuildPlacement(buildingPlacementService);
+            return true;
+        }
+
+        public bool TryQueueProduction(UnitProductionQueue productionQueue, int hotkeyIndex)
+        {
+            if (productionQueue == null || hotkeyIndex < 0 || hotkeyIndex >= ContextHotkeys.Length)
+            {
+                return false;
+            }
+
+            var definitions = productionQueue.ProducibleUnits;
+            if (hotkeyIndex >= definitions.Count || definitions[hotkeyIndex] == null)
+            {
+                return false;
+            }
+
+            var definition = definitions[hotkeyIndex];
+            if (productionQueue.TryEnqueue(hotkeyIndex))
+            {
+                productionFeedback = $"Queued {definition.DisplayName}.";
+                return true;
+            }
+
+            productionFeedback = productionQueue.LastEnqueueFailureReason;
+            return false;
         }
 
         private static bool DrawCommandButton(Rect rect, int iconIndex, string fallbackLabel)
@@ -430,6 +539,13 @@ namespace ProjectS.UI
             }
 
             GUI.DrawTexture(new Rect(rect.x + 2f, rect.y + 2f, rect.width - 4f, rect.height - 4f), icon, ScaleMode.ScaleToFit, true);
+            var hotkeyStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.LowerRight,
+                fontStyle = FontStyle.Bold,
+                fontSize = 11
+            };
+            GUI.Label(new Rect(rect.x + 2f, rect.y + 2f, rect.width - 4f, rect.height - 4f), GetCommandHotkeyLabel(fallbackLabel), hotkeyStyle);
             return clicked;
         }
 
@@ -483,6 +599,16 @@ namespace ProjectS.UI
             {
                 GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 62f, panelRect.width - 16f, 42f), ShortenFailureReason(message));
             }
+
+            var groupHintStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 10,
+                alignment = TextAnchor.LowerLeft
+            };
+            GUI.Label(
+                new Rect(panelRect.x + 8f, panelRect.y + 90f, panelRect.width - 16f, 18f),
+                "Groups: 1-0 select | Ctrl set | Shift add",
+                groupHintStyle);
         }
 
         private void DrawProductionPanel(Rect panelRect)
@@ -492,13 +618,26 @@ namespace ProjectS.UI
             {
                 productionFeedback = string.Empty;
                 selectedPendingProductionIndex = 0;
+                showUpgradeResearch = false;
+                return;
+            }
+
+            var research = displayedUpgradeResearch ?? TeamUpgradeResearch.FindForTeam(playerTeam);
+            if (showUpgradeResearch && research != null)
+            {
+                DrawUpgradeResearchPanel(panelRect, research);
                 return;
             }
 
             GUI.Box(panelRect, string.Empty);
             var active = productionQueue.ActiveProduction;
             var activeLabel = active != null ? $"{active.DisplayName} {productionQueue.ActiveProgress01 * 100f:0}%" : "Production idle";
-            GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 6f, panelRect.width - 174f, 20f), activeLabel);
+            GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 6f, panelRect.width - 252f, 20f), activeLabel);
+            if (research != null && GUI.Button(new Rect(panelRect.x + panelRect.width - 236f, panelRect.y + 4f, 72f, 24f), "Research"))
+            {
+                showUpgradeResearch = true;
+                upgradeFeedback = string.Empty;
+            }
             if (GUI.Button(new Rect(panelRect.x + panelRect.width - 158f, panelRect.y + 4f, 72f, 24f), "Rally"))
             {
                 commandController.BeginRallyPointCommand(productionQueue);
@@ -534,17 +673,10 @@ namespace ProjectS.UI
 
                 var x = panelRect.x + 8f + i * (buttonSize + buttonGap);
                 var y = panelRect.y + 42f;
-                var buttonLabel = $"{definition.DisplayName}\n{FormatCost(definition.Cost)}";
+                var buttonLabel = WithHotkeyLabel($"{definition.DisplayName}\n{FormatCost(definition.Cost)}", i);
                 if (GUI.Button(new Rect(x, y, buttonSize, buttonSize), buttonLabel))
                 {
-                    if (productionQueue.TryEnqueue(i))
-                    {
-                        productionFeedback = $"Queued {definition.DisplayName}.";
-                    }
-                    else
-                    {
-                        productionFeedback = productionQueue.LastEnqueueFailureReason;
-                    }
+                    TryQueueProduction(productionQueue, i);
                 }
 
             }
@@ -559,6 +691,66 @@ namespace ProjectS.UI
             if (productionQueue.PendingCount <= 0 && !string.IsNullOrWhiteSpace(feedback))
             {
                 GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 92f, panelRect.width - 16f, 20f), ShortenFailureReason(feedback));
+            }
+        }
+
+        private void DrawUpgradeResearchPanel(Rect panelRect, TeamUpgradeResearch research)
+        {
+            GUI.Box(panelRect, string.Empty);
+            GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 6f, panelRect.width - 96f, 20f), "Unit research");
+            if (GUI.Button(new Rect(panelRect.x + panelRect.width - 80f, panelRect.y + 4f, 72f, 24f), "Back"))
+            {
+                showUpgradeResearch = false;
+                return;
+            }
+
+            var active = research.ActiveDefinition;
+            var activeLabel = active != null
+                ? $"Researching: {active.DisplayName} {research.ActiveProgress01 * 100f:0}%"
+                : "Research idle";
+            GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 28f, panelRect.width - 16f, 18f), activeLabel);
+            if (active != null)
+            {
+                var barRect = new Rect(panelRect.x + 8f, panelRect.y + 46f, panelRect.width - 16f, 6f);
+                GUI.Box(barRect, string.Empty);
+                DrawFilledRect(new Rect(barRect.x + 1f, barRect.y + 1f, (barRect.width - 2f) * research.ActiveProgress01, barRect.height - 2f), new Color(0.9f, 0.66f, 0.25f, 0.9f));
+            }
+
+            var definitions = research.Definitions;
+            for (var i = 0; i < definitions.Count && i < 2; i++)
+            {
+                var definition = definitions[i];
+                if (definition == null)
+                {
+                    continue;
+                }
+
+                var status = research.GetStatus(definition);
+                var label = status == UnitUpgradeResearchStatus.Completed
+                    ? $"{definition.DisplayName}\nCompleted"
+                    : status == UnitUpgradeResearchStatus.Researching
+                        ? $"{definition.DisplayName}\nResearching"
+                        : $"{definition.DisplayName}\n{FormatCost(definition.Cost)}  {definition.ResearchDuration:0}s";
+                var buttonWidth = (panelRect.width - 22f) * 0.5f;
+                var buttonRect = new Rect(panelRect.x + 8f + i * buttonWidth, panelRect.y + 58f, buttonWidth, 38f);
+                var wasEnabled = GUI.enabled;
+                GUI.enabled = status == UnitUpgradeResearchStatus.Available && active == null;
+                if (GUI.Button(buttonRect, label))
+                {
+                    upgradeFeedback = research.TryStartResearch(i)
+                        ? $"Started {definition.DisplayName}."
+                        : research.LastFailureReason;
+                }
+
+                GUI.enabled = wasEnabled;
+            }
+
+            var feedback = string.IsNullOrWhiteSpace(research.LastFailureReason)
+                ? upgradeFeedback
+                : research.LastFailureReason;
+            if (!string.IsNullOrWhiteSpace(feedback))
+            {
+                GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 98f, panelRect.width - 16f, 18f), ShortenFailureReason(feedback));
             }
         }
 
@@ -718,6 +910,33 @@ namespace ProjectS.UI
             }
 
             return $"{cost.Minerals}M/{cost.Gas}G";
+        }
+
+        private static string WithHotkeyLabel(string label, int hotkeyIndex)
+        {
+            return hotkeyIndex >= 0 && hotkeyIndex < ContextHotkeys.Length
+                ? $"{label} [{ContextHotkeys[hotkeyIndex]}]"
+                : label;
+        }
+
+        private static string GetCommandHotkeyLabel(string fallbackLabel)
+        {
+            var separator = fallbackLabel.LastIndexOf(' ');
+            return separator >= 0 && separator < fallbackLabel.Length - 1
+                ? fallbackLabel.Substring(separator + 1)
+                : string.Empty;
+        }
+
+        private static bool IsContextHotkeyModifierPressed()
+        {
+            var keyboard = Keyboard.current;
+            return keyboard != null
+                && (keyboard.leftCtrlKey.isPressed
+                    || keyboard.rightCtrlKey.isPressed
+                    || keyboard.leftShiftKey.isPressed
+                    || keyboard.rightShiftKey.isPressed
+                    || keyboard.leftAltKey.isPressed
+                    || keyboard.rightAltKey.isPressed);
         }
 
         private static string ShortenFailureReason(string failureReason)

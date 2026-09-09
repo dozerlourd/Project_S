@@ -13,6 +13,8 @@ Project S의 새 맵 시스템은 Unity 기본 `Grid`, `Tilemap`, `Tile Palette`
 | `ProjectSTile` | Unity `Tile`을 확장한 Project S용 타일 에셋 |
 | `ProjectSTilemapWorld` | 씬의 Tilemap 레이어를 읽어 셀/월드 좌표와 타일 판정을 제공 |
 | `ProjectSTilemapNavigator` | Tilemap 셀 기반 A* 경로 탐색 제공 |
+| `ResourceTile` | 셀별 자원 종류와 채집 설정을 저장하는 자원 전용 Tile 에셋 |
+| `ResourceTilemapNodeSynchronizer` | Resource Tilemap 셀을 런타임 `ResourceNode`로 동기화 |
 
 ## Terrain Type
 
@@ -54,3 +56,28 @@ Assets/Assets/Tilemaps/Tiles
 6. 유닛은 `UnitPathAgent`를 통해 Navigator가 있으면 Tilemap 경로를 사용한다.
 
 Navigator가 없는 씬에서는 기존처럼 클릭 위치까지 직선 이동으로 동작한다.
+
+## 자원 Tilemap
+
+자원은 `Resource` 이름의 별도 Tilemap에 배치한다. 이 레이어는 `ProjectSTilemapWorld`의 Ground/Stair/Overlay/Obstacle 조회 대상이 아니므로, Resource Tile 자체는 이동 가능 여부나 건설 가능 여부를 바꾸지 않는다. 셀마다 생성되는 `ResourceNode`는 기존 상호작용과 건설 충돌 정책을 그대로 사용한다.
+
+`ResourceTilemapNodeSynchronizer`는 `Resource` Tilemap을 찾아 `ResourceTile`이 있는 셀마다 런타임 노드를 생성한다. Minerals/Gas 종류, 초기량, 1회 채집량, 채집 시간, 상호작용 범위는 타일 에셋 설정에서 읽는다. Tilemap이 비어 있지 않으면 `MapCreateSceneAutoBootstrap`은 기존 Home/Expansion 자원 클러스터를 생성하지 않는다.
+
+`Assets/Resources/ResourceNodes.png`에는 좌측 Minerals와 우측 Gas가 Sprite Multiple로 분할되어 있다. 이 경로는 런타임 fallback 자원 노드와 Resource Tile 에셋이 공통으로 사용한다. Unity Editor에서 아래 메뉴를 실행하면 분할 설정을 다시 적용하고 Tile Palette에 바로 넣을 수 있는 두 Resource Tile 에셋을 생성하거나 갱신한다.
+
+```text
+Tools/Project S/Resources/Prepare Resource Tile Palette
+```
+
+활성 씬의 Grid 아래에 Resource 레이어가 없다면 아래 메뉴로 생성한다.
+
+```text
+Tools/Project S/Resources/Add Resource Tilemap To Active Scene
+```
+
+생성 경로는 다음과 같다.
+
+```text
+Assets/Assets/Tilemaps/Resource Tiles/ResourceNodes_Minerals.asset
+Assets/Assets/Tilemaps/Resource Tiles/ResourceNodes_Gas.asset
+```

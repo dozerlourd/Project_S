@@ -1,4 +1,5 @@
 using ProjectS.Buildings;
+using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.Units;
 using UnityEngine;
@@ -19,6 +20,14 @@ namespace ProjectS.UI
         private static readonly Color TeamTwoColor = new Color(1f, 0.28f, 0.2f);
         private static readonly Color NeutralColor = new Color(0.78f, 0.78f, 0.78f);
         private static readonly Color ViewportColor = new Color(1f, 0.92f, 0.2f);
+        private static readonly Color MineralColor = new Color(0.22f, 0.86f, 1f);
+        private static readonly Color GasColor = new Color(0.4f, 0.92f, 0.36f);
+        private static readonly Color SelectedUnitColor = new Color(1f, 1f, 1f, 0.95f);
+        private static readonly Color CombatTargetColor = new Color(1f, 0.72f, 0.16f, 0.72f);
+        private static readonly Color WalkableTerrainColor = new Color(0.19f, 0.31f, 0.22f, 1f);
+        private static readonly Color NonBuildableTerrainColor = new Color(0.37f, 0.3f, 0.17f, 1f);
+        private static readonly Color BlockedTerrainColor = new Color(0.1f, 0.11f, 0.14f, 1f);
+        private static readonly Color EmptyTerrainColor = new Color(0.035f, 0.04f, 0.055f, 1f);
 
         [SerializeField] private ProjectSTilemapWorld tilemapWorld;
         [SerializeField] private RtsCameraController cameraController;
@@ -26,6 +35,9 @@ namespace ProjectS.UI
         [SerializeField] private UnitTeam enemyTeam = UnitTeam.Team2;
 
         private bool isDraggingCamera;
+        private Texture2D terrainTexture;
+        private BoundsInt terrainTextureBounds;
+        private int terrainCacheRebuildCount = -1;
 
         public static RtsMinimap ActiveInstance { get; private set; }
         public static float BottomRightReservedWidth => PanelWidth + PanelMargin + 8f;
@@ -50,6 +62,11 @@ namespace ProjectS.UI
             {
                 ActiveInstance = null;
             }
+
+            if (terrainTexture != null)
+            {
+                Destroy(terrainTexture);
+            }
         }
 
         private void Update()
@@ -66,6 +83,8 @@ namespace ProjectS.UI
 
             GUI.Box(new Rect(mapRect.x - 4f, mapRect.y - 4f, mapRect.width + 8f, mapRect.height + 8f), string.Empty);
             DrawFilledRect(mapRect, new Color(0.06f, 0.09f, 0.11f, 0.92f));
+            DrawTerrain(mapRect);
+            DrawResources(mapRect, worldBounds);
             DrawViewport(mapRect, worldBounds);
             DrawUnits(mapRect, worldBounds);
             DrawBuildings(mapRect, worldBounds);
@@ -114,6 +133,84 @@ namespace ProjectS.UI
             return tilemapWorld != null && tilemapWorld.TryGetWorldBounds(out worldBounds);
         }
 
+        private void DrawTerrain(Rect mapRect)
+        {
+            RebuildTerrainTextureIfNeeded();
+            if (terrainTexture != null)
+            {
+                GUI.DrawTexture(mapRect, terrainTexture, ScaleMode.StretchToFill, true);
+            }
+        }
+
+        private void RebuildTerrainTextureIfNeeded()
+        {
+            if (tilemapWorld == null)
+            {
+                return;
+            }
+
+            var bounds = tilemapWorld.CellBounds;
+            if (bounds.size.x < 1 || bounds.size.y < 1)
+            {
+                return;
+            }
+
+            // The navigation cache is the only terrain source used here, so this avoids per-frame tile sampling.
+            if (terrainTexture != null
+                && terrainTextureBounds == bounds
+                && terrainCacheRebuildCount == tilemapWorld.CacheRebuildCount)
+            {
+                return;
+            }
+
+            var width = Mathf.Clamp(bounds.size.x, 1, 256);
+            var height = Mathf.Clamp(bounds.size.y, 1, 256);
+            if (terrainTexture == null || terrainTexture.width != width || terrainTexture.height != height)
+            {
+                if (terrainTexture != null)
+                {
+                    Destroy(terrainTexture);
+                }
+
+                terrainTexture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+                {
+                    filterMode = FilterMode.Point,
+                    wrapMode = TextureWrapMode.Clamp,
+                    name = "RtsMinimap Terrain Cache"
+                };
+            }
+
+            var pixels = new Color[width * height];
+            for (var textureY = 0; textureY < height; textureY++)
+            {
+                var cellY = bounds.yMin + Mathf.FloorToInt((textureY + 0.5f) * bounds.size.y / height);
+                for (var textureX = 0; textureX < width; textureX++)
+                {
+                    var cellX = bounds.xMin + Mathf.FloorToInt((textureX + 0.5f) * bounds.size.x / width);
+                    var cell = new Vector3Int(cellX, cellY, 0);
+                    var color = tilemapWorld.TrySample(cell, out var sample)
+                        ? GetTerrainColor(sample.Walkable, sample.Buildable)
+                        : EmptyTerrainColor;
+                    pixels[textureY * width + textureX] = color;
+                }
+            }
+
+            terrainTexture.SetPixels(pixels);
+            terrainTexture.Apply(false, false);
+            terrainTextureBounds = bounds;
+            terrainCacheRebuildCount = tilemapWorld.CacheRebuildCount;
+        }
+
+        private static Color GetTerrainColor(bool walkable, bool buildable)
+        {
+            if (!walkable)
+            {
+                return BlockedTerrainColor;
+            }
+
+            return buildable ? WalkableTerrainColor : NonBuildableTerrainColor;
+        }
+
         private static bool TryGetMapRect(out Rect mapRect)
         {
             var x = Screen.width - PanelWidth - PanelMargin;
@@ -135,6 +232,32 @@ namespace ProjectS.UI
                 }
 
                 DrawMarker(mapRect, worldBounds, unit.transform.position, UnitSize, GetTeamColor(status.Team));
+                if (IsSelected(unit))
+                {
+                    DrawOutlineMarker(mapRect, worldBounds, unit.transform.position, UnitSize + 3f, SelectedUnitColor);
+                }
+
+                var target = unit.PriorityTarget;
+                if (target != null && target.SelectionTransform != null && target.IsAlive)
+                {
+                    DrawOutlineMarker(mapRect, worldBounds, target.SelectionTransform.position, BuildingSize + 2f, CombatTargetColor);
+                }
+            }
+        }
+
+        private void DrawResources(Rect mapRect, Bounds worldBounds)
+        {
+            var nodes = ResourceNode.AllNodes;
+            for (var i = 0; i < nodes.Count; i++)
+            {
+                var node = nodes[i];
+                if (node == null || !node.isActiveAndEnabled || node.IsDepleted)
+                {
+                    continue;
+                }
+
+                var color = node.ResourceType == ResourceType.Gas ? GasColor : MineralColor;
+                DrawMarker(mapRect, worldBounds, node.transform.position, 5f, color);
             }
         }
 
@@ -299,6 +422,32 @@ namespace ProjectS.UI
             var point = MapWorldToGui(worldPosition, mapRect, worldBounds);
             var markerRect = new Rect(point.x - size * 0.5f, point.y - size * 0.5f, size, size);
             DrawFilledRect(markerRect, color);
+        }
+
+        private static void DrawOutlineMarker(Rect mapRect, Bounds worldBounds, Vector3 worldPosition, float size, Color color)
+        {
+            var point = MapWorldToGui(worldPosition, mapRect, worldBounds);
+            DrawOutline(new Rect(point.x - size * 0.5f, point.y - size * 0.5f, size, size), color);
+        }
+
+        private static bool IsSelected(UnitCommandAgent unit)
+        {
+            var controller = PlayerUnitCommandController.ActiveInstance;
+            if (controller == null)
+            {
+                return false;
+            }
+
+            var selectedUnits = controller.SelectedUnits;
+            for (var i = 0; i < selectedUnits.Count; i++)
+            {
+                if (selectedUnits[i] == unit)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static int CountActiveUnits(UnitTeam team)

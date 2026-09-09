@@ -5,6 +5,7 @@ using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.UI;
 using ProjectS.Units;
+using ProjectS.Upgrades;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -16,12 +17,18 @@ namespace ProjectS
         private const string TargetSceneName = "MapCreate_Scene";
         private const string SetupRootName = "ProjectS Match Test Setup";
         private const string ResourceLayerName = "Resource";
+        private const string ResourceNodesSpriteResourcePath = "ResourceNodes";
+        private const string MineralsSpriteName = "ResourceNodes_Minerals";
+        private const string GasSpriteName = "ResourceNodes_Gas";
         private const int ResourceSortingOrder = 12;
         private const int UnitSortingOrder = 20;
         private const int MainBaseSupplyProvided = 20;
         private const int SupplyDepotSupplyProvided = 10;
 
         private static Sprite squareSprite;
+        private static Sprite mineralsResourceSprite;
+        private static Sprite gasResourceSprite;
+        private static bool resourceSpritesLoaded;
 
         [Header("Unit Prefabs")]
         [SerializeField] private GameObject workerPrefab;
@@ -64,8 +71,13 @@ namespace ProjectS
         private void UpgradeExistingSetup(Transform root)
         {
             EnsureSupplyManagers(root);
+            EnsureTeamUpgradeResearch(root, UnitTeam.Team1);
+            EnsureTeamUpgradeResearch(root, UnitTeam.Team2);
             GetStartPositions(ProjectSTilemapWorld.ActiveInstance, out var playerStart, out var aiStart);
-            CreateExpansionResourceClusters(playerStart, aiStart, root, ProjectSTilemapWorld.ActiveInstance);
+            if (!ResourceTilemapNodeSynchronizer.SceneHasResourceTiles())
+            {
+                CreateExpansionResourceClusters(playerStart, aiStart, root, ProjectSTilemapWorld.ActiveInstance);
+            }
             var placementService = FindFirstObjectByType<BuildingPlacementService>();
             if (placementService == null)
             {
@@ -145,6 +157,8 @@ namespace ProjectS
             GetStartPositions(tilemapWorld, out var playerStart, out var aiStart);
             var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(700, 100), root.transform);
             var aiWallet = CreateWallet("AI Wallet", UnitTeam.Team2, new ResourceAmount(700, 100), root.transform);
+            CreateTeamUpgradeResearch("Player Unit Upgrades", UnitTeam.Team1, playerWallet, root.transform);
+            CreateTeamUpgradeResearch("AI Unit Upgrades", UnitTeam.Team2, aiWallet, root.transform);
             EnsureSupplyManagers(root.transform);
 
             var workerUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Worker);
@@ -197,9 +211,12 @@ namespace ProjectS
             InstantiateBuilding(mainBasePrototype, "Player Main Base", UnitTeam.Team1, BuildingKind.MainBase, playerStart, playerWallet, tilemapWorld, workerDefinitions, new Vector3(2.5f, -1.5f, 0f), new Vector3(5f, -2f, 0f), root.transform);
             InstantiateBuilding(mainBasePrototype, "AI Main Base", UnitTeam.Team2, BuildingKind.MainBase, aiStart, aiWallet, tilemapWorld, workerDefinitions, new Vector3(-2.5f, 1.5f, 0f), new Vector3(-5f, 2f, 0f), root.transform);
 
-            CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
-            CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
-            CreateExpansionResourceClusters(playerStart, aiStart, root.transform, tilemapWorld);
+            if (!ResourceTilemapNodeSynchronizer.SceneHasResourceTiles())
+            {
+                CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
+                CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
+                CreateExpansionResourceClusters(playerStart, aiStart, root.transform, tilemapWorld);
+            }
             CreateStartingUnits(UnitTeam.Team1, playerStart, workerUnitPrefab, root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team2, aiStart, workerUnitPrefab, root.transform, tilemapWorld);
             CreatePlayerSystems(
@@ -366,6 +383,57 @@ namespace ProjectS
             var wallet = walletObject.AddComponent<PlayerResourceWallet>();
             wallet.Initialize(team, resources);
             return wallet;
+        }
+
+        private static void CreateTeamUpgradeResearch(
+            string name,
+            UnitTeam team,
+            PlayerResourceWallet wallet,
+            Transform parent)
+        {
+            if (TeamUpgradeResearch.FindForTeam(team) != null)
+            {
+                return;
+            }
+
+            var researchObject = CreateChild(parent, name);
+            var research = researchObject.AddComponent<TeamUpgradeResearch>();
+            research.Configure(team, wallet, CreateMvpUnitUpgradeDefinitions());
+        }
+
+        private static void EnsureTeamUpgradeResearch(Transform parent, UnitTeam team)
+        {
+            if (TeamUpgradeResearch.FindForTeam(team) == null)
+            {
+                var wallet = PlayerResourceWallet.FindForTeam(team);
+                if (wallet != null)
+                {
+                    CreateTeamUpgradeResearch($"{team} Unit Upgrades", team, wallet, parent);
+                }
+            }
+        }
+
+        private static UnitUpgradeDefinition[] CreateMvpUnitUpgradeDefinitions()
+        {
+            var weaponUpgrade = ScriptableObject.CreateInstance<UnitUpgradeDefinition>();
+            weaponUpgrade.name = "Weapon Calibration";
+            weaponUpgrade.Configure(
+                "Weapon Calibration (+3 ATK)",
+                UnitUpgradeKind.AttackDamage,
+                new ResourceAmount(100, 25),
+                10f,
+                3f);
+
+            var mobilityUpgrade = ScriptableObject.CreateInstance<UnitUpgradeDefinition>();
+            mobilityUpgrade.name = "Mobility Tuning";
+            mobilityUpgrade.Configure(
+                "Mobility Tuning (+15% Move)",
+                UnitUpgradeKind.MovementSpeed,
+                new ResourceAmount(75, 25),
+                8f,
+                0.15f);
+
+            return new[] { weaponUpgrade, mobilityUpgrade };
         }
 
         private static void EnsureSupplyManagers(Transform parent)
@@ -574,11 +642,15 @@ namespace ProjectS
             nodeObject.transform.position = Snap(tilemapWorld, position);
             SetLayerIfExists(nodeObject, ResourceLayerName);
             var renderer = nodeObject.AddComponent<SpriteRenderer>();
-            renderer.sprite = squareSprite ??= CreateSquareSprite();
-            renderer.color = type == ResourceType.Minerals
-                ? new Color(0.25f, 0.85f, 0.95f, 1f)
-                : new Color(0.4f, 0.9f, 0.35f, 1f);
+            var resourceSprite = GetResourceNodeSprite(type);
+            renderer.sprite = resourceSprite ?? (squareSprite ??= CreateSquareSprite());
+            renderer.color = resourceSprite != null
+                ? Color.white
+                : type == ResourceType.Minerals
+                    ? new Color(0.25f, 0.85f, 0.95f, 1f)
+                    : new Color(0.4f, 0.9f, 0.35f, 1f);
             renderer.sortingOrder = ResourceSortingOrder;
+            ScaleResourceNodeVisual(nodeObject.transform, resourceSprite, type);
 
             var collider = nodeObject.AddComponent<BoxCollider2D>();
             collider.size = type == ResourceType.Minerals ? new Vector2(1f, 0.8f) : new Vector2(1.2f, 1.2f);
@@ -592,6 +664,46 @@ namespace ProjectS
                 type == ResourceType.Minerals ? 1.2f : 1.8f,
                 type == ResourceType.Minerals ? 0.95f : 1.05f,
                 true);
+        }
+
+        private static Sprite GetResourceNodeSprite(ResourceType type)
+        {
+            if (!resourceSpritesLoaded)
+            {
+                var sprites = UnityEngine.Resources.LoadAll<Sprite>(ResourceNodesSpriteResourcePath);
+                for (var i = 0; i < sprites.Length; i++)
+                {
+                    if (sprites[i].name == MineralsSpriteName)
+                    {
+                        mineralsResourceSprite = sprites[i];
+                    }
+                    else if (sprites[i].name == GasSpriteName)
+                    {
+                        gasResourceSprite = sprites[i];
+                    }
+                }
+
+                resourceSpritesLoaded = true;
+            }
+
+            return type == ResourceType.Gas ? gasResourceSprite : mineralsResourceSprite;
+        }
+
+        private static void ScaleResourceNodeVisual(Transform nodeTransform, Sprite sprite, ResourceType type)
+        {
+            if (nodeTransform == null || sprite == null)
+            {
+                return;
+            }
+
+            var largestDimension = Mathf.Max(sprite.bounds.size.x, sprite.bounds.size.y);
+            if (largestDimension <= 0f)
+            {
+                return;
+            }
+
+            var desiredSize = type == ResourceType.Gas ? 1.35f : 1.2f;
+            nodeTransform.localScale = Vector3.one * (desiredSize / largestDimension);
         }
 
         private static void SetLayerIfExists(GameObject target, string layerName)

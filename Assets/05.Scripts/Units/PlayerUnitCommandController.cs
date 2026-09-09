@@ -91,17 +91,17 @@ namespace ProjectS.Units
             {
                 if (pendingRallyQueue != null)
                 {
-                    return "Rally: select a map destination.";
+                    return "Rally: select a map destination. Esc cancels.";
                 }
 
                 switch (pendingPointCommand)
                 {
                     case PendingPointCommand.Move:
-                        return "Move: select a map destination.";
+                        return "Move: select a map destination. Esc cancels.";
                     case PendingPointCommand.AttackMove:
-                        return "Attack Move: select a map destination.";
+                        return "Attack Move: select a map destination. Esc cancels.";
                     case PendingPointCommand.Patrol:
-                        return "Patrol: select a map destination.";
+                        return "Patrol: select a map destination. Esc cancels.";
                     default:
                         return BuildPlacementStatusMessage;
                 }
@@ -605,9 +605,7 @@ namespace ProjectS.Units
                     null,
                     constructionSite,
                     false));
-                pendingBuildPlacementService = null;
-                waitForBuildPlacementMouseRelease = false;
-                buildPlacementFeedback = string.Empty;
+                CloseBuildMenu();
                 return;
             }
 
@@ -615,6 +613,11 @@ namespace ProjectS.Units
         }
 
         public void CancelBuildPlacement()
+        {
+            CloseBuildMenu();
+        }
+
+        private void ResetBuildPlacementState()
         {
             pendingBuildPlacementService = null;
             pendingRallyQueue = null;
@@ -728,19 +731,21 @@ namespace ProjectS.Units
 
         public void ToggleBuildMenu()
         {
-            isBuildMenuOpen = !isBuildMenuOpen;
-            if (!isBuildMenuOpen)
+            if (isBuildMenuOpen)
             {
+                CloseBuildMenu();
                 return;
             }
 
             pendingPointCommand = PendingPointCommand.None;
-            CancelBuildPlacement();
+            ResetBuildPlacementState();
+            isBuildMenuOpen = true;
         }
 
         public void CloseBuildMenu()
         {
             isBuildMenuOpen = false;
+            ResetBuildPlacementState();
         }
 
         public void BeginRallyPointCommand(IUnitRallyPointService productionQueue)
@@ -853,6 +858,17 @@ namespace ProjectS.Units
             {
                 pendingPointCommand = PendingPointCommand.None;
                 CancelBuildPlacement();
+                return;
+            }
+
+            if (IsControlGroupAssignPressed() || IsAdditiveSelectionPressed())
+            {
+                HandleControlGroups(keyboard);
+                return;
+            }
+
+            if (IsCommandShortcutModifierPressed())
+            {
                 return;
             }
 
@@ -1253,6 +1269,7 @@ namespace ProjectS.Units
                 return;
             }
 
+            CloseBuildMenu();
             selectedUnits.Add(agent);
             PrimarySelection = agent.Status;
             SetSelectionVisible(agent, true);
@@ -1260,6 +1277,7 @@ namespace ProjectS.Units
 
         private void ClearSelection()
         {
+            CloseBuildMenu();
             foreach (var unit in selectedUnits)
             {
                 if (unit != null)
@@ -1452,6 +1470,14 @@ namespace ProjectS.Units
             var keyboard = Keyboard.current;
             return keyboard != null
                 && (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed);
+        }
+
+        private static bool IsCommandShortcutModifierPressed()
+        {
+            var keyboard = Keyboard.current;
+            return keyboard != null
+                && (keyboard.leftAltKey.isPressed
+                    || keyboard.rightAltKey.isPressed);
         }
 
         private Vector3 GetUniqueTileDestination(Vector3 destination, int index, int count, Vector2Int footprint)

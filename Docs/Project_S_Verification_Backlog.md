@@ -89,6 +89,9 @@
 ### 미니맵 및 전장 정보
 
 - [ ] 미니맵이 Tilemap 실제 셀 범위와 맞게 표시되고, 아군/적군 유닛과 건물이 식별 가능한 색으로 갱신되는지 확인한다.
+- [ ] 미니맵 지형 캐시가 이동 가능, 이동 불가, 이동 가능하지만 건설 불가, 맵 외부 영역을 서로 다른 색으로 표시하며 실제 타일 형태와 일치하는지 확인한다.
+- [ ] 미니맵에서 미네랄·가스, 선택 유닛, 현재 공격 중인 대상의 표시가 기존 유닛·건물·카메라 뷰포트와 겹쳐도 식별 가능한지 확인한다.
+- [ ] 타일 또는 장애물 변경으로 `ProjectSTilemapWorld` 내비게이션 캐시가 갱신될 때만 미니맵 지형 텍스처가 다시 생성되고, 일반 플레이 중 프레임 드롭이 없는지 확인한다.
 - [ ] 카메라 뷰포트 표시가 줌과 이동에 맞춰 갱신되는지 확인한다.
 - [ ] 미니맵 좌클릭이 카메라만 이동시키며 유닛 선택, 이동, 공격 명령으로 중복 처리되지 않는지 확인한다.
 
@@ -139,9 +142,34 @@
 
 - [ ] Unity PlayMode에서 `M`, `A`, `P`, `H`, `S` 단축키와 HUD 버튼이 동일한 대기 명령 안내 및 유닛 `Mode`/`ActionState` 표시를 제공하는지 확인한다.
 - [ ] 생산 건물 선택 후 현재 랠리 좌표가 표시되고, Rally 버튼 뒤 지도 또는 미니맵 클릭이 해당 좌표를 즉시 갱신하는지 확인한다.
+- [ ] 생산 및 B 건설 메뉴에서 `Q/E/R/T/Y/U/I` 슬롯 단축키와 UI 버튼이 한 번씩만 같은 항목을 실행하는지 확인한다.
+- [ ] `Esc`가 건설·이동·공격이동·순찰·집결점 보류 상태를 취소하고, `1-0` 선택, `Ctrl+1-0` 저장, `Shift+1-0` 추가 선택이 명령 단축키와 충돌하지 않는지 확인한다.
 
 ### 확장 자원 거점 및 생산 중단
 
 - [ ] 런타임 부트스트랩의 두 추가 자원 지대에서 Main Base 또는 Drop-off를 건설한 뒤, 일꾼이 기존 `ResourceDropOff.FindNearest` 정책대로 가장 가까운 반납 지점을 선택하는지 확인한다.
 - [ ] AI가 추가 자원 지대 근처에 두 번째 Main Base를 건설하고, 새 본진 생산 큐와 반납 지점을 실제로 활용하는지 확인한다.
 - [ ] 생산 건물 파괴 또는 비활성화 직후 활성/대기 생산 비용과 예약 보급이 한 번만 반환되고, 선택 HUD 및 생산 패널이 즉시 사라지는지 확인한다.
+
+### 자원 Tilemap 배치
+
+- [x] `ResourceTile` 및 `ResourceTilemapNodeSynchronizer`를 추가했다. `Resource` 이름의 Tilemap에서 `ResourceTile` 셀만 읽어 런타임 `ResourceNode`로 생성·동기화하며, 별도 Resource 레이어는 `ProjectSTilemapWorld`의 이동·건설 판정 Tilemap 조회에 포함하지 않는다.
+- [x] `Assets/01.Textures/Resources/ResourceNodes.png`를 추가하고 좌측 Minerals·우측 Gas를 Sprite Multiple로 분할하는 import 설정과 `Tools/Project S/Resources/Prepare Resource Tile Palette` 메뉴를 추가했다. 메뉴는 `Assets/Assets/Tilemaps/Resource Tiles`의 두 Resource Tile 에셋을 생성하거나 갱신한다.
+- [x] `MapCreateSceneAutoBootstrap`이 Resource Tilemap에 자원 타일이 하나라도 있을 때 기존 Home/Expansion 자원 클러스터 생성을 건너뛰도록 연결했다.
+- [x] fallback 자원 노드가 `Assets/Resources/ResourceNodes.png`의 Minerals/Gas Sprite를 런타임에 로드하고, Resource Tile 에셋도 같은 Sprite 참조를 사용하도록 보정했다.
+- [ ] `Resource` Tilemap에 Minerals/Gas 타일을 각각 배치했을 때 셀별 자원 타입·초기량·채집량·시간·상호작용 범위가 `ResourceNode`로 전달되는지 Unity PlayMode에서 확인한다.
+- [ ] Resource Tilemap이 있는 경우 fallback 자원 클러스터가 중복 생성되지 않고, 비어 있는 경우에만 기존 fallback이 유지되는지 Unity PlayMode에서 확인한다.
+- [ ] `ResourceTilemap_SynchronizesResourceNodes_WithoutChangingNavigationOrBuildability` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+- [ ] `ResourceNodeSprites_AreAvailableToRuntimeFallback` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+
+### 최소 유닛 업그레이드
+
+- [ ] 생산 건물을 선택해 Research 화면에서 Weapon Calibration과 Mobility Tuning을 각각 시작했을 때 비용 차감, 진행률, 완료 상태가 HUD에 정확히 표시되는지 확인한다.
+- [ ] Team1의 Weapon Calibration(+3 ATK)과 Mobility Tuning(+15% Move)이 기존 유닛과 이후 생산된 Team1 유닛에 모두 적용되고 Team2에는 영향을 주지 않는지 확인한다.
+- [ ] `TeamUpgradeResearch_AppliesCompletedUpgradesToOnlyItsTeam` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+
+### 건설 메뉴 해제
+
+- [ ] 작업 유닛으로 건물 배치를 성공한 직후 B 건물 목록과 배치 프리뷰가 닫히고, 즉시 다른 명령을 입력할 수 있는지 확인한다.
+- [ ] B 건물 목록을 연 상태와 건물 배치 대기 상태에서 Esc를 누르면 목록과 배치 상태가 함께 닫히는지 확인한다.
+- [ ] B 건물 목록 또는 건물 배치 대기 상태에서 다른 아군 유닛·건물을 선택하면 목록이 닫히는지 확인한다.
