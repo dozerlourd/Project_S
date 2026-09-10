@@ -338,6 +338,12 @@ namespace ProjectS.Units
             pendingBuildPlacementService = null;
             pendingRallyQueue = null;
 
+            if (TryBeginRallyPointForPrimarySelection())
+            {
+                CommandRallyPoint();
+                return;
+            }
+
             if (TryGetAttackTargetUnderCursor(out var target) && target.Team != playerTeam)
             {
                 CommandFocusAttack(target);
@@ -755,6 +761,22 @@ namespace ProjectS.Units
             pendingBuildPlacementService = null;
             pendingRallyQueue = productionQueue;
             buildPlacementFeedback = string.Empty;
+        }
+
+        public bool TryBeginRallyPointForPrimarySelection()
+        {
+            var selection = PrimarySelection;
+            var selectionObject = selection != null ? selection.SelectionGameObject : null;
+            var productionQueue = selectionObject != null
+                ? selectionObject.GetComponent<IUnitRallyPointService>()
+                : null;
+            if (productionQueue == null)
+            {
+                return false;
+            }
+
+            BeginRallyPointCommand(productionQueue);
+            return true;
         }
 
         public void StopSelectedUnits()

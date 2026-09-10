@@ -74,6 +74,7 @@ namespace ProjectS.Buildings
             FogOfWarRegistry.Refresh(this);
         }
 
+
         public void Initialize(UnitTeam ownerTeam, BuildingKind buildingKind, Vector2Int occupiedFootprint, bool isCompleted)
         {
             SupplyManager.FindForTeam(team)?.UnregisterBuilding(this);

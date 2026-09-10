@@ -94,38 +94,39 @@ namespace ProjectS.Visibility
             }
 
             EnsureRenderingResources();
-            var cellCount = bounds.size.x * bounds.size.y;
-            var vertices = new Vector3[cellCount * 4];
-            var colors = new Color[cellCount * 4];
-            var triangles = new int[cellCount * 6];
-            var vertexIndex = 0;
+            var width = bounds.size.x;
+            var height = bounds.size.y;
+            var vertices = new Vector3[(width + 1) * (height + 1)];
+            var colors = new Color[vertices.Length];
+            var triangles = new int[width * height * 6];
             var triangleIndex = 0;
 
-            foreach (var cell in bounds.allPositionsWithin)
+            for (var y = 0; y <= height; y++)
             {
-                var bottomLeft = GetCellCorner(world, cell);
-                var bottomRight = GetCellCorner(world, cell + Vector3Int.right);
-                var topLeft = GetCellCorner(world, cell + Vector3Int.up);
-                var topRight = GetCellCorner(world, cell + Vector3Int.right + Vector3Int.up);
-                vertices[vertexIndex] = transform.InverseTransformPoint(bottomLeft);
-                vertices[vertexIndex + 1] = transform.InverseTransformPoint(bottomRight);
-                vertices[vertexIndex + 2] = transform.InverseTransformPoint(topRight);
-                vertices[vertexIndex + 3] = transform.InverseTransformPoint(topLeft);
+                for (var x = 0; x <= width; x++)
+                {
+                    var index = y * (width + 1) + x;
+                    var cornerCell = new Vector3Int(bounds.xMin + x, bounds.yMin + y, 0);
+                    vertices[index] = transform.InverseTransformPoint(GetCellCorner(world, cornerCell));
+                    colors[index] = GetCornerFogColor(bounds, x, y);
+                }
+            }
 
-                var color = GetFogColor(manager.GetVisibility(cell));
-                colors[vertexIndex] = color;
-                colors[vertexIndex + 1] = color;
-                colors[vertexIndex + 2] = color;
-                colors[vertexIndex + 3] = color;
-
-                triangles[triangleIndex] = vertexIndex;
-                triangles[triangleIndex + 1] = vertexIndex + 2;
-                triangles[triangleIndex + 2] = vertexIndex + 1;
-                triangles[triangleIndex + 3] = vertexIndex;
-                triangles[triangleIndex + 4] = vertexIndex + 3;
-                triangles[triangleIndex + 5] = vertexIndex + 2;
-                vertexIndex += 4;
-                triangleIndex += 6;
+            for (var y = 0; y < height; y++)
+            {
+                for (var x = 0; x < width; x++)
+                {
+                    var bottomLeft = y * (width + 1) + x;
+                    var bottomRight = bottomLeft + 1;
+                    var topLeft = bottomLeft + width + 1;
+                    var topRight = topLeft + 1;
+                    triangles[triangleIndex++] = bottomLeft;
+                    triangles[triangleIndex++] = topRight;
+                    triangles[triangleIndex++] = bottomRight;
+                    triangles[triangleIndex++] = bottomLeft;
+                    triangles[triangleIndex++] = topLeft;
+                    triangles[triangleIndex++] = topRight;
+                }
             }
 
             overlayMesh.Clear();
@@ -178,6 +179,28 @@ namespace ProjectS.Visibility
                 default:
                     return UnexploredColor;
             }
+        }
+
+        private Color GetCornerFogColor(BoundsInt bounds, int x, int y)
+        {
+            var color = Color.clear;
+            var samples = 0;
+            for (var offsetY = -1; offsetY <= 0; offsetY++)
+            {
+                for (var offsetX = -1; offsetX <= 0; offsetX++)
+                {
+                    var cell = new Vector3Int(bounds.xMin + x + offsetX, bounds.yMin + y + offsetY, 0);
+                    if (cell.x < bounds.xMin || cell.y < bounds.yMin || cell.x >= bounds.xMax || cell.y >= bounds.yMax)
+                    {
+                        continue;
+                    }
+
+                    color += GetFogColor(manager.GetVisibility(cell));
+                    samples++;
+                }
+            }
+
+            return samples > 0 ? color / samples : UnexploredColor;
         }
     }
 }

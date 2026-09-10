@@ -137,6 +137,12 @@ namespace ProjectS.UI
                 return;
             }
 
+            if (keyboard.rKey.wasPressedThisFrame && commandController.TryBeginRallyPointForPrimarySelection())
+            {
+                productionFeedback = "Click the map to set rally point.";
+                return;
+            }
+
             for (var i = 0; i < ContextHotkeys.Length; i++)
             {
                 if (!keyboard[ContextHotkeys[i]].wasPressedThisFrame)

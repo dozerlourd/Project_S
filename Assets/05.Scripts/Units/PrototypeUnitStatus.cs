@@ -193,6 +193,7 @@ namespace ProjectS.Units
             EnsureGroundPathAgent();
             EnsureCommandAgent();
             EnsureCombatComponents();
+            EnsureFogVisibilityTarget();
         }
 
         private void OnEnable()
@@ -211,6 +212,14 @@ namespace ProjectS.Units
         {
             UnitAttackTargetRegistry.RefreshPosition(this);
             FogOfWarRegistry.Refresh(this);
+        }
+
+        private void EnsureFogVisibilityTarget()
+        {
+            if (GetComponent<FogVisibilityTarget>() == null)
+            {
+                gameObject.AddComponent<FogVisibilityTarget>();
+            }
         }
 
         public void Initialize(
