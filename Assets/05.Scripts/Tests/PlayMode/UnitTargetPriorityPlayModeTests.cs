@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using ProjectS.Units;
@@ -30,6 +31,40 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(commandAgent.PriorityTarget, Is.EqualTo(combatStatus));
 
             Destroy(attacker, worker, combatUnit);
+        }
+
+        [UnityTest]
+        public IEnumerator AttackMove_PrefersWorkerOverCloserDefensiveBuilding()
+        {
+            var attacker = CreateUnit("WorkerPriorityAttacker", Vector3.zero, UnitTeam.Team1, UnitRole.Combat, 20f);
+            var worker = CreateUnit("WorkerPriorityTarget", new Vector3(1.3f, 0f), UnitTeam.Team2, UnitRole.Resource, 0f);
+            var defensiveBuilding = CreateBuilding("CloserDefensiveBuilding", "AutoTurret", new Vector3(0.7f, 0f));
+            var commandAgent = attacker.GetComponent<UnitCommandAgent>();
+            var workerStatus = worker.GetComponent<PrototypeUnitStatus>();
+
+            commandAgent.Issue(new UnitCommand(UnitCommandMode.AttackMove, new Vector3(5f, 0f), null, false));
+            yield return new WaitForSeconds(0.35f);
+
+            Assert.That(commandAgent.PriorityTarget, Is.EqualTo(workerStatus));
+
+            Destroy(attacker, worker, defensiveBuilding);
+        }
+
+        [UnityTest]
+        public IEnumerator AttackMove_PrefersHigherThreatCombatUnitAtSimilarDistance()
+        {
+            var attacker = CreateUnit("ThreatPriorityAttacker", Vector3.zero, UnitTeam.Team1, UnitRole.Combat, 1f);
+            var weaker = CreateUnit("ThreatPriorityWeak", new Vector3(0.8f, 0f), UnitTeam.Team2, UnitRole.Combat, 2f);
+            var stronger = CreateUnit("ThreatPriorityStrong", new Vector3(1.3f, 0f), UnitTeam.Team2, UnitRole.Combat, 20f);
+            var commandAgent = attacker.GetComponent<UnitCommandAgent>();
+            var strongerStatus = stronger.GetComponent<PrototypeUnitStatus>();
+
+            commandAgent.Issue(new UnitCommand(UnitCommandMode.AttackMove, new Vector3(5f, 0f), null, false));
+            yield return new WaitForSeconds(0.35f);
+
+            Assert.That(commandAgent.PriorityTarget, Is.EqualTo(strongerStatus));
+
+            Destroy(attacker, weaker, stronger);
         }
 
         [UnityTest]
@@ -115,6 +150,72 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(commandAgent.PriorityTarget, Is.EqualTo(workerStatus));
 
             Destroy(attacker, worker, combatUnit);
+        }
+
+        [UnityTest]
+        public IEnumerator SpatialQuery_VisitsOnlyNearbyEnemyBuckets()
+        {
+            var seeker = CreateUnit("SpatialSeeker", Vector3.zero, UnitTeam.Team1, UnitRole.Combat, 0f);
+            var nearby = CreateUnit("SpatialNearby", new Vector3(1f, 0f), UnitTeam.Team2, UnitRole.Combat, 10f);
+            var distant = CreateUnit("SpatialDistant", new Vector3(40f, 0f), UnitTeam.Team2, UnitRole.Combat, 10f);
+            var ally = CreateUnit("SpatialAlly", new Vector3(1f, 1f), UnitTeam.Team1, UnitRole.Combat, 10f);
+            yield return null;
+
+            UnitAttackTargetRegistry.ResetQueryStatistics();
+            var results = new List<IUnitAttackTarget>();
+            UnitAttackTargetRegistry.QueryNearbyEnemies(UnitTeam.Team1, Vector3.zero, 2f, results);
+            var statistics = UnitAttackTargetRegistry.GetQueryStatistics();
+
+            Assert.That(results.Contains(nearby.GetComponent<PrototypeUnitStatus>()), Is.True);
+            Assert.That(results.Contains(distant.GetComponent<PrototypeUnitStatus>()), Is.False);
+            Assert.That(results.Contains(ally.GetComponent<PrototypeUnitStatus>()), Is.False);
+            Assert.That(statistics.QueryCount, Is.EqualTo(1));
+            Assert.That(statistics.VisitedCandidateCount, Is.EqualTo(1));
+
+            Destroy(seeker, nearby, distant, ally);
+        }
+
+        [UnityTest]
+        public IEnumerator SpatialQuery_RefreshesTargetAfterItChangesCells()
+        {
+            var target = CreateUnit("MovingSpatialTarget", new Vector3(20f, 0f), UnitTeam.Team2, UnitRole.Combat, 10f);
+            var targetStatus = target.GetComponent<PrototypeUnitStatus>();
+            yield return null;
+
+            target.transform.position = new Vector3(1f, 0f);
+            UnitAttackTargetRegistry.RefreshPosition(targetStatus);
+            var results = new List<IUnitAttackTarget>();
+            UnitAttackTargetRegistry.QueryNearbyEnemies(UnitTeam.Team1, Vector3.zero, 2f, results);
+
+            Assert.That(results.Contains(targetStatus), Is.True);
+            Assert.That(UnitAttackTargetRegistry.GetQueryStatistics().PositionUpdateCount, Is.GreaterThan(0));
+
+            Destroy(target);
+        }
+
+        [UnityTest]
+        public IEnumerator AttackMove_KeepsCurrentTargetWhenSamePriorityCandidateIsOnlySlightlyCloser()
+        {
+            var attacker = CreateUnit("HysteresisAttacker", Vector3.zero, UnitTeam.Team1, UnitRole.Combat, 1f);
+            var current = CreateUnit("HysteresisCurrent", new Vector3(1.2f, 0f), UnitTeam.Team2, UnitRole.Combat, 1f);
+            var commandAgent = attacker.GetComponent<UnitCommandAgent>();
+            var currentStatus = current.GetComponent<PrototypeUnitStatus>();
+
+            commandAgent.Issue(new UnitCommand(UnitCommandMode.AttackMove, new Vector3(5f, 0f), null, false));
+            yield return new WaitForSeconds(0.3f);
+            Assert.That(commandAgent.PriorityTarget, Is.EqualTo(currentStatus));
+
+            var slightlyCloser = CreateUnit(
+                "HysteresisSlightlyCloser",
+                new Vector3(1f, 0f),
+                UnitTeam.Team2,
+                UnitRole.Combat,
+                1f);
+            yield return new WaitForSeconds(0.35f);
+
+            Assert.That(commandAgent.PriorityTarget, Is.EqualTo(currentStatus));
+
+            Destroy(attacker, current, slightlyCloser);
         }
 
         [UnityTest]

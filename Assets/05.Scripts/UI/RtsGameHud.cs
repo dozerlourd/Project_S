@@ -59,6 +59,9 @@ namespace ProjectS.UI
         private const float ResourcePanelY = 12f;
         private const float ResourcePanelWidth = 260f;
         private const float ResourcePanelHeight = 112f;
+        private const float MatchTimerWidth = 132f;
+        private const float MatchTimerHeight = 38f;
+        private const float MatchTimerTopMargin = 14f;
         private const float BottomPanelMargin = 10f;
         private const float BottomPanelGap = 8f;
         private const float BottomPanelHeight = 118f;
@@ -192,6 +195,7 @@ namespace ProjectS.UI
         private void OnGUI()
         {
             DrawResourcePanel();
+            DrawMatchTimer();
             var bottomLayout = CalculateBottomLayout();
             DrawSelectionPanel(bottomLayout.selectionRect);
             DrawCommandPanel(bottomLayout.commandRect, bottomLayout.contextRect);
@@ -201,6 +205,31 @@ namespace ProjectS.UI
             }
 
             DrawMatchResultOverlay();
+        }
+
+        private void DrawMatchTimer()
+        {
+            if (matchController == null)
+            {
+                return;
+            }
+
+            var timerRect = new Rect(
+                (Screen.width - MatchTimerWidth) * 0.5f,
+                MatchTimerTopMargin,
+                MatchTimerWidth,
+                MatchTimerHeight);
+            GUI.Box(timerRect, string.Empty);
+
+            var totalSeconds = Mathf.FloorToInt(matchController.ElapsedPlayTime);
+            var label = $"{totalSeconds / 60:00}:{totalSeconds % 60:00}";
+            var style = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = 20,
+                fontStyle = FontStyle.Bold
+            };
+            GUI.Label(timerRect, label, style);
         }
 
         private static BottomHudLayout CalculateBottomLayout()
@@ -587,6 +616,8 @@ namespace ProjectS.UI
                     return "Attacking";
                 case UnitActionState.HoldingPosition:
                     return "Holding";
+                case UnitActionState.RetreatingFromTarget:
+                    return "Repositioning";
                 default:
                     return state.ToString();
             }

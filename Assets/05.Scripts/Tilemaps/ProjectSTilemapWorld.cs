@@ -29,6 +29,7 @@ namespace ProjectS.Tilemaps
         private int cachedSampleCount;
         private int sampleCacheHits;
         private int sampleCacheMisses;
+        private int navigationRevision;
 
         public static ProjectSTilemapWorld ActiveInstance { get; private set; }
 
@@ -48,6 +49,7 @@ namespace ProjectS.Tilemaps
         public int CachedSampleCount => cachedSampleCount;
         public int SampleCacheHits => sampleCacheHits;
         public int SampleCacheMisses => sampleCacheMisses;
+        public int NavigationRevision => navigationRevision;
 
         private void Awake()
         {
@@ -58,6 +60,7 @@ namespace ProjectS.Tilemaps
 
         private void OnEnable()
         {
+            Tilemap.tilemapTileChanged += OnTilemapTileChanged;
             ResolveReferences();
             MarkNavigationCacheDirty();
             ActiveInstance = this;
@@ -65,9 +68,25 @@ namespace ProjectS.Tilemaps
 
         private void OnDisable()
         {
+            Tilemap.tilemapTileChanged -= OnTilemapTileChanged;
+
             if (ActiveInstance == this)
             {
                 ActiveInstance = null;
+            }
+        }
+
+        private void OnTilemapTileChanged(Tilemap changedTilemap, Tilemap.SyncTile[] _)
+        {
+            if (changedTilemap == null)
+            {
+                return;
+            }
+
+            ResolveReferences();
+            if (queryTilemaps.Contains(changedTilemap))
+            {
+                MarkNavigationCacheDirty();
             }
         }
 
@@ -103,12 +122,25 @@ namespace ProjectS.Tilemaps
                 groundTilemap = GetComponentInChildren<Tilemap>();
             }
 
+            if (obstacleTilemap == null)
+            {
+                foreach (var tilemap in GetComponentsInChildren<Tilemap>(true))
+                {
+                    if (tilemap != null && tilemap.gameObject.name == ObstacleLayerName)
+                    {
+                        obstacleTilemap = tilemap;
+                        break;
+                    }
+                }
+            }
+
             RebuildQueryTilemaps();
         }
 
         public void MarkNavigationCacheDirty()
         {
             cacheDirty = true;
+            navigationRevision++;
         }
 
         public void RebuildNavigationCache()
@@ -127,6 +159,7 @@ namespace ProjectS.Tilemaps
 
             cachedSampleCount = sampleCache.Count;
             cacheRebuildCount++;
+            navigationRevision++;
             cacheDirty = false;
         }
 
@@ -319,6 +352,7 @@ namespace ProjectS.Tilemaps
             AddTilemap(stairTilemap);
             AddTilemap(overlayTilemap);
             AddTilemap(obstacleTilemap);
+            AddNamedObstacleTilemaps();
             AddObstacleLayerTilemaps();
         }
 
@@ -347,6 +381,17 @@ namespace ProjectS.Tilemaps
             }
         }
 
+        private void AddNamedObstacleTilemaps()
+        {
+            foreach (var tilemap in GetComponentsInChildren<Tilemap>(true))
+            {
+                if (tilemap != null && tilemap.gameObject.name == ObstacleLayerName)
+                {
+                    AddTilemap(tilemap);
+                }
+            }
+        }
+
         private bool IsObstacleTilemap(Tilemap tilemap)
         {
             if (tilemap == null)
@@ -356,6 +401,7 @@ namespace ProjectS.Tilemaps
 
             var obstacleLayer = LayerMask.NameToLayer(ObstacleLayerName);
             return tilemap == obstacleTilemap
+                || tilemap.gameObject.name == ObstacleLayerName
                 || (obstacleLayer >= 0 && tilemap.gameObject.layer == obstacleLayer);
         }
 

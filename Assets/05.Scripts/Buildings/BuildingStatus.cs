@@ -1,5 +1,6 @@
 using ProjectS.Units;
 using ProjectS.Resources;
+using ProjectS.Visibility;
 using UnityEngine;
 
 namespace ProjectS.Buildings
@@ -16,13 +17,14 @@ namespace ProjectS.Buildings
         Other
     }
 
-    public sealed class BuildingStatus : MonoBehaviour, IUnitAttackTarget, IAttackTargetPriorityProvider
+    public sealed class BuildingStatus : MonoBehaviour, IUnitAttackTarget, IAttackTargetPriorityProvider, IFogVisionProvider
     {
         [SerializeField] private UnitTeam team = UnitTeam.Team1;
         [SerializeField] private BuildingKind kind = BuildingKind.MainBase;
         [SerializeField] private Vector2Int footprint = new Vector2Int(2, 2);
         [SerializeField] private bool completed = true;
         [SerializeField, Min(0)] private int supplyProvided;
+        [SerializeField, Min(0f)] private float visionRadius = 9f;
 
         private BuildingHealth health;
         private Collider2D attackCollider;
@@ -38,6 +40,9 @@ namespace ProjectS.Buildings
         public bool IsAlive => completed && (health == null || !health.IsDestroyed);
         public Collider2D AttackCollider => attackCollider != null ? attackCollider : GetComponent<Collider2D>();
         public AttackTargetPriority TargetPriority => GetTargetPriority(kind);
+        public Transform VisionTransform => transform;
+        public bool IsVisionActive => isActiveAndEnabled && IsAlive;
+        public float VisionRadius => Mathf.Max(0f, visionRadius);
 
         private void Awake()
         {
@@ -51,6 +56,7 @@ namespace ProjectS.Buildings
             EnsureHealth();
             BuildingRegistry.Register(this);
             UnitAttackTargetRegistry.Register(this);
+            FogOfWarRegistry.Register(this);
             SyncSupplyProvider();
         }
 
@@ -58,7 +64,14 @@ namespace ProjectS.Buildings
         {
             BuildingRegistry.Unregister(this);
             UnitAttackTargetRegistry.Unregister(this);
+            FogOfWarRegistry.Unregister(this);
             SupplyManager.FindForTeam(team)?.UnregisterBuilding(this);
+        }
+
+        private void LateUpdate()
+        {
+            UnitAttackTargetRegistry.RefreshPosition(this);
+            FogOfWarRegistry.Refresh(this);
         }
 
         public void Initialize(UnitTeam ownerTeam, BuildingKind buildingKind, Vector2Int occupiedFootprint, bool isCompleted)
@@ -68,6 +81,7 @@ namespace ProjectS.Buildings
             {
                 BuildingRegistry.Unregister(this);
                 UnitAttackTargetRegistry.Unregister(this);
+                FogOfWarRegistry.Unregister(this);
             }
 
             team = ownerTeam;
@@ -86,6 +100,7 @@ namespace ProjectS.Buildings
             {
                 BuildingRegistry.Register(this);
                 UnitAttackTargetRegistry.Register(this);
+                FogOfWarRegistry.Register(this);
                 SyncSupplyProvider();
             }
         }
@@ -98,7 +113,17 @@ namespace ProjectS.Buildings
             if (isActiveAndEnabled)
             {
                 UnitAttackTargetRegistry.Register(this);
+                FogOfWarRegistry.Register(this);
                 SyncSupplyProvider();
+            }
+        }
+
+        public void ConfigureVisionRadius(float radius)
+        {
+            visionRadius = Mathf.Max(0f, radius);
+            if (isActiveAndEnabled)
+            {
+                FogOfWarRegistry.Refresh(this);
             }
         }
 

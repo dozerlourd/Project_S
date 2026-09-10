@@ -10,7 +10,7 @@ namespace ProjectS.Resources
             new Dictionary<UnitTeam, PlayerResourceWallet>();
 
         [SerializeField] private UnitTeam team = UnitTeam.Team1;
-        [SerializeField] private ResourceAmount startingResources = new ResourceAmount(50, 0);
+        [SerializeField] private ResourceAmount startingResources = new ResourceAmount(100, 0);
 
         private ResourceAmount currentResources;
         private string lastFailureReason;

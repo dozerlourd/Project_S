@@ -57,6 +57,31 @@ Assets/Assets/Tilemaps/Tiles
 
 Navigator가 없는 씬에서는 기존처럼 클릭 위치까지 직선 이동으로 동작한다.
 
+## Obstacle Tilemap
+
+이동 불가 지형은 `Obstacle` 이름의 전용 Tilemap에 배치한다. 기본 장애물 타일은 이동과 건설을 막고, 시야 차단 정보도 함께 가진다. `Obstacle` Unity Layer가 프로젝트에 등록돼 있으면 그 레이어를 사용하며, 누락된 경우에도 Tilemap 이름으로 동일한 이동·건설 차단 판정을 유지한다.
+
+Unity Editor에서 아래 메뉴를 실행하면 임시 돌 장애물 스프라이트와 배치용 타일 에셋을 생성하거나 갱신한다.
+
+```text
+Tools/Project S/Tilemaps/Prepare Obstacle Tile Palette
+```
+
+활성 씬의 Grid 하위에 `Obstacle` Tilemap이 없다면 아래 메뉴로 생성한다. 생성된 레이어는 `FrontProps` 정렬 레이어를 사용한다.
+
+```text
+Tools/Project S/Tilemaps/Add Obstacle Tilemap To Active Scene
+```
+
+생성 경로는 다음과 같다.
+
+```text
+Assets/Assets/Tilemaps/Obstacle Tiles/Obstacle_Stone.png
+Assets/Assets/Tilemaps/Obstacle Tiles/Obstacle_Stone.asset
+```
+
+Obstacle Tilemap의 타일을 추가하거나 제거하면 `ProjectSTilemapWorld`가 내비게이션 캐시를 갱신하고, 미니맵 지형 캐시도 다음 갱신 시점에 변경된 이동 가능 상태를 반영한다.
+
 ## 자원 Tilemap
 
 자원은 `Resource` 이름의 별도 Tilemap에 배치한다. 이 레이어는 `ProjectSTilemapWorld`의 Ground/Stair/Overlay/Obstacle 조회 대상이 아니므로, Resource Tile 자체는 이동 가능 여부나 건설 가능 여부를 바꾸지 않는다. 셀마다 생성되는 `ResourceNode`는 기존 상호작용과 건설 충돌 정책을 그대로 사용한다.

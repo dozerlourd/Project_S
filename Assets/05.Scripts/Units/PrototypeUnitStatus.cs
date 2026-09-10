@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ProjectS.Visibility;
 using UnityEngine;
 
 namespace ProjectS.Units
@@ -81,7 +82,7 @@ namespace ProjectS.Units
         AreaAttack
     }
 
-    public sealed class PrototypeUnitStatus : MonoBehaviour, IPlayerSelectableTarget, IUnitAttackTarget
+    public sealed class PrototypeUnitStatus : MonoBehaviour, IPlayerSelectableTarget, IUnitAttackTarget, IFogVisionProvider
     {
         [Header("Classification")]
         [SerializeField] private UnitTrial trial;
@@ -106,6 +107,7 @@ namespace ProjectS.Units
         [SerializeField] private int maxAttackTargets = 1;
         [SerializeField] private Vector2Int occupiedCells = Vector2Int.one;
         [SerializeField, Min(0)] private int supplyCost = 1;
+        [SerializeField, Min(0f)] private float visionRadius = 7f;
 
         [Header("Special Status")]
         [SerializeField] private bool hasHealthRegeneration;
@@ -181,6 +183,9 @@ namespace ProjectS.Units
             }
         }
         public Collider2D AttackCollider => GetComponent<Collider2D>();
+        public Transform VisionTransform => transform;
+        public bool IsVisionActive => isActiveAndEnabled && IsAlive;
+        public float VisionRadius => Mathf.Max(0f, visionRadius);
 
         private void Awake()
         {
@@ -193,11 +198,19 @@ namespace ProjectS.Units
         private void OnEnable()
         {
             UnitAttackTargetRegistry.Register(this);
+            FogOfWarRegistry.Register(this);
         }
 
         private void OnDisable()
         {
             UnitAttackTargetRegistry.Unregister(this);
+            FogOfWarRegistry.Unregister(this);
+        }
+
+        private void LateUpdate()
+        {
+            UnitAttackTargetRegistry.RefreshPosition(this);
+            FogOfWarRegistry.Refresh(this);
         }
 
         public void Initialize(
@@ -262,6 +275,7 @@ namespace ProjectS.Units
             if (isActiveAndEnabled)
             {
                 UnitAttackTargetRegistry.Register(this);
+                FogOfWarRegistry.Register(this);
             }
         }
 
@@ -277,6 +291,16 @@ namespace ProjectS.Units
             if (isActiveAndEnabled)
             {
                 UnitAttackTargetRegistry.Register(this);
+                FogOfWarRegistry.Register(this);
+            }
+        }
+
+        public void ConfigureVisionRadius(float radius)
+        {
+            visionRadius = Mathf.Max(0f, radius);
+            if (isActiveAndEnabled)
+            {
+                FogOfWarRegistry.Refresh(this);
             }
         }
 

@@ -192,18 +192,18 @@ MonoBehaviour:
   unitType: 4
   movementDomain: 0
   roles: 4
-  attackDistanceType: 0
+  attackDistanceType: 1
   attackPowerType: 0
   placementType: 0
   grade: 0
   attackTargetType: 0
   maxHealth: 260
-  physicalAttackPower: 5
+  physicalAttackPower: 26
   magicalAttackPower: 0
-  attackRange: 1.4
-  detectionRange: 4.5
-  attackSpeed: 0.65
-  movementSpeed: 2.4
+  attackRange: 5.5
+  detectionRange: 7
+  attackSpeed: 0.55
+  movementSpeed: 2
   maxAttackTargets: 1
   occupiedCells: {x: 1, y: 1}
   supplyCost: 3

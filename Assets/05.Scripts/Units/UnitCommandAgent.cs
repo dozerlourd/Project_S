@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
@@ -11,6 +12,8 @@ namespace ProjectS.Units
     {
         [SerializeField] private float targetScanInterval = 0.2f;
         [SerializeField] private float targetScanJitter = 0.05f;
+        [SerializeField, Min(1f)] private float targetRetentionRangeMultiplier = 1.15f;
+        [SerializeField, Min(0f)] private float targetSwitchDistanceAdvantage = 0.4f;
         [SerializeField] private float targetRepathDistance = 0.25f;
         [SerializeField] private float targetRepathInterval = 0.25f;
         [SerializeField] private float targetRepathJitter = 0.08f;
@@ -39,9 +42,11 @@ namespace ProjectS.Units
         private bool hasFocusPathTarget;
         private bool targetMustStayDetected;
         private bool hasExplicitFocusTarget;
+        private bool isRetreatingFromTarget;
         private float nextScanTime;
         private float nextTargetRepathTime;
         private string lastInteractionFailureReason;
+        private readonly List<IUnitAttackTarget> targetCandidates = new List<IUnitAttackTarget>();
 
         public UnitCommandMode Mode => mode;
         public UnitActionState ActionState => actionState;
@@ -218,46 +223,94 @@ namespace ProjectS.Units
         private void UpdateTargetEngagement()
         {
             if (!IsAttackableTarget(priorityTarget)
-                || (targetMustStayDetected && !IsInDetectionRange(priorityTarget)))
+                || (targetMustStayDetected && !IsWithinTargetRetentionRange(priorityTarget)))
             {
                 ClearTarget();
                 ResumeInterruptedCommand();
                 return;
             }
 
-            if (!CanChasePriorityTarget() && !IsInAttackRange(priorityTarget))
+            var targetDistance = GetTargetDistance(priorityTarget);
+            if (ShouldRetreatFromTarget(targetDistance))
+            {
+                actionState = UnitActionState.RetreatingFromTarget;
+                if (!MoveAwayFromTarget(priorityTarget, targetDistance))
+                {
+                    isRetreatingFromTarget = false;
+                    EnterAttackState();
+                }
+
+                return;
+            }
+
+            if (!CanChasePriorityTarget() && !IsInAttackRange(targetDistance))
             {
                 ClearTarget();
                 ResumeInterruptedCommand();
                 return;
             }
 
-            if (IsInAttackRange(priorityTarget))
+            if (IsReadyToAttackTarget(targetDistance))
             {
-                actionState = UnitActionState.AttackingTarget;
-                hasFocusPathTarget = false;
-                pathAgent.ClearPath();
+                EnterAttackState();
                 return;
             }
 
+            isRetreatingFromTarget = false;
             actionState = UnitActionState.ChasingTarget;
             MoveTowardTarget(priorityTarget);
+        }
+
+        private void EnterAttackState()
+        {
+            actionState = UnitActionState.AttackingTarget;
+            hasFocusPathTarget = false;
+            pathAgent.ClearPath();
         }
 
         private void MoveTowardTarget(IUnitAttackTarget target)
         {
             var targetPosition = target.SelectionTransform.position + focusTargetOffset;
+            MoveTowardPosition(targetPosition);
+        }
+
+        private bool MoveAwayFromTarget(IUnitAttackTarget target, float targetDistance)
+        {
+            if (Time.time < nextTargetRepathTime || target == null || target.SelectionTransform == null)
+            {
+                return true;
+            }
+
+            var away = transform.position - target.SelectionTransform.position;
+            away.z = 0f;
+            if (away.sqrMagnitude < 0.0001f)
+            {
+                away = GetDeterministicRetreatDirection(target);
+            }
+            else
+            {
+                away.Normalize();
+            }
+
+            var profile = UnitTacticalBehaviorProfiles.Get(status.UnitType);
+            var safeDistance = status.AttackRange * profile.RetreatReleaseRangeRatio;
+            var retreatDistance = Mathf.Max(0.5f, safeDistance - targetDistance + 0.2f);
+            return MoveTowardPosition(transform.position + away * retreatDistance);
+        }
+
+        private bool MoveTowardPosition(Vector3 targetPosition)
+        {
 
             if (pathAgent.HasPath
                 && hasFocusPathTarget
                 && Vector3.Distance(lastFocusPathTarget, targetPosition) < targetRepathDistance)
             {
-                return;
+                return true;
             }
 
             if (Time.time < nextTargetRepathTime)
             {
-                return;
+                return true;
             }
 
             if (pathAgent.MoveTo(targetPosition))
@@ -265,7 +318,10 @@ namespace ProjectS.Units
                 lastFocusPathTarget = targetPosition;
                 hasFocusPathTarget = true;
                 ScheduleNextTargetRepath();
+                return true;
             }
+
+            return false;
         }
 
         private void ScanForTargets()
@@ -276,15 +332,33 @@ namespace ProjectS.Units
             }
 
             ScheduleNextScan(false);
-            var scanRange = status.DetectionRange;
+            var scanRange = mode == UnitCommandMode.HoldPosition
+                ? status.AttackRange
+                : status.DetectionRange;
 
             if (!TryAcquireTarget(scanRange, out var target))
             {
                 return;
             }
 
+            if (priorityTarget != null)
+            {
+                var recentAttacker = UnitTargetPriority.GetRecentAttacker(status);
+                if (!UnitTargetPriority.ShouldSwitchTarget(
+                        priorityTarget,
+                        GetTargetDistance(priorityTarget),
+                        target,
+                        GetTargetDistance(target),
+                        recentAttacker,
+                        targetSwitchDistanceAdvantage))
+                {
+                    return;
+                }
+            }
+
             priorityTarget = target;
             targetMustStayDetected = true;
+            hasFocusPathTarget = false;
             UpdateTargetEngagement();
         }
 
@@ -293,40 +367,36 @@ namespace ProjectS.Units
             target = null;
             var bestDistance = float.PositiveInfinity;
             var recentAttacker = UnitTargetPriority.GetRecentAttacker(status);
-            var teams = UnitRegistry.AllTeams;
-
-            for (var teamIndex = 0; teamIndex < teams.Count; teamIndex++)
+            if (IsAttackableTarget(priorityTarget)
+                && GetTargetDistance(priorityTarget) <= scanRange * Mathf.Max(1f, targetRetentionRangeMultiplier))
             {
-                var team = teams[teamIndex];
-                if (status != null && team == status.Team)
+                target = priorityTarget;
+                bestDistance = GetTargetDistance(priorityTarget);
+            }
+
+            UnitAttackTargetRegistry.QueryNearbyEnemies(status.Team, transform.position, scanRange, targetCandidates);
+            for (var i = 0; i < targetCandidates.Count; i++)
+            {
+                var candidate = targetCandidates[i];
+                if (!IsAttackableTarget(candidate))
                 {
                     continue;
                 }
 
-                var candidates = UnitAttackTargetRegistry.GetTargets(team);
-                for (var i = 0; i < candidates.Count; i++)
+                var distance = GetTargetDistance(candidate);
+                if (distance > scanRange
+                    || !UnitTargetPriority.IsPreferredTarget(
+                        candidate,
+                        distance,
+                        target,
+                        bestDistance,
+                        recentAttacker))
                 {
-                    var candidate = candidates[i];
-                    if (!IsAttackableTarget(candidate))
-                    {
-                        continue;
-                    }
-
-                    var distance = GetTargetDistance(candidate);
-                    if (distance > scanRange
-                        || !UnitTargetPriority.IsPreferredTarget(
-                            candidate,
-                            distance,
-                            target,
-                            bestDistance,
-                            recentAttacker))
-                    {
-                        continue;
-                    }
-
-                    bestDistance = distance;
-                    target = candidate;
+                    continue;
                 }
+
+                bestDistance = distance;
+                target = candidate;
             }
 
             return target != null;
@@ -335,11 +405,10 @@ namespace ProjectS.Units
         private bool CanAcquireTargetsForCurrentState()
         {
             return !hasExplicitFocusTarget
-                && priorityTarget == null
-                && (actionState == UnitActionState.Idle
-                    || actionState == UnitActionState.AttackMoving
-                    || actionState == UnitActionState.Patrolling
-                    || actionState == UnitActionState.HoldingPosition);
+                && (mode == UnitCommandMode.Idle
+                    || mode == UnitCommandMode.AttackMove
+                    || mode == UnitCommandMode.Patrol
+                    || mode == UnitCommandMode.HoldPosition);
         }
 
         private void ResumeInterruptedCommand()
@@ -406,12 +475,65 @@ namespace ProjectS.Units
 
         private bool IsInAttackRange(IUnitAttackTarget target)
         {
-            return GetTargetDistance(target) <= Mathf.Max(0.05f, status.AttackRange - attackRangeStopBuffer);
+            return IsInAttackRange(GetTargetDistance(target));
+        }
+
+        private bool IsInAttackRange(float targetDistance)
+        {
+            return targetDistance <= Mathf.Max(0.05f, status.AttackRange - attackRangeStopBuffer);
+        }
+
+        private bool IsReadyToAttackTarget(float targetDistance)
+        {
+            if (!CanChasePriorityTarget())
+            {
+                return IsInAttackRange(targetDistance);
+            }
+
+            var profile = UnitTacticalBehaviorProfiles.Get(status.UnitType);
+            var entryRange = Mathf.Max(
+                0.05f,
+                (status.AttackRange - attackRangeStopBuffer) * profile.AttackEntryRangeRatio);
+            return targetDistance <= entryRange;
+        }
+
+        private bool ShouldRetreatFromTarget(float targetDistance)
+        {
+            var profile = UnitTacticalBehaviorProfiles.Get(status.UnitType);
+            if (profile.EngagementStyle != UnitEngagementStyle.KeepDistance || !CanChasePriorityTarget())
+            {
+                isRetreatingFromTarget = false;
+                return false;
+            }
+
+            var triggerDistance = status.AttackRange * profile.RetreatTriggerRangeRatio;
+            var releaseDistance = status.AttackRange * profile.RetreatReleaseRangeRatio;
+            if (isRetreatingFromTarget)
+            {
+                if (targetDistance < releaseDistance)
+                {
+                    return true;
+                }
+
+                isRetreatingFromTarget = false;
+                return false;
+            }
+
+            isRetreatingFromTarget = targetDistance < triggerDistance;
+            return isRetreatingFromTarget;
         }
 
         private bool IsInDetectionRange(IUnitAttackTarget target)
         {
             return GetTargetDistance(target) <= status.DetectionRange;
+        }
+
+        private bool IsWithinTargetRetentionRange(IUnitAttackTarget target)
+        {
+            var baseRange = mode == UnitCommandMode.HoldPosition
+                ? status.AttackRange
+                : status.DetectionRange;
+            return GetTargetDistance(target) <= baseRange * Mathf.Max(1f, targetRetentionRangeMultiplier);
         }
 
         private float GetTargetDistance(IUnitAttackTarget target)
@@ -463,6 +585,7 @@ namespace ProjectS.Units
             hasFocusPathTarget = false;
             targetMustStayDetected = false;
             hasExplicitFocusTarget = false;
+            isRetreatingFromTarget = false;
             nextTargetRepathTime = 0f;
             SyncPathOccupationOverride();
         }
@@ -578,9 +701,20 @@ namespace ProjectS.Units
 
         private void ScheduleNextTargetRepath()
         {
-            var interval = Mathf.Max(0.02f, targetRepathInterval);
+            var profile = status != null
+                ? UnitTacticalBehaviorProfiles.Get(status.UnitType)
+                : UnitTacticalBehaviorProfiles.Get(PrototypeUnitType.Soldier);
+            var interval = Mathf.Max(0.02f, targetRepathInterval * profile.TargetRepathIntervalMultiplier);
             var jitter = Mathf.Max(0f, targetRepathJitter);
             nextTargetRepathTime = Time.time + interval + (jitter > 0f ? Random.Range(0f, jitter) : 0f);
+        }
+
+        private Vector3 GetDeterministicRetreatDirection(IUnitAttackTarget target)
+        {
+            var targetObject = target != null ? target.SelectionGameObject : null;
+            var targetId = targetObject != null ? targetObject.GetInstanceID() : 0;
+            var sign = ((gameObject.GetInstanceID() ^ targetId) & 1) == 0 ? 1f : -1f;
+            return new Vector3(sign, 0f, 0f);
         }
 
         private void SyncPathOccupationOverride()

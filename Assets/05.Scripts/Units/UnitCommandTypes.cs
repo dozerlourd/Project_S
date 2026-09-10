@@ -23,7 +23,8 @@ namespace ProjectS.Units
         AttackingTarget,
         HoldingPosition,
         Patrolling,
-        Interacting
+        Interacting,
+        RetreatingFromTarget
     }
 
     public interface IUnitInteractableTarget

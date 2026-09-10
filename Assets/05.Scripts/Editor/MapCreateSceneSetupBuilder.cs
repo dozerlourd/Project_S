@@ -49,8 +49,8 @@ namespace ProjectS.Editor
             SceneManager.MoveGameObjectToScene(root, scene);
 
             GetStartPositions(tilemapWorld, out var playerStart, out var aiStart);
-            var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(700, 100), root.transform);
-            var aiWallet = CreateWallet("AI Wallet", UnitTeam.Team2, new ResourceAmount(700, 100), root.transform);
+            var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(100, 0), root.transform);
+            var aiWallet = CreateWallet("AI Wallet", UnitTeam.Team2, new ResourceAmount(100, 0), root.transform);
 
             var workerPrefab = LoadRequired<GameObject>(WorkerPrefabPath);
             var soldierPrefab = LoadRequired<GameObject>(SoldierPrefabPath);

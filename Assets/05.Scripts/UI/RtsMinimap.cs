@@ -2,6 +2,7 @@ using ProjectS.Buildings;
 using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.Units;
+using ProjectS.Visibility;
 using UnityEngine;
 
 namespace ProjectS.UI
@@ -38,6 +39,8 @@ namespace ProjectS.UI
         private Texture2D terrainTexture;
         private BoundsInt terrainTextureBounds;
         private int terrainCacheRebuildCount = -1;
+        private int fogVisibilityRevision = -1;
+        private FogOfWarManager fogOfWar;
 
         public static RtsMinimap ActiveInstance { get; private set; }
         public static float BottomRightReservedWidth => PanelWidth + PanelMargin + 8f;
@@ -120,6 +123,11 @@ namespace ProjectS.UI
                 cameraController = FindFirstObjectByType<RtsCameraController>();
             }
 
+            if (fogOfWar == null)
+            {
+                fogOfWar = FogOfWarManager.ActiveInstance;
+            }
+
             var commandController = PlayerUnitCommandController.ActiveInstance;
             if (commandController != null)
             {
@@ -158,7 +166,8 @@ namespace ProjectS.UI
             // The navigation cache is the only terrain source used here, so this avoids per-frame tile sampling.
             if (terrainTexture != null
                 && terrainTextureBounds == bounds
-                && terrainCacheRebuildCount == tilemapWorld.CacheRebuildCount)
+                && terrainCacheRebuildCount == tilemapWorld.CacheRebuildCount
+                && fogVisibilityRevision == GetFogVisibilityRevision())
             {
                 return;
             }
@@ -191,6 +200,7 @@ namespace ProjectS.UI
                     var color = tilemapWorld.TrySample(cell, out var sample)
                         ? GetTerrainColor(sample.Walkable, sample.Buildable)
                         : EmptyTerrainColor;
+                    color = ApplyFogToTerrain(color, cell);
                     pixels[textureY * width + textureX] = color;
                 }
             }
@@ -199,6 +209,30 @@ namespace ProjectS.UI
             terrainTexture.Apply(false, false);
             terrainTextureBounds = bounds;
             terrainCacheRebuildCount = tilemapWorld.CacheRebuildCount;
+            fogVisibilityRevision = GetFogVisibilityRevision();
+        }
+
+        private Color ApplyFogToTerrain(Color terrainColor, Vector3Int cell)
+        {
+            if (fogOfWar == null)
+            {
+                return terrainColor;
+            }
+
+            switch (fogOfWar.GetVisibility(cell))
+            {
+                case FogVisibilityState.Visible:
+                    return terrainColor;
+                case FogVisibilityState.Explored:
+                    return Color.Lerp(Color.black, terrainColor, 0.38f);
+                default:
+                    return new Color(0.01f, 0.012f, 0.016f, 1f);
+            }
+        }
+
+        private int GetFogVisibilityRevision()
+        {
+            return fogOfWar != null ? fogOfWar.VisibilityRevision : -1;
         }
 
         private static Color GetTerrainColor(bool walkable, bool buildable)
@@ -231,6 +265,11 @@ namespace ProjectS.UI
                     continue;
                 }
 
+                if (!ShouldDisplayEntity(status.Team, unit.transform.position))
+                {
+                    continue;
+                }
+
                 DrawMarker(mapRect, worldBounds, unit.transform.position, UnitSize, GetTeamColor(status.Team));
                 if (IsSelected(unit))
                 {
@@ -238,7 +277,10 @@ namespace ProjectS.UI
                 }
 
                 var target = unit.PriorityTarget;
-                if (target != null && target.SelectionTransform != null && target.IsAlive)
+                if (target != null
+                    && target.SelectionTransform != null
+                    && target.IsAlive
+                    && ShouldDisplayEntity(target.Team, target.SelectionTransform.position))
                 {
                     DrawOutlineMarker(mapRect, worldBounds, target.SelectionTransform.position, BuildingSize + 2f, CombatTargetColor);
                 }
@@ -272,8 +314,18 @@ namespace ProjectS.UI
                     continue;
                 }
 
+                if (!ShouldDisplayEntity(building.Team, building.transform.position))
+                {
+                    continue;
+                }
+
                 DrawMarker(mapRect, worldBounds, building.transform.position, BuildingSize, GetTeamColor(building.Team));
             }
+        }
+
+        private bool ShouldDisplayEntity(UnitTeam team, Vector3 worldPosition)
+        {
+            return team == playerTeam || fogOfWar == null || fogOfWar.IsWorldPositionVisible(worldPosition);
         }
 
         private void DrawViewport(Rect mapRect, Bounds worldBounds)
@@ -450,14 +502,17 @@ namespace ProjectS.UI
             return false;
         }
 
-        private static int CountActiveUnits(UnitTeam team)
+        private int CountActiveUnits(UnitTeam team)
         {
             var units = UnitRegistry.GetAgents(team);
             var count = 0;
             for (var i = 0; i < units.Count; i++)
             {
                 var status = units[i] != null ? units[i].Status : null;
-                if (status != null && status.isActiveAndEnabled && status.IsAlive)
+                if (status != null
+                    && status.isActiveAndEnabled
+                    && status.IsAlive
+                    && ShouldDisplayEntity(status.Team, status.transform.position))
                 {
                     count++;
                 }
@@ -466,14 +521,17 @@ namespace ProjectS.UI
             return count;
         }
 
-        private static int CountActiveBuildings(UnitTeam team)
+        private int CountActiveBuildings(UnitTeam team)
         {
             var buildings = BuildingRegistry.GetBuildings(team);
             var count = 0;
             for (var i = 0; i < buildings.Count; i++)
             {
                 var building = buildings[i];
-                if (building != null && building.isActiveAndEnabled && building.IsAlive)
+                if (building != null
+                    && building.isActiveAndEnabled
+                    && building.IsAlive
+                    && ShouldDisplayEntity(building.Team, building.transform.position))
                 {
                     count++;
                 }

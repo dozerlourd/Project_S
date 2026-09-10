@@ -13,6 +13,7 @@ namespace ProjectS.Units
         private Collider2D attackCollider;
         private float nextAttackTime;
         private readonly List<IUnitAttackTarget> attackTargets = new List<IUnitAttackTarget>();
+        private readonly List<IUnitAttackTarget> nearbyTargets = new List<IUnitAttackTarget>();
 
         private void Awake()
         {
@@ -72,10 +73,10 @@ namespace ProjectS.Units
             var center = primaryTarget.SelectionTransform.position;
             var maxTargets = Mathf.Max(1, status.MaxAttackTargets);
             var radiusSquared = status.AttackArea * status.AttackArea;
-            var allTargets = UnitAttackTargetRegistry.All;
-            for (var i = 0; i < allTargets.Count; i++)
+            UnitAttackTargetRegistry.QueryNearbyEnemies(status.Team, center, status.AttackArea, nearbyTargets);
+            for (var i = 0; i < nearbyTargets.Count; i++)
             {
-                var candidate = allTargets[i];
+                var candidate = nearbyTargets[i];
                 if (candidate == primaryTarget
                     || !IsValidEnemyTarget(candidate)
                     || (candidate.SelectionTransform.position - center).sqrMagnitude > radiusSquared)

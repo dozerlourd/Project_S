@@ -155,8 +155,8 @@ namespace ProjectS
             prototypeRoot.SetActive(false);
 
             GetStartPositions(tilemapWorld, out var playerStart, out var aiStart);
-            var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(700, 100), root.transform);
-            var aiWallet = CreateWallet("AI Wallet", UnitTeam.Team2, new ResourceAmount(700, 100), root.transform);
+            var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(100, 0), root.transform);
+            var aiWallet = CreateWallet("AI Wallet", UnitTeam.Team2, new ResourceAmount(100, 0), root.transform);
             CreateTeamUpgradeResearch("Player Unit Upgrades", UnitTeam.Team1, playerWallet, root.transform);
             CreateTeamUpgradeResearch("AI Unit Upgrades", UnitTeam.Team2, aiWallet, root.transform);
             EnsureSupplyManagers(root.transform);

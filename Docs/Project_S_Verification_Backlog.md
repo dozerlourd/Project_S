@@ -53,6 +53,10 @@
 
 ### Obstacle 경로 차단
 
+- [ ] Unity Editor에서 `Tools > Project S > Tilemaps > Prepare Obstacle Tile Palette`를 실행하거나 스크립트 리컴파일 뒤 `Assets/Assets/Tilemaps/Obstacle Tiles/Obstacle_Stone.asset`이 생성되고, Walkable/Buildable false, 모든 차단 옵션 true, Grid Collider 설정인지 확인한다.
+- [ ] `Tools > Project S > Tilemaps > Add Obstacle Tilemap To Active Scene`로 생성한 `Obstacle` Tilemap이 Grid 하위와 FrontProps 정렬에 배치되고, Obstacle 레이어가 존재할 때만 해당 레이어를 사용하는지 확인한다.
+- [ ] PlayMode에서 이름이 `Obstacle`인 Tilemap에 타일을 추가·삭제했을 때 경로 탐색, 건설 가능 판정, 미니맵 차단 색상이 즉시 갱신되는지 확인한다.
+- [ ] `NamedObstacleTilemapChanges_RefreshNavigationAndMinimapTerrain` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 - [ ] Obstacle 레이어 타일맵이 A* 경로 계산에서 이동 불가 셀로 처리되는지 확인한다.
 - [ ] 유닛이 실제 이동 중에도 Obstacle 지역을 지나가거나 스치듯 통과하지 않는지 확인한다.
 - [ ] 대각선 이동 시 Obstacle 모서리 사이를 끼고 통과하지 않는지 확인한다.
@@ -167,6 +171,32 @@
 - [ ] 생산 건물을 선택해 Research 화면에서 Weapon Calibration과 Mobility Tuning을 각각 시작했을 때 비용 차감, 진행률, 완료 상태가 HUD에 정확히 표시되는지 확인한다.
 - [ ] Team1의 Weapon Calibration(+3 ATK)과 Mobility Tuning(+15% Move)이 기존 유닛과 이후 생산된 Team1 유닛에 모두 적용되고 Team2에는 영향을 주지 않는지 확인한다.
 - [ ] `TeamUpgradeResearch_AppliesCompletedUpgradesToOnlyItsTeam` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+
+### 전투 타깃 탐색
+
+- [ ] 다수 유닛이 서로 다른 공간 버킷에 분산된 전투에서 감지거리 밖의 적이 후보 조회에 포함되지 않고, `UnitTargetQueryStatistics`의 방문 후보 수가 전체 적 수보다 충분히 작은지 확인한다.
+- [ ] 공격 이동·순찰·대기 상태에서 최근 공격자, 전투 유닛, 일꾼, 방어 건물, 생산 건물, 본진 우선순위가 유지되는지 확인한다.
+- [ ] 같은 우선순위의 적이 조금 더 가까워졌을 때 즉시 목표가 흔들리지 않고, 뚜렷하게 더 가까운 적 또는 더 높은 위협의 적이 나타날 때만 목표를 바꾸는지 확인한다.
+- [ ] 이동 유닛과 건물의 공간 버킷 갱신 뒤 자동 공격, 광역 공격, 자동 포탑이 새 위치의 대상만 정상 탐색하는지 확인한다.
+- [ ] `SpatialQuery_VisitsOnlyNearbyEnemyBuckets`, `SpatialQuery_RefreshesTargetAfterItChangesCells`, `AttackMove_KeepsCurrentTargetWhenSamePriorityCandidateIsOnlySlightlyCloser` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+
+### 유닛별 전술 행동
+
+- [ ] Soldier가 표준 사거리 경계에서 안정적으로 정지하고, 새 직접 명령을 받으면 추격이나 공격을 즉시 중단하는지 확인한다.
+- [ ] Ranger가 공격 사거리 45% 안에서 `RetreatingFromTarget`으로 전환되고 72% 거리에서 재교전하며, 후퇴 경로가 장애물과 아군 점유 셀을 통과하지 않는지 확인한다.
+- [ ] Ranger의 `HoldPosition`과 일반 `Move`가 자동 후퇴보다 우선하고, `FocusAttack`은 지정 대상을 유지한 채 거리 조절만 수행하는지 확인한다.
+- [ ] Tank 프리팹에 체력 260, 공격력 26, 사거리 5.5, 감지 7, 공격 속도 0.55, 이동 속도 2가 적용되는지 확인한다.
+- [ ] Striker와 Swarm이 표준 유닛보다 깊게 접근하고 더 짧은 재경로 간격으로 목표를 추적하면서 기존 점유 분산을 유지하는지 확인한다.
+- [ ] Spliter가 주 대상 포함, 반경 2, 최대 3대상 광역 공격 규칙을 유지하는지 확인한다.
+- [ ] `UnitTacticalBehaviorPlayModeTests`와 기존 명령·광역 공격 PlayMode 테스트를 Unity Test Runner에서 함께 실행한다.
+
+### 안개 전쟁
+
+- [ ] 아군 유닛과 건물이 현재 시야를 제공하고, 이동·파괴·비활성화 뒤 이전 시야가 탐색 완료 상태로 전환되는지 확인한다.
+- [ ] `BlocksVision` Obstacle 뒤의 셀이 미탐색 또는 탐색 완료 상태로 유지되고, 장애물을 제거하면 시야가 즉시 확장되는지 확인한다.
+- [ ] 메인 화면 오버레이와 미니맵 모두 현재 시야 밖 적 유닛·건물 마커를 숨기고, 탐색 완료 지형은 어둡게 남기는지 확인한다.
+- [ ] 다수 유닛 이동 중 전맵 계산이 매 프레임 발생하지 않고, 제공자 셀·활성 상태·시야 반경·지형 리비전 변경 때만 `FogOfWarManager.RebuildCount`가 증가하는지 확인한다.
+- [ ] `Visibility_ChangesOnlyWhenProviderChangesCells`, `BlocksVisionTile_HidesCellsBehindItUntilTerrainChanges`, `Minimap_HidesEnemyMarkersOutsideCurrentVision` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 
 ### 건설 메뉴 해제
 

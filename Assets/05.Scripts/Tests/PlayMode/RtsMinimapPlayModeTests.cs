@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using ProjectS.Tilemaps;
@@ -117,6 +118,70 @@ namespace ProjectS.Tests.PlayMode
             Object.Destroy(walkableTile);
             Object.Destroy(blockedTile);
             Object.Destroy(nonBuildableTile);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator NamedObstacleTilemapChanges_RefreshNavigationAndMinimapTerrain()
+        {
+            var gridObject = new GameObject("Obstacle Cache Grid");
+            gridObject.AddComponent<Grid>();
+            var groundObject = new GameObject("Ground");
+            groundObject.transform.SetParent(gridObject.transform, false);
+            var groundTilemap = groundObject.AddComponent<Tilemap>();
+            var obstacleObject = new GameObject("Obstacle");
+            obstacleObject.transform.SetParent(gridObject.transform, false);
+            var obstacleTilemap = obstacleObject.AddComponent<Tilemap>();
+            var world = gridObject.AddComponent<ProjectSTilemapWorld>();
+            var navigator = gridObject.AddComponent<ProjectSTilemapNavigator>();
+            var groundTile = ScriptableObject.CreateInstance<Tile>();
+            var obstacleTile = ScriptableObject.CreateInstance<Tile>();
+            var changedCell = new Vector3Int(1, 0, 0);
+            groundTilemap.SetTile(new Vector3Int(0, 0, 0), groundTile);
+            groundTilemap.SetTile(changedCell, groundTile);
+            groundTilemap.SetTile(new Vector3Int(2, 0, 0), groundTile);
+
+            yield return null;
+
+            Assert.That(world.IsWalkable(changedCell), Is.True);
+            var cacheRebuildCount = world.CacheRebuildCount;
+
+            var minimapObject = new GameObject("Obstacle Cache Minimap");
+            var minimap = minimapObject.AddComponent(GetGameplayType("ProjectS.UI.RtsMinimap"));
+            SetPrivateField(minimap, "tilemapWorld", world);
+            InvokePrivate(minimap, "RebuildTerrainTextureIfNeeded");
+            var terrainTexture = GetPrivateField<Texture2D>(minimap, "terrainTexture");
+            var walkableColor = terrainTexture.GetPixel(1, 0);
+
+            obstacleTilemap.SetTile(changedCell, obstacleTile);
+
+            Assert.That(world.IsWalkable(changedCell), Is.False);
+            Assert.That(world.IsBuildable(changedCell), Is.False);
+            Assert.That(world.CacheRebuildCount, Is.GreaterThan(cacheRebuildCount));
+            Assert.That(navigator.TryFindPath(
+                world.GetCellCenterWorld(new Vector3Int(0, 0, 0)),
+                world.GetCellCenterWorld(new Vector3Int(2, 0, 0)),
+                new List<Vector3>()), Is.False);
+
+            InvokePrivate(minimap, "RebuildTerrainTextureIfNeeded");
+            Assert.That(terrainTexture.GetPixel(1, 0), Is.Not.EqualTo(walkableColor));
+
+            obstacleTilemap.SetTile(changedCell, null);
+            var removalCacheRebuildCount = world.CacheRebuildCount;
+            Assert.That(world.IsWalkable(changedCell), Is.True);
+            Assert.That(world.IsBuildable(changedCell), Is.True);
+            Assert.That(world.CacheRebuildCount, Is.GreaterThan(removalCacheRebuildCount));
+            Assert.That(navigator.TryFindPath(
+                world.GetCellCenterWorld(new Vector3Int(0, 0, 0)),
+                world.GetCellCenterWorld(new Vector3Int(2, 0, 0)),
+                new List<Vector3>()), Is.True);
+            InvokePrivate(minimap, "RebuildTerrainTextureIfNeeded");
+            Assert.That(terrainTexture.GetPixel(1, 0), Is.EqualTo(walkableColor));
+
+            Object.Destroy(minimapObject);
+            Object.Destroy(gridObject);
+            Object.Destroy(groundTile);
+            Object.Destroy(obstacleTile);
             yield return null;
         }
 

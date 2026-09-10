@@ -30,6 +30,8 @@ namespace ProjectS
         [SerializeField] private bool stopActivityOnMatchEnd = true;
 
         private float nextEvaluationTime;
+        private float matchStartTime;
+        private float finalElapsedTime;
 
         public static RtsMatchController ActiveInstance { get; private set; }
 
@@ -41,6 +43,9 @@ namespace ProjectS
         public RtsMatchEndReason EndReason { get; private set; } = RtsMatchEndReason.None;
         public bool IsMatchOver => Result != RtsMatchResult.InProgress;
         public int ResolutionCount { get; private set; }
+        public float ElapsedPlayTime => IsMatchOver
+            ? finalElapsedTime
+            : Mathf.Max(0f, Time.unscaledTime - matchStartTime);
         public string ResultLabel => Result == RtsMatchResult.Victory
             ? "Victory"
             : Result == RtsMatchResult.Defeat
@@ -50,12 +55,19 @@ namespace ProjectS
         private void Awake()
         {
             ActiveInstance = this;
+            matchStartTime = Time.unscaledTime;
+            finalElapsedTime = 0f;
         }
 
         private void OnEnable()
         {
             ActiveInstance = this;
             nextEvaluationTime = Time.time + evaluationInterval;
+            if (!IsMatchOver)
+            {
+                matchStartTime = Time.unscaledTime;
+                finalElapsedTime = 0f;
+            }
         }
 
         private void OnDestroy()
@@ -153,6 +165,7 @@ namespace ProjectS
 
             Result = result;
             EndReason = reason;
+            finalElapsedTime = Mathf.Max(0f, Time.unscaledTime - matchStartTime);
             ResolutionCount++;
 
             if (stopActivityOnMatchEnd)
