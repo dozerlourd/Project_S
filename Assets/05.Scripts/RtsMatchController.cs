@@ -3,6 +3,7 @@ using ProjectS.AI;
 using ProjectS.Buildings;
 using ProjectS.Units;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace ProjectS
 {
@@ -22,12 +23,24 @@ namespace ProjectS
         PlayerBuildingsDestroyed
     }
 
+    public enum RtsMatchPostAction
+    {
+        None,
+        Rematch,
+        MainMenu,
+        EndMatch
+    }
+
     public sealed class RtsMatchController : MonoBehaviour
     {
         [SerializeField] private UnitTeam playerTeam = UnitTeam.Team1;
         [SerializeField] private UnitTeam enemyTeam = UnitTeam.Team2;
         [SerializeField, Min(0.02f)] private float evaluationInterval = 0.25f;
         [SerializeField] private bool stopActivityOnMatchEnd = true;
+        [SerializeField] private bool reloadCurrentSceneOnRematch = true;
+        [SerializeField] private bool loadMainMenuOnReturn = true;
+        [SerializeField] private string mainMenuSceneName = RtsSceneFlow.DefaultMainMenuSceneName;
+        [SerializeField] private bool quitApplicationOnEndMatch = true;
 
         private float nextEvaluationTime;
         private float matchStartTime;
@@ -36,12 +49,14 @@ namespace ProjectS
         public static RtsMatchController ActiveInstance { get; private set; }
 
         public event Action<RtsMatchController> MatchEnded;
+        public event Action<RtsMatchPostAction> PostMatchActionRequested;
 
         public UnitTeam PlayerTeam => playerTeam;
         public UnitTeam EnemyTeam => enemyTeam;
         public RtsMatchResult Result { get; private set; } = RtsMatchResult.InProgress;
         public RtsMatchEndReason EndReason { get; private set; } = RtsMatchEndReason.None;
         public bool IsMatchOver => Result != RtsMatchResult.InProgress;
+        public RtsMatchPostAction RequestedPostMatchAction { get; private set; }
         public int ResolutionCount { get; private set; }
         public float ElapsedPlayTime => IsMatchOver
             ? finalElapsedTime
@@ -98,6 +113,73 @@ namespace ProjectS
         public void ForceEvaluate()
         {
             EvaluateMatch();
+        }
+
+        public void ConfigurePostMatchActions(bool reloadOnRematch, bool quitOnEndMatch)
+        {
+            reloadCurrentSceneOnRematch = reloadOnRematch;
+            quitApplicationOnEndMatch = quitOnEndMatch;
+        }
+
+        public void ConfigureMainMenuAction(bool loadOnReturn, string sceneName)
+        {
+            loadMainMenuOnReturn = loadOnReturn;
+            mainMenuSceneName = sceneName;
+        }
+
+        public bool TryRequestRematch()
+        {
+            if (!CanRequestPostMatchAction())
+            {
+                return false;
+            }
+
+            RequestedPostMatchAction = RtsMatchPostAction.Rematch;
+            PostMatchActionRequested?.Invoke(RequestedPostMatchAction);
+            if (reloadCurrentSceneOnRematch)
+            {
+                var activeScene = SceneManager.GetActiveScene();
+                if (activeScene.IsValid() && activeScene.buildIndex >= 0)
+                {
+                    SceneManager.LoadScene(activeScene.buildIndex);
+                }
+                else if (activeScene.IsValid() && !string.IsNullOrWhiteSpace(activeScene.name))
+                {
+                    SceneManager.LoadScene(activeScene.name);
+                }
+            }
+
+            return true;
+        }
+
+        public bool TryRequestMainMenu()
+        {
+            if (!CanRequestPostMatchAction())
+            {
+                return false;
+            }
+
+            if (loadMainMenuOnReturn && !RtsSceneFlow.TryLoadScene(mainMenuSceneName))
+            {
+                return false;
+            }
+
+            RequestedPostMatchAction = RtsMatchPostAction.MainMenu;
+            PostMatchActionRequested?.Invoke(RequestedPostMatchAction);
+            return true;
+        }
+
+        public bool TryRequestEndMatch()
+        {
+            if (!CanRequestPostMatchAction())
+            {
+                return false;
+            }
+
+            RequestedPostMatchAction = RtsMatchPostAction.EndMatch;
+            PostMatchActionRequested?.Invoke(RequestedPostMatchAction);
+            RtsSceneFlow.RequestApplicationQuit(quitApplicationOnEndMatch);
+            return true;
         }
 
         private void EvaluateMatch()
@@ -174,6 +256,11 @@ namespace ProjectS
             }
 
             MatchEnded?.Invoke(this);
+        }
+
+        private bool CanRequestPostMatchAction()
+        {
+            return IsMatchOver && RequestedPostMatchAction == RtsMatchPostAction.None;
         }
 
         private void StopMatchActivity()

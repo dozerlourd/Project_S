@@ -122,6 +122,14 @@
 - [ ] AI 주요 건물 반경 안에 적 전투 유닛이 진입하면 AI 전투 유닛이 해당 위협을 우선 공격하는지 확인한다.
 - [ ] 건설 대기 중인 AI 작업 유닛이 자원 채집 명령에서 건설 명령으로 전환되고, 건설 완료 뒤 정상 채집 루프로 복귀하는지 확인한다.
 
+### 쉬운 AI 병력 구성 및 연구
+
+- [ ] AI가 전투 유닛 5기 전에는 Soldier만 생산하고, 이후 성공 생산 5회마다 Ranger와 Striker를 번갈아 시도하는지 확인한다.
+- [ ] Ranger 또는 Striker 생산이 자원·보급·생산 조건 때문에 실패하면 Soldier 생산으로 안전하게 복귀하고, Tank·Spliter·Swarm은 기본 조합에 포함하지 않는지 확인한다.
+- [ ] 최초 90초와 전투 유닛 7기 조건 전에는 공격하지 않고, 이후 공격 명령 사이에도 18초 이상의 간격을 유지하는지 확인한다.
+- [ ] 전투 유닛 6기와 연구비 외 미네랄 200, 가스 50을 확보한 경우에만 Weapon Calibration 이후 Mobility Tuning을 한 번씩 연구하는지 확인한다.
+- [ ] `SimpleSkirmishAiEasyPlayModeTests`를 Unity Test Runner에서 실행한다.
+
 ### 생산 조건 시스템
 
 - [ ] 조건이 없는 기존 생산 정의가 이전과 동일하게 생산 가능한지 확인한다.
@@ -151,9 +159,19 @@
 
 ### 확장 자원 거점 및 생산 중단
 
+- [ ] 자원 노드 기준 상하좌우 3칸·대각선 2칸 보호 영역이 건설 프리뷰와 실제 건설 시도에 동일하게 적용되는지 Unity PlayMode에서 확인한다.
+- [ ] AI가 보호 영역 안쪽 후보를 건너뛰고 반경을 넓혀 보호 영역 밖의 Main Base 후보를 순차적으로 선택하는지 Unity PlayMode에서 확인한다.
 - [ ] 런타임 부트스트랩의 두 추가 자원 지대에서 Main Base 또는 Drop-off를 건설한 뒤, 일꾼이 기존 `ResourceDropOff.FindNearest` 정책대로 가장 가까운 반납 지점을 선택하는지 확인한다.
 - [ ] AI가 추가 자원 지대 근처에 두 번째 Main Base를 건설하고, 새 본진 생산 큐와 반납 지점을 실제로 활용하는지 확인한다.
 - [ ] 생산 건물 파괴 또는 비활성화 직후 활성/대기 생산 비용과 예약 보급이 한 번만 반환되고, 선택 HUD 및 생산 패널이 즉시 사라지는지 확인한다.
+
+### Worker 자동 자원 분배
+
+- [ ] 기본 비활성인 `WorkerAutoAssignmentManager`를 활성화했을 때 팀별 유휴 Worker만 살아있는 반납처가 있는 자원 노드에 균등 배정되는지 Unity PlayMode에서 확인한다.
+- [ ] 자동 배정 중인 Worker에게 플레이어의 명시적 우클릭 이동·채집·건설 명령을 내리면 자동 관리자가 해당 명령을 덮어쓰지 않는지 확인한다.
+- [ ] 자원 노드 고갈, 반납처 비활성화, Worker 유휴 전환 시 재평가가 일어나며 매 프레임 `FindObjects` 탐색을 수행하지 않는지 확인한다.
+- [ ] Team1 HUD의 자동 Worker 분배 버튼이 기본 OFF로 표시되고, 버튼 클릭 시 ON/OFF 상태와 현재 배정 Worker 수가 즉시 갱신되는지 Unity PlayMode에서 확인한다.
+- [ ] 자동 Worker 분배 HUD 버튼이 기존 이동·채집·건설 단축키와 충돌하지 않고, 직접 명령 우선 원칙을 유지하는지 확인한다.
 
 ### 자원 Tilemap 배치
 
@@ -190,6 +208,32 @@
 - [ ] Spliter가 주 대상 포함, 반경 2, 최대 3대상 광역 공격 규칙을 유지하는지 확인한다.
 - [ ] `UnitTacticalBehaviorPlayModeTests`와 기존 명령·광역 공격 PlayMode 테스트를 Unity Test Runner에서 함께 실행한다.
 
+### 능동 스킬 최소 루프
+
+- [ ] Striker 선택 HUD에 `Overdrive [F]` 버튼과 준비, 활성 지속시간, 쿨다운이 정상 표시되는지 확인한다.
+- [ ] 이동, 공격 이동, 집중 공격, 위치 사수 중 Overdrive를 사용해도 최신 명령과 현재 목적지가 초기화되지 않는지 확인한다.
+- [ ] Overdrive가 4초 동안 이동 속도를 50% 높이고 종료 뒤 건물 오라와 연구 보너스를 보존한 채 자기 수정자만 제거하는지 확인한다.
+- [ ] 여러 Striker 선택 시 사용 가능한 유닛만 실행되고 쿨다운 중인 유닛 수와 실패 사유가 HUD에 표시되는지 확인한다.
+- [ ] Soldier 등 스킬이 없는 유닛과 AI가 Overdrive를 자동으로 실행하지 않는지 확인한다.
+- [ ] `UnitActiveSkillPlayModeTests`를 Unity Test Runner에서 실행한다.
+
+### 전투 시각 피드백
+
+- [ ] 유닛과 자동 포탑 공격 적중 시 황색 파동, 피격 시 적색 파동, 사망 시 큰 소멸 파동이 각각 한 번씩 표시되는지 확인한다.
+- [ ] Striker의 Overdrive 성공 시 청록색 강화 파동이 표시되고, 쿨다운 실패 시에는 이펙트가 발생하지 않는지 확인한다.
+- [ ] 다수 유닛 교전에서도 전투 피드백 오브젝트가 최대 풀 크기 48개를 넘지 않고 가장 오래된 효과를 재사용하는지 확인한다.
+- [ ] 현재 시야 밖 적 유닛과 건물의 적중, 피격, 사망, 스킬 효과가 화면에 노출되지 않고 아군 효과는 계속 표시되는지 확인한다.
+- [ ] 전투 피드백 추가 전후의 공격력, 상성 배율, 체력 차감, 공격 속도가 동일한지 확인한다.
+- [ ] `CombatFeedbackPlayModeTests`와 기존 전투·안개·능동 스킬 PlayMode 테스트를 Unity Test Runner에서 함께 실행한다.
+
+### 재경기 및 매치 종료
+
+- [ ] 승패 확정 뒤 결과 오버레이에서 `Rematch`를 누르면 현재 씬이 다시 로드되고 자원, 유닛, 건물, 생산 큐, 매치 타이머가 새 매치 상태로 초기화되는지 확인한다.
+- [ ] 빌드 시작 시 `MainMenu` 씬에서 전장 배경과 명령 버튼 이미지가 표시되고, `PLAY`를 연속 클릭해도 `MapCreate_Scene` 로드가 한 번만 시작되는지 확인한다.
+- [ ] 승패 확정 뒤 `Main Menu`를 누르면 `MainMenu` 씬으로 복귀하고 새 매치를 시작할 수 있는지 확인한다.
+- [ ] 승패 확정 뒤 `End Match`는 중복 실행되지 않으며, 실제 빌드에서는 애플리케이션을 종료하고 Unity Editor에서는 종료 요청만 안전하게 기록하는지 확인한다.
+- [ ] `MatchOutcomePlayModeTests`와 `MainMenuFlowPlayModeTests`를 Unity Test Runner에서 실행한다.
+
 ### 안개 전쟁
 
 - [ ] 아군 유닛과 건물이 현재 시야를 제공하고, 이동·파괴·비활성화 뒤 이전 시야가 탐색 완료 상태로 전환되는지 확인한다.
@@ -197,9 +241,26 @@
 - [ ] 메인 화면 오버레이와 미니맵 모두 현재 시야 밖 적 유닛·건물 마커를 숨기고, 탐색 완료 지형은 어둡게 남기는지 확인한다.
 - [ ] 다수 유닛 이동 중 전맵 계산이 매 프레임 발생하지 않고, 제공자 셀·활성 상태·시야 반경·지형 리비전 변경 때만 `FogOfWarManager.RebuildCount`가 증가하는지 확인한다.
 - [ ] `Visibility_ChangesOnlyWhenProviderChangesCells`, `BlocksVisionTile_HidesCellsBehindItUntilTerrainChanges`, `Minimap_HidesEnemyMarkersOutsideCurrentVision` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+- [ ] 시야에서 벗어난 적 유닛과 건물이 실제 위치 대신 마지막 관측 위치에 작고 반투명한 일반 마커로 표시되는지 확인한다.
+- [ ] 적을 재발견하면 마지막 관측 마커가 실제 팀 마커로 교체되고, 적이 파괴되면 마지막 관측 마커도 제거되는지 확인한다.
+- [ ] Worker 6, Soldier 7, Spliter 7, Ranger 9, Tank 8, Striker 6, Swarm 5.5의 기본 시야 반경이 프리팹과 실제 시야에 동일하게 적용되는지 확인한다.
+- [ ] `Minimap_UsesLastObservedPositionAfterEnemyEntersFog` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 
 ### 건설 메뉴 해제
 
 - [ ] 작업 유닛으로 건물 배치를 성공한 직후 B 건물 목록과 배치 프리뷰가 닫히고, 즉시 다른 명령을 입력할 수 있는지 확인한다.
 - [ ] B 건물 목록을 연 상태와 건물 배치 대기 상태에서 Esc를 누르면 목록과 배치 상태가 함께 닫히는지 확인한다.
 - [ ] B 건물 목록 또는 건물 배치 대기 상태에서 다른 아군 유닛·건물을 선택하면 목록이 닫히는지 확인한다.
+
+### 건물별 생산 역할
+
+- [ ] MainBase가 Worker만, Production이 Soldier/Ranger/Tank/Striker/Swarm만, SpliterProduction이 Spliter만 표시하고 생산 가능한지 실제 Unity PlayMode에서 확인한다.
+- [ ] 역할과 맞지 않는 생산 정의가 HUD 버튼과 단축키 슬롯에 나타나지 않고, 직접 큐 요청도 비용·보급 예약 없이 역할 실패 사유로 거부되는지 확인한다.
+- [ ] `UnitProductionQueue_FiltersDefinitionsByConfiguredBuildingRole` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+
+### 기술 및 해금 시스템 기반
+
+- [ ] 조건이 없는 생산 및 건설 항목이 기존과 동일하게 항상 사용 가능한지 Unity PlayMode에서 확인한다.
+- [ ] 팀별 `TeamUnlockState`에 해금 ID를 부여했을 때 해당 조건을 가진 생산 버튼과 건설 버튼이 `LOCKED` 상태로 보이고, 클릭 및 `Q/E/R/T/Y/U/I` 단축키가 같은 실패 사유를 표시하는지 확인한다.
+- [ ] 잠긴 생산 요청과 건설 배치 요청이 자원·보급을 소비하지 않으며, 해금 직후에는 즉시 다시 사용할 수 있는지 확인한다.
+- [ ] `UnlockRequirement_UsesSameTeamStateForProductionAndConstruction` PlayMode 테스트를 Unity Test Runner에서 실행한다.

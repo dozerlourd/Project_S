@@ -5,6 +5,7 @@ using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.UI;
 using ProjectS.Units;
+using ProjectS.Unlocks;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -51,6 +52,8 @@ namespace ProjectS.Editor
             GetStartPositions(tilemapWorld, out var playerStart, out var aiStart);
             var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(100, 0), root.transform);
             var aiWallet = CreateWallet("AI Wallet", UnitTeam.Team2, new ResourceAmount(100, 0), root.transform);
+            CreateTeamUnlockState("Player Unlocks", UnitTeam.Team1, root.transform);
+            CreateTeamUnlockState("AI Unlocks", UnitTeam.Team2, root.transform);
 
             var workerPrefab = LoadRequired<GameObject>(WorkerPrefabPath);
             var soldierPrefab = LoadRequired<GameObject>(SoldierPrefabPath);
@@ -68,19 +71,19 @@ namespace ProjectS.Editor
 
             var workerDefinitions = new[]
             {
-                CreateProductionDefinition("Worker", PrototypeUnitType.Worker, workerPrefab, new ResourceAmount(50, 0), 5f)
+                CreateProductionDefinition("Worker", PrototypeUnitType.Worker, workerPrefab, new ResourceAmount(50, 0), 5f, allowedProductionBuildings: new[] { BuildingKind.MainBase })
             };
             var combatDefinitions = new[]
             {
-                CreateProductionDefinition("Soldier", PrototypeUnitType.Soldier, soldierPrefab, new ResourceAmount(100, 0), 7f),
-                CreateProductionDefinition("Ranger", PrototypeUnitType.Ranger, rangerPrefab, new ResourceAmount(100, 25), 8f),
-                CreateProductionDefinition("Tank", PrototypeUnitType.Tank, tankPrefab, new ResourceAmount(150, 0), 10f, 3),
-                CreateProductionDefinition("Striker", PrototypeUnitType.Striker, strikerPrefab, new ResourceAmount(75, 0), 6f),
-                CreateProductionDefinition("Swarm x3", PrototypeUnitType.Swarm, swarmPrefab, new ResourceAmount(120, 0), 8f, 1, 3)
+                CreateProductionDefinition("Soldier", PrototypeUnitType.Soldier, soldierPrefab, new ResourceAmount(100, 0), 7f, allowedProductionBuildings: new[] { BuildingKind.Production }),
+                CreateProductionDefinition("Ranger", PrototypeUnitType.Ranger, rangerPrefab, new ResourceAmount(100, 25), 8f, allowedProductionBuildings: new[] { BuildingKind.Production }),
+                CreateProductionDefinition("Tank", PrototypeUnitType.Tank, tankPrefab, new ResourceAmount(150, 0), 10f, 3, allowedProductionBuildings: new[] { BuildingKind.Production }),
+                CreateProductionDefinition("Striker", PrototypeUnitType.Striker, strikerPrefab, new ResourceAmount(75, 0), 6f, allowedProductionBuildings: new[] { BuildingKind.Production }),
+                CreateProductionDefinition("Swarm x3", PrototypeUnitType.Swarm, swarmPrefab, new ResourceAmount(120, 0), 8f, 1, 3, allowedProductionBuildings: new[] { BuildingKind.Production })
             };
             var spliterDefinitions = new[]
             {
-                CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterPrefab, new ResourceAmount(125, 0), 8f)
+                CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterPrefab, new ResourceAmount(125, 0), 8f, allowedProductionBuildings: new[] { BuildingKind.SpliterProduction })
             };
 
             InstantiateBuilding(
@@ -233,6 +236,8 @@ namespace ProjectS.Editor
             var runtime = new GameObject("Player Runtime Systems");
             runtime.transform.SetParent(parent, false);
 
+            var workerAutoAssignment = runtime.AddComponent<WorkerAutoAssignmentManager>();
+            workerAutoAssignment.Configure(UnitTeam.Team1, false);
             var commandController = runtime.AddComponent<PlayerUnitCommandController>();
             var placementService = runtime.AddComponent<BuildingPlacementService>();
             placementService.Configure(
@@ -291,6 +296,14 @@ namespace ProjectS.Editor
             var wallet = walletObject.AddComponent<PlayerResourceWallet>();
             wallet.Initialize(team, resources);
             return wallet;
+        }
+
+        private static void CreateTeamUnlockState(string name, UnitTeam team, Transform parent)
+        {
+            var stateObject = new GameObject(name);
+            stateObject.transform.SetParent(parent, false);
+            var state = stateObject.AddComponent<TeamUnlockState>();
+            state.Configure(team);
         }
 
         private static void InstantiateBuilding(
@@ -406,10 +419,12 @@ namespace ProjectS.Editor
             ResourceAmount cost,
             float duration,
             int supplyCost = 1,
-            int outputCount = 1)
+            int outputCount = 1,
+            BuildingKind[] allowedProductionBuildings = null)
         {
             var definition = new UnitProductionDefinition();
             definition.Configure(displayName, unitType, prefab, cost, duration, supplyCost, outputCount);
+            definition.ConfigureAllowedProductionBuildings(allowedProductionBuildings);
             return definition;
         }
 

@@ -61,6 +61,7 @@ namespace ProjectS.Units
                 return;
             }
 
+            CombatFeedbackEvents.Publish(CombatFeedbackType.Damaged, transform.position, status.Team);
             currentHealth = Mathf.Max(0f, currentHealth - amount);
             HealthChanged?.Invoke(this, currentHealth);
 
@@ -78,6 +79,7 @@ namespace ProjectS.Units
             }
 
             isDead = true;
+            CombatFeedbackEvents.Publish(CombatFeedbackType.Death, transform.position, status.Team);
             Died?.Invoke(this);
             gameObject.SetActive(false);
         }

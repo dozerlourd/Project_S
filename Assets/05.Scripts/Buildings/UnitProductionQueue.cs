@@ -38,6 +38,7 @@ namespace ProjectS.Buildings
         public int QueuedCount => queue.Count + (activeProduction != null ? 1 : 0);
         public int MaxQueueSize => Mathf.Max(1, maxQueueSize);
         public UnitProductionDefinition ActiveProduction => activeProduction;
+        public UnitTeam Team => status != null ? status.Team : UnitTeam.Team1;
         public string LastEnqueueFailureReason => lastEnqueueFailureReason;
         public string LastCancellationFailureReason => lastCancellationFailureReason;
         public float ActiveProgress => activeProgress;
@@ -160,9 +161,9 @@ namespace ProjectS.Buildings
                 return false;
             }
 
-            if (status != null && status.Kind == BuildingKind.Production && definition.UnitType == PrototypeUnitType.Spliter)
+            if (status != null && !definition.CanBeProducedAt(status.Kind))
             {
-                failureReason = "Spliter can only be produced at a Spliter Production building.";
+                failureReason = definition.GetProductionBuildingFailureReason(status.Kind);
                 return false;
             }
 
@@ -187,6 +188,11 @@ namespace ProjectS.Buildings
                     failureReason = requirement.GetFailureReason(definition);
                     return false;
                 }
+            }
+
+            if (status != null && !definition.CanBeProducedBy(status.Team, out failureReason))
+            {
+                return false;
             }
 
             if (QueuedCount >= MaxQueueSize)
@@ -538,31 +544,32 @@ namespace ProjectS.Buildings
                 status = GetComponent<BuildingStatus>();
             }
 
-            if (status == null || status.Kind != BuildingKind.Production || producibleUnits.Length == 0)
+            if (status == null || producibleUnits.Length == 0)
             {
                 return;
             }
 
-            var spliterCount = 0;
+            var supportedCount = 0;
             for (var i = 0; i < producibleUnits.Length; i++)
             {
-                if (producibleUnits[i] != null && producibleUnits[i].UnitType == PrototypeUnitType.Spliter)
+                var definition = producibleUnits[i];
+                if (definition != null && definition.CanBeProducedAt(status.Kind))
                 {
-                    spliterCount++;
+                    supportedCount++;
                 }
             }
 
-            if (spliterCount == 0)
+            if (supportedCount == producibleUnits.Length)
             {
                 return;
             }
 
-            var filtered = new UnitProductionDefinition[producibleUnits.Length - spliterCount];
+            var filtered = new UnitProductionDefinition[supportedCount];
             var targetIndex = 0;
             for (var i = 0; i < producibleUnits.Length; i++)
             {
                 var definition = producibleUnits[i];
-                if (definition == null || definition.UnitType != PrototypeUnitType.Spliter)
+                if (definition != null && definition.CanBeProducedAt(status.Kind))
                 {
                     filtered[targetIndex++] = definition;
                 }

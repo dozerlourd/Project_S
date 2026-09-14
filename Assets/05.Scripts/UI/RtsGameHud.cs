@@ -13,6 +13,7 @@ namespace ProjectS.UI
         [SerializeField] private UnitTeam playerTeam = UnitTeam.Team1;
         [SerializeField] private bool showPathStats = true;
         [SerializeField] private BuildingPlacementService buildingPlacementService;
+        [SerializeField] private WorkerAutoAssignmentManager workerAutoAssignmentManager;
 
         private PlayerUnitCommandController commandController;
         private PlayerResourceWallet wallet;
@@ -22,6 +23,7 @@ namespace ProjectS.UI
         private TeamUpgradeResearch displayedUpgradeResearch;
         private string productionFeedback;
         private string upgradeFeedback;
+        private string skillFeedback;
         private int selectedPendingProductionIndex;
         private bool showUpgradeResearch;
         private static readonly Texture2D[] CommandIcons = new Texture2D[6];
@@ -58,7 +60,7 @@ namespace ProjectS.UI
         private const float ResourcePanelX = 12f;
         private const float ResourcePanelY = 12f;
         private const float ResourcePanelWidth = 260f;
-        private const float ResourcePanelHeight = 112f;
+        private const float ResourcePanelHeight = 168f;
         private const float MatchTimerWidth = 132f;
         private const float MatchTimerHeight = 38f;
         private const float MatchTimerTopMargin = 14f;
@@ -98,6 +100,7 @@ namespace ProjectS.UI
             }
 
             ResolvePlayerWallet();
+            ResolveWorkerAutoAssignmentManager();
 
             if (buildingPlacementService == null)
             {
@@ -134,6 +137,12 @@ namespace ProjectS.UI
             var keyboard = Keyboard.current;
             if (keyboard == null)
             {
+                return;
+            }
+
+            if (keyboard.fKey.wasPressedThisFrame && ResolveDisplayedSkillController() != null)
+            {
+                TryActivateSelectedSkill(0);
                 return;
             }
 
@@ -178,9 +187,11 @@ namespace ProjectS.UI
             commandController = null;
             wallet = null;
             supplyManager = null;
+            workerAutoAssignmentManager = null;
             displayedProductionQueue = null;
             displayedUpgradeResearch = null;
             showUpgradeResearch = false;
+            skillFeedback = string.Empty;
         }
 
         private void ResolvePlayerWallet()
@@ -266,7 +277,8 @@ namespace ProjectS.UI
             }
 
             var hasContextPanel = (commandController != null && commandController.IsBuildMenuOpen)
-                || displayedProductionQueue != null;
+                || displayedProductionQueue != null
+                || ResolveDisplayedSkillController() != null;
             return hasContextPanel && bottomLayout.contextRect.Contains(guiPosition);
         }
 
@@ -281,12 +293,24 @@ namespace ProjectS.UI
             GUI.Label(new Rect(24f, 22f, 120f, 22f), $"Minerals: {minerals}");
             GUI.Label(new Rect(144f, 22f, 100f, 22f), $"Gas: {gas}");
             GUI.Label(new Rect(24f, 46f, 220f, 22f), $"Supply: {currentSupply}/{maxSupply}  Reserved: {reservedSupply}");
-            GUI.Label(new Rect(24f, 70f, 220f, 22f), $"Team: {playerTeam}");
+            GUI.Label(new Rect(24f, 70f, 220f, 20f), $"Team: {playerTeam}");
+            var autoLabel = workerAutoAssignmentManager == null
+                ? "Auto Workers: Unavailable"
+                : $"Auto Workers: {(workerAutoAssignmentManager.AutomaticAssignmentEnabled ? "ON" : "OFF")}  ({workerAutoAssignmentManager.AssignedWorkerCount})";
+            GUI.Label(new Rect(24f, 91f, 220f, 20f), autoLabel);
+            if (workerAutoAssignmentManager != null
+                && GUI.Button(new Rect(24f, 112f, 220f, 24f), workerAutoAssignmentManager.AutomaticAssignmentEnabled
+                    ? "Disable automatic assignment"
+                    : "Enable automatic assignment"))
+            {
+                ToggleWorkerAutoAssignment();
+            }
+
             var research = TeamUpgradeResearch.FindForTeam(playerTeam);
             var researchLabel = research != null && research.ActiveDefinition != null
                 ? $"Research: {research.ActiveDefinition.DisplayName} {research.ActiveProgress01 * 100f:0}%"
                 : "Research: Idle";
-            GUI.Label(new Rect(24f, 94f, 236f, 18f), researchLabel);
+            GUI.Label(new Rect(24f, 142f, 236f, 18f), researchLabel);
         }
 
         private void DrawSelectionPanel(Rect rect)
@@ -473,10 +497,107 @@ namespace ProjectS.UI
             {
                 DrawBuildMenu(contextRect);
             }
+            else if (ResolveDisplayedSkillController() != null)
+            {
+                DrawActiveSkillPanel(contextRect);
+            }
             else
             {
                 DrawProductionPanel(contextRect);
             }
+        }
+
+        private void ResolveWorkerAutoAssignmentManager()
+        {
+            if (workerAutoAssignmentManager == null || workerAutoAssignmentManager.Team != playerTeam)
+            {
+                workerAutoAssignmentManager = WorkerAutoAssignmentManager.FindForTeam(playerTeam);
+            }
+        }
+
+        public bool WorkerAutoAssignmentEnabled =>
+            workerAutoAssignmentManager != null && workerAutoAssignmentManager.AutomaticAssignmentEnabled;
+
+        public int WorkerAutoAssignmentCount =>
+            workerAutoAssignmentManager != null ? workerAutoAssignmentManager.AssignedWorkerCount : 0;
+
+        public bool ToggleWorkerAutoAssignment()
+        {
+            ResolveWorkerAutoAssignmentManager();
+            if (workerAutoAssignmentManager == null)
+            {
+                return false;
+            }
+
+            workerAutoAssignmentManager.ToggleAutomaticAssignment();
+            return workerAutoAssignmentManager.AutomaticAssignmentEnabled;
+        }
+
+        public bool TryActivateSelectedSkill(int skillIndex)
+        {
+            if (commandController == null)
+            {
+                commandController = PlayerUnitCommandController.ActiveInstance;
+            }
+
+            if (commandController == null || IsMatchOver())
+            {
+                skillFeedback = "Active skills are unavailable.";
+                return false;
+            }
+
+            var selectedUnits = commandController.SelectedUnits;
+            var eligibleCount = 0;
+            var activatedCount = 0;
+            var failedCount = 0;
+            var skillName = "Active skill";
+            var firstFailureReason = string.Empty;
+            for (var i = 0; i < selectedUnits.Count; i++)
+            {
+                var unit = selectedUnits[i];
+                var controller = unit != null ? unit.GetComponent<UnitActiveSkillController>() : null;
+                if (controller == null || skillIndex < 0 || skillIndex >= controller.Skills.Count)
+                {
+                    continue;
+                }
+
+                eligibleCount++;
+                var definition = controller.Skills[skillIndex];
+                if (definition != null)
+                {
+                    skillName = definition.DisplayName;
+                }
+
+                if (controller.TryActivate(skillIndex))
+                {
+                    activatedCount++;
+                }
+                else
+                {
+                    failedCount++;
+                    if (string.IsNullOrWhiteSpace(firstFailureReason))
+                    {
+                        firstFailureReason = controller.LastFailureReason;
+                    }
+                }
+            }
+
+            if (eligibleCount == 0)
+            {
+                skillFeedback = "No selected unit has an active skill in this slot.";
+                return false;
+            }
+
+            if (activatedCount == 0)
+            {
+                skillFeedback = firstFailureReason;
+                return false;
+            }
+
+            skillFeedback = failedCount > 0
+                ? $"Activated {skillName}: {activatedCount} unit(s), {failedCount} unavailable."
+                : $"Activated {skillName}: {activatedCount} unit(s).";
+            return true;
         }
 
         private void DrawBuildMenu(Rect panelRect)
@@ -507,7 +628,11 @@ namespace ProjectS.UI
 
         private void DrawBuildOption(Rect buttonRect, int hotkeyIndex, string label)
         {
-            if (!GUI.Button(buttonRect, WithHotkeyLabel(label, hotkeyIndex)))
+            var buildingKind = BuildMenuBuildings[hotkeyIndex];
+            var isLocked = buildingPlacementService != null
+                && !buildingPlacementService.CanSelectBuilding(buildingKind, out _);
+            var buttonLabel = isLocked ? "LOCKED" : label;
+            if (!GUI.Button(buttonRect, WithHotkeyLabel(buttonLabel, hotkeyIndex)))
             {
                 return;
             }
@@ -710,7 +835,10 @@ namespace ProjectS.UI
 
                 var x = panelRect.x + 8f + i * (buttonSize + buttonGap);
                 var y = panelRect.y + 42f;
-                var buttonLabel = WithHotkeyLabel($"{definition.DisplayName}\n{FormatCost(definition.Cost)}", i);
+                var isLocked = !definition.CanBeProducedBy(productionQueue.Team, out _);
+                var buttonLabel = isLocked
+                    ? WithHotkeyLabel($"LOCKED\n{definition.DisplayName}", i)
+                    : WithHotkeyLabel($"{definition.DisplayName}\n{FormatCost(definition.Cost)}", i);
                 if (GUI.Button(new Rect(x, y, buttonSize, buttonSize), buttonLabel))
                 {
                     TryQueueProduction(productionQueue, i);
@@ -728,6 +856,43 @@ namespace ProjectS.UI
             if (productionQueue.PendingCount <= 0 && !string.IsNullOrWhiteSpace(feedback))
             {
                 GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 92f, panelRect.width - 16f, 20f), ShortenFailureReason(feedback));
+            }
+        }
+
+        private void DrawActiveSkillPanel(Rect panelRect)
+        {
+            var controller = ResolveDisplayedSkillController();
+            if (controller == null || controller.Skills.Count == 0)
+            {
+                return;
+            }
+
+            GUI.Box(panelRect, string.Empty);
+            GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 6f, panelRect.width - 16f, 20f), "Active skill");
+            var definition = controller.Skills[0];
+            if (definition == null)
+            {
+                GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 32f, panelRect.width - 16f, 20f), "Skill unavailable");
+                return;
+            }
+
+            var cooldownRemaining = controller.GetCooldownRemaining(0);
+            var activeRemaining = controller.GetActiveDurationRemaining(0);
+            var stateLabel = activeRemaining > 0f
+                ? $"Active {activeRemaining:0.0}s | Cooldown {cooldownRemaining:0.0}s"
+                : cooldownRemaining > 0f
+                    ? $"Cooldown {cooldownRemaining:0.0}s"
+                    : "Ready";
+            if (GUI.Button(
+                    new Rect(panelRect.x + 8f, panelRect.y + 30f, 132f, 46f),
+                    $"{definition.DisplayName} [F]\n{stateLabel}"))
+            {
+                TryActivateSelectedSkill(0);
+            }
+
+            if (!string.IsNullOrWhiteSpace(skillFeedback))
+            {
+                GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 82f, panelRect.width - 16f, 28f), skillFeedback);
             }
         }
 
@@ -810,6 +975,43 @@ namespace ProjectS.UI
             return displayedProductionQueue;
         }
 
+        private UnitActiveSkillController ResolveDisplayedSkillController()
+        {
+            if (commandController == null)
+            {
+                return null;
+            }
+
+            var selection = commandController.PrimarySelection;
+            var selectionObject = selection != null ? selection.SelectionGameObject : null;
+            var controller = selectionObject != null
+                ? selectionObject.GetComponent<UnitActiveSkillController>()
+                : null;
+            if (IsUsableSkillController(controller))
+            {
+                return controller;
+            }
+
+            var selectedUnits = commandController.SelectedUnits;
+            for (var i = 0; i < selectedUnits.Count; i++)
+            {
+                controller = selectedUnits[i] != null
+                    ? selectedUnits[i].GetComponent<UnitActiveSkillController>()
+                    : null;
+                if (IsUsableSkillController(controller))
+                {
+                    return controller;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsUsableSkillController(UnitActiveSkillController controller)
+        {
+            return controller != null && controller.isActiveAndEnabled && controller.Skills.Count > 0;
+        }
+
         private void DrawPendingProductionCancelControls(Rect panelRect, UnitProductionQueue productionQueue)
         {
             if (productionQueue.PendingCount <= 0)
@@ -869,7 +1071,7 @@ namespace ProjectS.UI
             }
 
             var width = 360f;
-            var height = 132f;
+            var height = 188f;
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUI.Box(rect, string.Empty);
 
@@ -890,6 +1092,34 @@ namespace ProjectS.UI
                 new Rect(rect.x + 16f, rect.y + 74f, rect.width - 32f, 28f),
                 FormatEndReason(matchController.EndReason),
                 reasonStyle);
+
+            var action = matchController.RequestedPostMatchAction;
+            var canChooseAction = action == ProjectS.RtsMatchPostAction.None;
+            var previousEnabled = GUI.enabled;
+            GUI.enabled = canChooseAction;
+            if (GUI.Button(new Rect(rect.x + 20f, rect.y + 116f, 96f, 34f), "Rematch"))
+            {
+                matchController.TryRequestRematch();
+            }
+
+            if (GUI.Button(new Rect(rect.x + 132f, rect.y + 116f, 96f, 34f), "Main Menu"))
+            {
+                matchController.TryRequestMainMenu();
+            }
+
+            if (GUI.Button(new Rect(rect.x + 244f, rect.y + 116f, 96f, 34f), "End Match"))
+            {
+                matchController.TryRequestEndMatch();
+            }
+
+            GUI.enabled = previousEnabled;
+            if (!canChooseAction)
+            {
+                GUI.Label(
+                    new Rect(rect.x + 16f, rect.y + 154f, rect.width - 32f, 18f),
+                    FormatPostMatchAction(action),
+                    reasonStyle);
+            }
         }
 
         private bool IsMatchOver()
@@ -911,6 +1141,19 @@ namespace ProjectS.UI
                     return "Player buildings destroyed";
                 default:
                     return string.Empty;
+            }
+        }
+
+        private static string FormatPostMatchAction(ProjectS.RtsMatchPostAction action)
+        {
+            switch (action)
+            {
+                case ProjectS.RtsMatchPostAction.Rematch:
+                    return "Restarting match...";
+                case ProjectS.RtsMatchPostAction.MainMenu:
+                    return "Returning to main menu...";
+                default:
+                    return "Ending match...";
             }
         }
 

@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using ProjectS.Buildings;
 using ProjectS.Resources;
 using ProjectS.Units;
+using ProjectS.Upgrades;
 using UnityEngine;
 
 namespace ProjectS.AI
@@ -12,21 +14,29 @@ namespace ProjectS.AI
         [SerializeField] private UnitTeam enemyTeam = UnitTeam.Team1;
         [SerializeField, Min(0.1f)] private float decisionInterval = 1f;
         [SerializeField, Min(0)] private int desiredWorkers = 4;
-        [SerializeField, Min(1)] private int attackGroupSize = 5;
-        [SerializeField, Min(0.1f)] private float attackCommandInterval = 8f;
+        [SerializeField, Min(1)] private int attackGroupSize = 7;
+        [SerializeField, Min(0.1f)] private float attackCommandInterval = 18f;
+        [SerializeField, Min(0f)] private float initialAttackDelay = 90f;
         [SerializeField, Min(0)] private int supplyBuffer = 2;
         [SerializeField, Min(0.1f)] private float constructionPlacementDistance = 4f;
         [SerializeField, Min(0.1f)] private float defenceRadius = 8f;
         [SerializeField, Min(1)] private int maximumMainBases = 2;
         [SerializeField, Min(0.1f)] private float expansionMinimumDropOffDistance = 8f;
         [SerializeField, Min(0.1f)] private float expansionSiteOffset = 3f;
+        [SerializeField, Min(1)] private int expansionCandidateSearchRadius = 8;
         [SerializeField] private PrototypeUnitType defaultWorkerType = PrototypeUnitType.Worker;
-        [SerializeField] private PrototypeUnitType defaultCombatType = PrototypeUnitType.Soldier;
+        [SerializeField, Min(1)] private int occasionalUnitFrequency = 5;
+        [SerializeField, Min(0)] private int minimumCombatUnitsForOccasionalUnit = 5;
+        [SerializeField, Min(0)] private int minimumCombatUnitsForResearch = 6;
+        [SerializeField] private ResourceAmount researchResourceReserve = new ResourceAmount(200, 50);
+        [SerializeField, Min(0.1f)] private float researchAttemptInterval = 5f;
         [SerializeField] private ResourceType preferredResourceType = ResourceType.Minerals;
         [SerializeField] private Vector3 fallbackAttackPoint;
 
         private float nextDecisionTime;
         private float nextAttackCommandTime;
+        private float nextResearchAttemptTime;
+        private int successfulCombatProductions;
         private ConstructionSite pendingConstructionSite;
         private BuildingKind pendingConstructionKind;
         private bool hasPendingConstruction;
@@ -52,6 +62,11 @@ namespace ProjectS.AI
             attackCommandInterval = Mathf.Max(0.1f, attackSeconds);
         }
 
+        private void Start()
+        {
+            nextAttackCommandTime = Mathf.Max(nextAttackCommandTime, Time.time + initialAttackDelay);
+        }
+
         private void Update()
         {
             if (ProjectS.RtsMatchController.ActiveInstance != null
@@ -70,6 +85,7 @@ namespace ProjectS.AI
             AssignIdleWorkersToResources();
             RunBaseOperations();
             RunProduction();
+            RunEasyResearch();
             IssueAttackIfReady();
         }
 
@@ -101,6 +117,7 @@ namespace ProjectS.AI
         private void RunProduction()
         {
             var workers = CountUnits(defaultWorkerType);
+            var combatUnits = CountCombatUnits();
             var buildings = BuildingRegistry.GetBuildings(team);
             for (var i = 0; i < buildings.Count; i++)
             {
@@ -122,8 +139,150 @@ namespace ProjectS.AI
                     continue;
                 }
 
-                queue.TryEnqueue(defaultCombatType);
+                if (TryEnqueueEasyCombatUnit(queue, combatUnits))
+                {
+                    combatUnits++;
+                }
             }
+        }
+
+        private bool TryEnqueueEasyCombatUnit(UnitProductionQueue queue, int currentCombatUnits)
+        {
+            var desiredType = SelectEasyCombatUnitType(currentCombatUnits);
+            if (TryEnqueueAvailableUnit(queue, desiredType))
+            {
+                successfulCombatProductions++;
+                return true;
+            }
+
+            if (desiredType != PrototypeUnitType.Soldier
+                && TryEnqueueAvailableUnit(queue, PrototypeUnitType.Soldier))
+            {
+                successfulCombatProductions++;
+                return true;
+            }
+
+            return false;
+        }
+
+        private PrototypeUnitType SelectEasyCombatUnitType(int currentCombatUnits)
+        {
+            if (currentCombatUnits < minimumCombatUnitsForOccasionalUnit)
+            {
+                return PrototypeUnitType.Soldier;
+            }
+
+            var frequency = Mathf.Max(1, occasionalUnitFrequency);
+            var nextProductionNumber = successfulCombatProductions + 1;
+            if (nextProductionNumber % frequency != 0)
+            {
+                return PrototypeUnitType.Soldier;
+            }
+
+            var supportProductionNumber = nextProductionNumber / frequency;
+            return supportProductionNumber % 2 == 1
+                ? PrototypeUnitType.Ranger
+                : PrototypeUnitType.Striker;
+        }
+
+        private static bool TryEnqueueAvailableUnit(UnitProductionQueue queue, PrototypeUnitType unitType)
+        {
+            var definition = FindProductionDefinition(queue, unitType);
+            return definition != null
+                && queue.CanEnqueue(definition, out _)
+                && queue.TryEnqueue(definition);
+        }
+
+        private static UnitProductionDefinition FindProductionDefinition(
+            UnitProductionQueue queue,
+            PrototypeUnitType unitType)
+        {
+            if (queue == null)
+            {
+                return null;
+            }
+
+            var definitions = queue.ProducibleUnits;
+            for (var i = 0; i < definitions.Count; i++)
+            {
+                var definition = definitions[i];
+                if (definition != null && definition.UnitType == unitType)
+                {
+                    return definition;
+                }
+            }
+
+            return null;
+        }
+
+        private void RunEasyResearch()
+        {
+            if (Time.time < nextResearchAttemptTime)
+            {
+                return;
+            }
+
+            nextResearchAttemptTime = Time.time + researchAttemptInterval;
+            if (CountCombatUnits() < minimumCombatUnitsForResearch)
+            {
+                return;
+            }
+
+            var research = TeamUpgradeResearch.FindForTeam(team);
+            if (research == null || research.ActiveDefinition != null)
+            {
+                return;
+            }
+
+            var definition = FindNextEasyUpgrade(research);
+            var wallet = PlayerResourceWallet.FindForTeam(team);
+            if (definition == null || !HasResearchBudget(wallet, definition))
+            {
+                return;
+            }
+
+            research.TryStartResearch(definition);
+        }
+
+        private static UnitUpgradeDefinition FindNextEasyUpgrade(TeamUpgradeResearch research)
+        {
+            var weapon = FindUpgradeDefinition(research, UnitUpgradeKind.AttackDamage);
+            if (weapon == null || research.GetStatus(weapon) != UnitUpgradeResearchStatus.Completed)
+            {
+                return weapon != null && research.GetStatus(weapon) == UnitUpgradeResearchStatus.Available
+                    ? weapon
+                    : null;
+            }
+
+            var mobility = FindUpgradeDefinition(research, UnitUpgradeKind.MovementSpeed);
+            return mobility != null && research.GetStatus(mobility) == UnitUpgradeResearchStatus.Available
+                ? mobility
+                : null;
+        }
+
+        private static UnitUpgradeDefinition FindUpgradeDefinition(
+            TeamUpgradeResearch research,
+            UnitUpgradeKind upgradeKind)
+        {
+            var definitions = research.Definitions;
+            for (var i = 0; i < definitions.Count; i++)
+            {
+                var definition = definitions[i];
+                if (definition != null && definition.UpgradeKind == upgradeKind)
+                {
+                    return definition;
+                }
+            }
+
+            return null;
+        }
+
+        private bool HasResearchBudget(PlayerResourceWallet wallet, UnitUpgradeDefinition definition)
+        {
+            return wallet != null
+                && definition != null
+                && wallet.Minerals >= definition.Cost.Minerals + researchResourceReserve.Minerals
+                && wallet.Gas >= definition.Cost.Gas + researchResourceReserve.Gas;
         }
 
         private void RunBaseOperations()
@@ -212,22 +371,45 @@ namespace ProjectS.AI
                 return;
             }
 
-            var offsets = new[]
-            {
-                Vector3.right,
-                Vector3.left,
-                Vector3.up,
-                Vector3.down
-            };
-            for (var i = 0; i < offsets.Length; i++)
+            var candidatePositions = GetExpansionCandidatePositions(resourceNode);
+            for (var i = 0; i < candidatePositions.Count; i++)
             {
                 if (TryBeginConstructionAt(
                         BuildingKind.MainBase,
-                        resourceNode.transform.position + offsets[i] * expansionSiteOffset))
+                        candidatePositions[i]))
                 {
                     return;
                 }
             }
+        }
+
+        private List<Vector3> GetExpansionCandidatePositions(ResourceNode resourceNode)
+        {
+            var candidates = new List<Vector3>();
+            if (resourceNode == null)
+            {
+                return candidates;
+            }
+
+            var minimumRadius = Mathf.Max(1, Mathf.RoundToInt(expansionSiteOffset));
+            var maximumRadius = Mathf.Max(minimumRadius, expansionCandidateSearchRadius);
+            for (var radius = minimumRadius; radius <= maximumRadius; radius++)
+            {
+                for (var y = -radius; y <= radius; y++)
+                {
+                    for (var x = -radius; x <= radius; x++)
+                    {
+                        if (Mathf.Max(Mathf.Abs(x), Mathf.Abs(y)) != radius)
+                        {
+                            continue;
+                        }
+
+                        candidates.Add(resourceNode.transform.position + new Vector3(x, y, 0f));
+                    }
+                }
+            }
+
+            return candidates;
         }
 
         private ResourceNode FindExpansionResourceNode()

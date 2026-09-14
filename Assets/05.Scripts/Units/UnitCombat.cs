@@ -52,6 +52,11 @@ namespace ProjectS.Units
             {
                 var target = attackTargets[i];
                 UnitTargetPriority.RecordRecentAttacker(target, status);
+                CombatFeedbackEvents.Publish(
+                    CombatFeedbackType.AttackHit,
+                    target.SelectionTransform.position,
+                    target.Team,
+                    status.Team);
                 target.TakeDamage(GetAttackDamage(target), status);
             }
         }

@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 100010}
   - component: {fileID: 100011}
   - component: {fileID: 100012}
+  - component: {fileID: 100013}
   m_Layer: 0
   m_Name: B_Striker
   m_TagString: Untagged
@@ -207,6 +208,7 @@ MonoBehaviour:
   maxAttackTargets: 1
   occupiedCells: {x: 1, y: 1}
   supplyCost: 1
+  visionRadius: 6
   hasHealthRegeneration: 0
   healthRegenerationAmount: 0
   hasShield: 0
@@ -320,6 +322,24 @@ MonoBehaviour:
   size: {x: 0.62, y: 0.075}
   sortingOrder: 41
   lowHealthThreshold: 0.35
+--- !u!114 &100013
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c07608023e843e0a12beb4788786119, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  skills:
+  - displayName: Overdrive
+    effectType: 0
+    cooldown: 12
+    duration: 4
+    movementSpeedMultiplier: 1.5
 --- !u!1 &100100
 GameObject:
   m_ObjectHideFlags: 0

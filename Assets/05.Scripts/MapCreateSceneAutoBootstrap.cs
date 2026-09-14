@@ -5,6 +5,7 @@ using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.UI;
 using ProjectS.Units;
+using ProjectS.Unlocks;
 using ProjectS.Upgrades;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -73,6 +74,8 @@ namespace ProjectS
             EnsureSupplyManagers(root);
             EnsureTeamUpgradeResearch(root, UnitTeam.Team1);
             EnsureTeamUpgradeResearch(root, UnitTeam.Team2);
+            EnsureTeamUnlockState(root, UnitTeam.Team1);
+            EnsureTeamUnlockState(root, UnitTeam.Team2);
             GetStartPositions(ProjectSTilemapWorld.ActiveInstance, out var playerStart, out var aiStart);
             if (!ResourceTilemapNodeSynchronizer.SceneHasResourceTiles())
             {
@@ -96,7 +99,7 @@ namespace ProjectS
                 ConfigureProductionTemplate(
                     FindOrCreateBuildingTemplate(templates, "Spliter Production Building Template", BuildingKind.SpliterProduction, true, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f)),
                     GetRequiredUnitPrefab(PrototypeUnitType.Spliter),
-                    new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, GetRequiredUnitPrefab(PrototypeUnitType.Spliter), new ResourceAmount(125, 0), 8f, 3) },
+                    new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, GetRequiredUnitPrefab(PrototypeUnitType.Spliter), new ResourceAmount(125, 0), 8f, 3, allowedProductionBuildings: new[] { BuildingKind.SpliterProduction }) },
                     new Vector3(2.5f, -0.5f, 0f),
                     new Vector3(5f, -1f, 0f)),
                 FindOrCreateBuildingTemplate(templates, "Auto Turret Building Template", BuildingKind.AutoTurret, false, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f)),
@@ -106,7 +109,7 @@ namespace ProjectS
                 ConfigureProductionTemplate(
                     FindOrCreateBuildingTemplate(templates, "Main Base Building Template", BuildingKind.MainBase, true, new Vector2(2.6f, 2.2f), new Color(0.28f, 0.52f, 0.76f, 1f)),
                     GetRequiredUnitPrefab(PrototypeUnitType.Worker),
-                    new[] { CreateProductionDefinition("Worker", PrototypeUnitType.Worker, GetRequiredUnitPrefab(PrototypeUnitType.Worker), new ResourceAmount(50, 0), 5f, 1) },
+                    new[] { CreateProductionDefinition("Worker", PrototypeUnitType.Worker, GetRequiredUnitPrefab(PrototypeUnitType.Worker), new ResourceAmount(50, 0), 5f, 1, allowedProductionBuildings: new[] { BuildingKind.MainBase }) },
                     new Vector3(2.5f, -1.5f, 0f),
                     new Vector3(5f, -2f, 0f)));
         }
@@ -159,6 +162,8 @@ namespace ProjectS
             var aiWallet = CreateWallet("AI Wallet", UnitTeam.Team2, new ResourceAmount(100, 0), root.transform);
             CreateTeamUpgradeResearch("Player Unit Upgrades", UnitTeam.Team1, playerWallet, root.transform);
             CreateTeamUpgradeResearch("AI Unit Upgrades", UnitTeam.Team2, aiWallet, root.transform);
+            CreateTeamUnlockState("Player Unlocks", UnitTeam.Team1, root.transform);
+            CreateTeamUnlockState("AI Unlocks", UnitTeam.Team2, root.transform);
             EnsureSupplyManagers(root.transform);
 
             var workerUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Worker);
@@ -194,17 +199,17 @@ namespace ProjectS
 
             var workerDefinitions = new[]
             {
-                CreateProductionDefinition("Worker", PrototypeUnitType.Worker, workerUnitPrefab, new ResourceAmount(50, 0), 5f, 1)
+                CreateProductionDefinition("Worker", PrototypeUnitType.Worker, workerUnitPrefab, new ResourceAmount(50, 0), 5f, 1, allowedProductionBuildings: new[] { BuildingKind.MainBase })
             };
             var combatDefinitions = new[]
             {
-                CreateProductionDefinition("Soldier", PrototypeUnitType.Soldier, soldierUnitPrefab, new ResourceAmount(100, 0), 7f, 2),
-                CreateProductionDefinition("Ranger", PrototypeUnitType.Ranger, rangerUnitPrefab, new ResourceAmount(100, 25), 8f, 2),
-                CreateProductionDefinition("Tank", PrototypeUnitType.Tank, tankUnitPrefab, new ResourceAmount(150, 0), 10f, 3),
-                CreateProductionDefinition("Striker", PrototypeUnitType.Striker, strikerUnitPrefab, new ResourceAmount(75, 0), 6f, 1),
-                CreateProductionDefinition("Swarm x3", PrototypeUnitType.Swarm, swarmUnitPrefab, new ResourceAmount(120, 0), 8f, 1, 3)
+                CreateProductionDefinition("Soldier", PrototypeUnitType.Soldier, soldierUnitPrefab, new ResourceAmount(100, 0), 7f, 2, allowedProductionBuildings: new[] { BuildingKind.Production }),
+                CreateProductionDefinition("Ranger", PrototypeUnitType.Ranger, rangerUnitPrefab, new ResourceAmount(100, 25), 8f, 2, allowedProductionBuildings: new[] { BuildingKind.Production }),
+                CreateProductionDefinition("Tank", PrototypeUnitType.Tank, tankUnitPrefab, new ResourceAmount(150, 0), 10f, 3, allowedProductionBuildings: new[] { BuildingKind.Production }),
+                CreateProductionDefinition("Striker", PrototypeUnitType.Striker, strikerUnitPrefab, new ResourceAmount(75, 0), 6f, 1, allowedProductionBuildings: new[] { BuildingKind.Production }),
+                CreateProductionDefinition("Swarm x3", PrototypeUnitType.Swarm, swarmUnitPrefab, new ResourceAmount(120, 0), 8f, 1, 3, allowedProductionBuildings: new[] { BuildingKind.Production })
             };
-            var spliterDefinitions = new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterUnitPrefab, new ResourceAmount(125, 0), 8f, 3) };
+            var spliterDefinitions = new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterUnitPrefab, new ResourceAmount(125, 0), 8f, 3, allowedProductionBuildings: new[] { BuildingKind.SpliterProduction }) };
 
             ConfigureProductionTemplate(mainBasePrototype, workerUnitPrefab, workerDefinitions, new Vector3(2.5f, -1.5f, 0f), new Vector3(5f, -2f, 0f));
 
@@ -294,6 +299,14 @@ namespace ProjectS
             {
                 commandController = CreateChild(parent, "Player Runtime Systems").AddComponent<PlayerUnitCommandController>();
             }
+
+            var workerAutoAssignment = commandController.GetComponent<WorkerAutoAssignmentManager>();
+            if (workerAutoAssignment == null)
+            {
+                workerAutoAssignment = commandController.gameObject.AddComponent<WorkerAutoAssignmentManager>();
+            }
+
+            workerAutoAssignment.Configure(UnitTeam.Team1, false);
 
             var placementService = commandController.GetComponent<BuildingPlacementService>();
             if (placementService == null)
@@ -410,6 +423,25 @@ namespace ProjectS
                 {
                     CreateTeamUpgradeResearch($"{team} Unit Upgrades", team, wallet, parent);
                 }
+            }
+        }
+
+        private static void CreateTeamUnlockState(string name, UnitTeam team, Transform parent)
+        {
+            if (TeamUnlockState.FindForTeam(team) != null)
+            {
+                return;
+            }
+
+            var state = CreateChild(parent, name).AddComponent<TeamUnlockState>();
+            state.Configure(team);
+        }
+
+        private static void EnsureTeamUnlockState(Transform parent, UnitTeam team)
+        {
+            if (TeamUnlockState.FindForTeam(team) == null)
+            {
+                CreateTeamUnlockState($"{team} Unlocks", team, parent);
             }
         }
 
@@ -756,10 +788,12 @@ namespace ProjectS
             ResourceAmount cost,
             float duration,
             int supplyCost,
-            int outputCount = 1)
+            int outputCount = 1,
+            BuildingKind[] allowedProductionBuildings = null)
         {
             var definition = new UnitProductionDefinition();
             definition.Configure(displayName, unitType, prefab, cost, duration, supplyCost, outputCount);
+            definition.ConfigureAllowedProductionBuildings(allowedProductionBuildings);
             return definition;
         }
 

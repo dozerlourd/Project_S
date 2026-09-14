@@ -28,13 +28,18 @@ namespace ProjectS.Tests.PlayMode
         private static readonly Type ConstructionSiteType = GetGameplayType("ProjectS.Buildings.ConstructionSite");
         private static readonly Type BuildingPlacementServiceType = GetGameplayType("ProjectS.Buildings.BuildingPlacementService");
         private static readonly Type ResourceDropOffType = GetGameplayType("ProjectS.Buildings.ResourceDropOff");
+        private static readonly Type WorkerAutoAssignmentManagerType = GetGameplayType("ProjectS.Resources.WorkerAutoAssignmentManager");
         private static readonly Type UnitProductionDefinitionType = GetGameplayType("ProjectS.Buildings.UnitProductionDefinition");
         private static readonly Type UnitProductionRequirementType = GetGameplayType("ProjectS.Buildings.UnitProductionRequirement");
         private static readonly Type UnitProductionQueueType = GetGameplayType("ProjectS.Buildings.UnitProductionQueue");
+        private static readonly Type BuildingConstructionDefinitionType = GetGameplayType("ProjectS.Buildings.BuildingConstructionDefinition");
         private static readonly Type BuildingAutoTurretType = GetGameplayType("ProjectS.Buildings.BuildingAutoTurret");
         private static readonly Type BuildingSpeedAuraType = GetGameplayType("ProjectS.Buildings.BuildingSpeedAura");
+        private static readonly Type SimpleSkirmishAIType = GetGameplayType("ProjectS.AI.SimpleSkirmishAI");
         private static readonly Type WorkerGatherControllerType = GetGameplayType("ProjectS.Resources.WorkerGatherController");
         private static readonly Type RtsGameHudType = GetGameplayType("ProjectS.UI.RtsGameHud");
+        private static readonly Type TeamUnlockStateType = GetGameplayType("ProjectS.Unlocks.TeamUnlockState");
+        private static readonly Type UnlockRequirementType = GetGameplayType("ProjectS.Unlocks.UnlockRequirement");
         private static int featureConstructionIndex;
 
         [UnityTest]
@@ -1243,6 +1248,90 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator ConstructionSite_ProtectsResourceNodeCardinalAndDiagonalCells()
+        {
+            var worldObject = CreateNavigationTestWorld(
+                "ResourceProtectionWorld",
+                RectCells(-4, -4, 14, 14),
+                new HashSet<Vector3Int>(),
+                out var tilemapWorld,
+                out _);
+            var resource = CreateResourceNode(
+                "ProtectedMineral",
+                Enum.Parse(ResourceTypeType, "Minerals"),
+                100,
+                5,
+                0f,
+                tilemapWorld.GetCellCenterWorld(new Vector3Int(2, 2, 0)));
+
+            var cardinalBlocked = (string)InvokeStatic(
+                ConstructionSiteType,
+                "GetPlacementFailureReason",
+                null,
+                tilemapWorld.GetCellCenterWorld(new Vector3Int(2, 5, 0)),
+                Vector2Int.one);
+            var cardinalClear = (string)InvokeStatic(
+                ConstructionSiteType,
+                "GetPlacementFailureReason",
+                null,
+                tilemapWorld.GetCellCenterWorld(new Vector3Int(2, 6, 0)),
+                Vector2Int.one);
+            var diagonalBlocked = (string)InvokeStatic(
+                ConstructionSiteType,
+                "GetPlacementFailureReason",
+                null,
+                tilemapWorld.GetCellCenterWorld(new Vector3Int(4, 4, 0)),
+                Vector2Int.one);
+            var diagonalClear = (string)InvokeStatic(
+                ConstructionSiteType,
+                "GetPlacementFailureReason",
+                null,
+                tilemapWorld.GetCellCenterWorld(new Vector3Int(5, 5, 0)),
+                Vector2Int.one);
+
+            Assert.That(cardinalBlocked, Does.Contain("protection area"));
+            Assert.That(cardinalClear, Is.Empty);
+            Assert.That(diagonalBlocked, Does.Contain("protection area"));
+            Assert.That(diagonalClear, Is.Empty);
+
+            Object.Destroy(resource);
+            Object.Destroy(worldObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator SimpleSkirmishAI_ExpansionCandidatesSearchBeyondInitialResourceOffset()
+        {
+            var resource = CreateResourceNode(
+                "ExpansionCandidateResource",
+                Enum.Parse(ResourceTypeType, "Minerals"),
+                100,
+                5,
+                0f,
+                Vector3.zero);
+            var aiObject = new GameObject("ExpansionCandidateAI");
+            var ai = aiObject.AddComponent(SimpleSkirmishAIType);
+            var candidates = (IList)Invoke(ai, "GetExpansionCandidatePositions", resource.GetComponent(ResourceNodeType));
+            var foundBeyondInitialOffset = false;
+
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                var candidate = (Vector3)candidates[i];
+                if (Mathf.Abs(candidate.x) >= 4f || Mathf.Abs(candidate.y) >= 4f)
+                {
+                    foundBeyondInitialOffset = true;
+                    break;
+                }
+            }
+
+            Assert.That(foundBeyondInitialOffset, Is.True);
+
+            Object.Destroy(aiObject);
+            Object.Destroy(resource);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator PlayerUnitCommandController_RequiresFriendlyBuilderBeforeEnteringPlacementMode()
         {
             var controllerObject = new GameObject("BuilderRequirementController");
@@ -1650,6 +1739,140 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator WorkerAutoAssignmentManager_BalancesIdleWorkersWithoutOverwritingDirectCommands()
+        {
+            var walletObject = new GameObject("AutoAssignmentWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 0));
+            var dropOff = CreateDropOff("AutoAssignmentDropOff", UnitTeam.Team1, Vector3.zero);
+            var firstResource = CreateResourceNode(
+                "AutoAssignmentMineralsA",
+                Enum.Parse(ResourceTypeType, "Minerals"),
+                100,
+                5,
+                0f,
+                new Vector3(3f, 0f, 0f));
+            var secondResource = CreateResourceNode(
+                "AutoAssignmentMineralsB",
+                Enum.Parse(ResourceTypeType, "Minerals"),
+                100,
+                5,
+                0f,
+                new Vector3(-3f, 0f, 0f));
+            var firstWorker = CreateWorkerUnit("AutoAssignmentWorkerA", new Vector3(2f, 0f, 0f));
+            var secondWorker = CreateWorkerUnit("AutoAssignmentWorkerB", new Vector3(-2f, 0f, 0f));
+            var managerObject = new GameObject("Team1AutoAssignmentManager");
+            var manager = managerObject.AddComponent(WorkerAutoAssignmentManagerType);
+            Invoke(manager, "Configure", UnitTeam.Team1, true);
+            Invoke(manager, "ReassessAssignments");
+
+            var firstAgent = firstWorker.GetComponent<UnitCommandAgent>();
+            var secondAgent = secondWorker.GetComponent<UnitCommandAgent>();
+            Assert.That(firstAgent.Mode, Is.EqualTo(UnitCommandMode.Interact));
+            Assert.That(secondAgent.Mode, Is.EqualTo(UnitCommandMode.Interact));
+            Assert.That(firstAgent.LatestCommand.InteractableTarget, Is.Not.EqualTo(secondAgent.LatestCommand.InteractableTarget));
+
+            firstAgent.Stop();
+            var directMoveTarget = new Vector3(6f, 0f, 0f);
+            firstAgent.Issue(new UnitCommand(UnitCommandMode.Move, directMoveTarget, null, false));
+            Invoke(manager, "ReassessAssignments");
+            Assert.That(firstAgent.Mode, Is.EqualTo(UnitCommandMode.Move));
+            Assert.That(firstAgent.CommandDestination, Is.EqualTo(directMoveTarget));
+
+            Object.Destroy(managerObject);
+            Object.Destroy(firstWorker);
+            Object.Destroy(secondWorker);
+            Object.Destroy(firstResource);
+            Object.Destroy(secondResource);
+            Object.Destroy(dropOff);
+            Object.Destroy(walletObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RtsGameHud_TogglesPlayerWorkerAutoAssignmentThroughHudAction()
+        {
+            var managerObject = new GameObject("HudAutoAssignmentManager");
+            var manager = managerObject.AddComponent(WorkerAutoAssignmentManagerType);
+            Invoke(manager, "Configure", UnitTeam.Team1, false);
+            var hudObject = new GameObject("WorkerAutoAssignmentHud");
+            var hud = hudObject.AddComponent(RtsGameHudType);
+            Invoke(hud, "Configure", UnitTeam.Team1, null);
+
+            Assert.That(GetProperty(hud, "WorkerAutoAssignmentEnabled"), Is.EqualTo(false));
+            Assert.That((bool)Invoke(hud, "ToggleWorkerAutoAssignment"), Is.True);
+            Assert.That(GetProperty(hud, "WorkerAutoAssignmentEnabled"), Is.EqualTo(true));
+            Assert.That((bool)Invoke(hud, "ToggleWorkerAutoAssignment"), Is.False);
+            Assert.That(GetProperty(hud, "WorkerAutoAssignmentEnabled"), Is.EqualTo(false));
+
+            Object.Destroy(hudObject);
+            Object.Destroy(managerObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator UnitProductionQueue_FiltersDefinitionsByConfiguredBuildingRole()
+        {
+            var walletObject = new GameObject("ProductionRoleWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 0));
+            var productionBuilding = CreateProductionBuilding("ProductionRoleBuilding", UnitTeam.Team1, Vector3.zero);
+            var workerPrefab = CreateUnitPrefab("ProductionRoleWorker", PrototypeUnitType.Worker);
+            var soldierPrefab = CreateUnitPrefab("ProductionRoleSoldier", PrototypeUnitType.Soldier);
+            var spliterPrefab = CreateUnitPrefab("ProductionRoleSpliter", PrototypeUnitType.Spliter);
+            var workerDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            var soldierDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            var spliterDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(workerDefinition, "Configure", "Role Worker", PrototypeUnitType.Worker, workerPrefab, CreateResourceAmount(10, 0), 10f);
+            Invoke(soldierDefinition, "Configure", "Role Soldier", PrototypeUnitType.Soldier, soldierPrefab, CreateResourceAmount(25, 0), 10f);
+            Invoke(spliterDefinition, "Configure", "Role Spliter", PrototypeUnitType.Spliter, spliterPrefab, CreateResourceAmount(30, 0), 10f);
+            Invoke(
+                workerDefinition,
+                "ConfigureAllowedProductionBuildings",
+                CreateBuildingKindArray("MainBase"));
+            Invoke(
+                soldierDefinition,
+                "ConfigureAllowedProductionBuildings",
+                CreateBuildingKindArray("Production"));
+            Invoke(
+                spliterDefinition,
+                "ConfigureAllowedProductionBuildings",
+                CreateBuildingKindArray("SpliterProduction"));
+            var definitions = Array.CreateInstance(UnitProductionDefinitionType, 3);
+            definitions.SetValue(workerDefinition, 0);
+            definitions.SetValue(soldierDefinition, 1);
+            definitions.SetValue(spliterDefinition, 2);
+            var queue = productionBuilding.AddComponent(UnitProductionQueueType);
+            Invoke(queue, "Configure", wallet, null, definitions, 3, Vector3.right, Vector3.right * 2f);
+            var hudObject = new GameObject("ProductionRoleHud");
+            var hud = hudObject.AddComponent(RtsGameHudType);
+
+            var visibleDefinitions = (IEnumerable)GetProperty(queue, "ProducibleUnits");
+            Assert.That(GetListCount(visibleDefinitions), Is.EqualTo(1));
+            Assert.That(GetFirstPreviewCell(visibleDefinitions), Is.EqualTo(soldierDefinition));
+            Assert.That((bool)Invoke(hud, "TryQueueProduction", queue, 1), Is.False);
+            Assert.That((bool)Invoke(workerDefinition, "CanBeProducedAt", Enum.Parse(BuildingKindType, "MainBase")), Is.True);
+            Assert.That((bool)Invoke(workerDefinition, "CanBeProducedAt", Enum.Parse(BuildingKindType, "Production")), Is.False);
+            Assert.That((bool)Invoke(spliterDefinition, "CanBeProducedAt", Enum.Parse(BuildingKindType, "SpliterProduction")), Is.True);
+            Assert.That((bool)Invoke(spliterDefinition, "CanBeProducedAt", Enum.Parse(BuildingKindType, "Production")), Is.False);
+
+            LogAssert.Expect(
+                LogType.Warning,
+                "Cannot enqueue Role Worker: cannot be produced at Production. Allowed building(s): MainBase.");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", workerDefinition), Is.False);
+            Assert.That((bool)Invoke(queue, "TryEnqueue", soldierDefinition), Is.True);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(75));
+
+            Object.Destroy(hudObject);
+            Object.Destroy(workerPrefab);
+            Object.Destroy(soldierPrefab);
+            Object.Destroy(spliterPrefab);
+            Object.Destroy(productionBuilding);
+            Object.Destroy(walletObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator UnitProductionQueue_ReportsFailureReasonWhenResourcesAreInsufficient()
         {
             var walletObject = new GameObject("PoorProductionWallet");
@@ -1910,6 +2133,80 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator UnlockRequirement_UsesSameTeamStateForProductionAndConstruction()
+        {
+            var walletObject = new GameObject("UnlockRequirementWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team2, CreateResourceAmount(100, 0));
+            var unlockStateObject = new GameObject("UnlockRequirementState");
+            var unlockState = unlockStateObject.AddComponent(TeamUnlockStateType);
+            Invoke(unlockState, "Configure", UnitTeam.Team2, Array.CreateInstance(typeof(string), 0));
+            var requirement = Activator.CreateInstance(UnlockRequirementType);
+            Invoke(requirement, "ConfigureTeamUnlock", "advanced-combat");
+            var requirements = Array.CreateInstance(UnlockRequirementType, 1);
+            requirements.SetValue(requirement, 0);
+
+            var productionBuilding = CreateProductionBuilding("UnlockRequirementProduction", UnitTeam.Team2, Vector3.zero);
+            var unitPrefab = CreateUnitPrefab("UnlockRequirementSoldierPrefab", PrototypeUnitType.Soldier);
+            var unitDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(
+                unitDefinition,
+                "Configure",
+                "Locked Soldier",
+                PrototypeUnitType.Soldier,
+                unitPrefab,
+                CreateResourceAmount(25, 0),
+                10f);
+            Invoke(unitDefinition, "ConfigureUnlockRequirements", requirements);
+            var unitDefinitions = Array.CreateInstance(UnitProductionDefinitionType, 1);
+            unitDefinitions.SetValue(unitDefinition, 0);
+            var queue = productionBuilding.AddComponent(UnitProductionQueueType);
+            Invoke(queue, "Configure", wallet, null, unitDefinitions, 2, Vector3.right, Vector3.right * 2f);
+
+            var constructionDefinition = Activator.CreateInstance(BuildingConstructionDefinitionType);
+            Invoke(constructionDefinition, "Configure", Enum.Parse(BuildingKindType, "Production"), requirements);
+            var constructionDefinitions = Array.CreateInstance(BuildingConstructionDefinitionType, 1);
+            constructionDefinitions.SetValue(constructionDefinition, 0);
+            var constructionPrefab = new GameObject("UnlockRequirementConstructionPrefab");
+            var placementObject = new GameObject("UnlockRequirementPlacement");
+            var placement = placementObject.AddComponent(BuildingPlacementServiceType);
+            Invoke(
+                placement,
+                "Configure",
+                UnitTeam.Team2,
+                wallet,
+                null,
+                null,
+                constructionPrefab,
+                Enum.Parse(BuildingKindType, "Production"),
+                CreateResourceAmount(150, 0),
+                8f,
+                Vector2Int.one);
+            Invoke(placement, "ConfigureConstructionDefinitions", constructionDefinitions);
+
+            LogAssert.Expect(LogType.Warning, "Cannot produce Locked Soldier: requires team unlock 'advanced-combat'.");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Soldier), Is.False);
+            Assert.That((string)GetProperty(queue, "LastEnqueueFailureReason"), Is.EqualTo("Cannot produce Locked Soldier: requires team unlock 'advanced-combat'."));
+            Assert.That((bool)Invoke(placement, "SelectBuilding", Enum.Parse(BuildingKindType, "Production")), Is.False);
+            Assert.That((string)GetProperty(placement, "LastPlacementFailureReason"), Is.EqualTo("Cannot build Production: requires team unlock 'advanced-combat'."));
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(100));
+
+            Invoke(unlockState, "Unlock", "advanced-combat");
+
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Soldier), Is.True);
+            Assert.That((bool)Invoke(placement, "SelectBuilding", Enum.Parse(BuildingKindType, "Production")), Is.True);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(75));
+
+            Object.Destroy(constructionPrefab);
+            Object.Destroy(placementObject);
+            Object.Destroy(unitPrefab);
+            Object.Destroy(productionBuilding);
+            Object.Destroy(unlockStateObject);
+            Object.Destroy(walletObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator UnitProductionQueue_DisableRefundsActiveAndPendingProductionAndReleasesSupply()
         {
             var supplyObject = new GameObject("DisableProductionSupply");
@@ -2129,6 +2426,17 @@ namespace ProjectS.Tests.PlayMode
             var definitions = Array.CreateInstance(UnitProductionDefinitionType, 1);
             definitions.SetValue(definition, 0);
             return definitions;
+        }
+
+        private static Array CreateBuildingKindArray(params string[] buildingKinds)
+        {
+            var values = Array.CreateInstance(BuildingKindType, buildingKinds != null ? buildingKinds.Length : 0);
+            for (var i = 0; i < values.Length; i++)
+            {
+                values.SetValue(Enum.Parse(BuildingKindType, buildingKinds[i]), i);
+            }
+
+            return values;
         }
 
         private sealed class RecordingBuildPlacementService : IUnitBuildPlacementService

@@ -13,6 +13,26 @@ namespace ProjectS.Visibility
         Visible
     }
 
+    public readonly struct FogObservedEnemy
+    {
+        public readonly IUnitAttackTarget Target;
+        public readonly UnitTeam Team;
+        public readonly Vector3 LastObservedPosition;
+        public readonly bool IsCurrentlyVisible;
+
+        public FogObservedEnemy(
+            IUnitAttackTarget target,
+            UnitTeam team,
+            Vector3 lastObservedPosition,
+            bool isCurrentlyVisible)
+        {
+            Target = target;
+            Team = team;
+            LastObservedPosition = lastObservedPosition;
+            IsCurrentlyVisible = isCurrentlyVisible;
+        }
+    }
+
     public sealed class FogOfWarManager : MonoBehaviour
     {
         private sealed class ProviderCoverage
@@ -22,6 +42,13 @@ namespace ProjectS.Visibility
             public readonly List<int> CellIndices = new List<int>();
         }
 
+        private sealed class EnemyObservation
+        {
+            public UnitTeam Team;
+            public Vector3 LastObservedPosition;
+            public bool IsCurrentlyVisible;
+        }
+
         [SerializeField] private ProjectSTilemapWorld tilemapWorld;
         [SerializeField] private UnitTeam playerTeam = UnitTeam.Team1;
 
@@ -29,6 +56,11 @@ namespace ProjectS.Visibility
             new Dictionary<IFogVisionProvider, ProviderCoverage>();
         private readonly HashSet<IFogVisionProvider> activeProviders = new HashSet<IFogVisionProvider>();
         private readonly List<IFogVisionProvider> providersToRemove = new List<IFogVisionProvider>();
+        private readonly Dictionary<IUnitAttackTarget, EnemyObservation> enemyObservations =
+            new Dictionary<IUnitAttackTarget, EnemyObservation>();
+        private readonly HashSet<IUnitAttackTarget> registeredEnemies = new HashSet<IUnitAttackTarget>();
+        private readonly List<IUnitAttackTarget> enemyObservationsToRemove = new List<IUnitAttackTarget>();
+        private readonly List<FogObservedEnemy> observedEnemySnapshots = new List<FogObservedEnemy>();
         private FogVisibilityState[] visibilityStates;
         private int[] visibilityCounts;
         private BoundsInt visibilityBounds;
@@ -42,6 +74,7 @@ namespace ProjectS.Visibility
         public int VisibilityRevision { get; private set; }
         public int RebuildCount { get; private set; }
         public BoundsInt VisibilityBounds => visibilityBounds;
+        public IReadOnlyList<FogObservedEnemy> ObservedEnemies => observedEnemySnapshots;
         public event Action VisibilityChanged;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -77,6 +110,7 @@ namespace ProjectS.Visibility
         private void Update()
         {
             RefreshIfNeeded();
+            RefreshEnemyObservations();
         }
 
         public void Configure(ProjectSTilemapWorld world, UnitTeam team)
@@ -85,7 +119,9 @@ namespace ProjectS.Visibility
             playerTeam = team;
             observedRegistryVersion = -1;
             observedTerrainRevision = -1;
+            ClearEnemyObservations();
             RefreshIfNeeded();
+            RefreshEnemyObservations();
         }
 
         public void RefreshNow()
@@ -93,6 +129,7 @@ namespace ProjectS.Visibility
             observedRegistryVersion = -1;
             observedTerrainRevision = -1;
             RefreshIfNeeded();
+            RefreshEnemyObservations();
         }
 
         public FogVisibilityState GetVisibility(Vector3Int cell)
@@ -112,6 +149,97 @@ namespace ProjectS.Visibility
         public bool IsWorldPositionVisible(Vector3 worldPosition)
         {
             return GetVisibility(worldPosition) == FogVisibilityState.Visible;
+        }
+
+        public bool TryGetEnemyObservation(IUnitAttackTarget target, out FogObservedEnemy observation)
+        {
+            if (target != null && enemyObservations.TryGetValue(target, out var record))
+            {
+                observation = new FogObservedEnemy(
+                    target,
+                    record.Team,
+                    record.LastObservedPosition,
+                    record.IsCurrentlyVisible);
+                return true;
+            }
+
+            observation = default;
+            return false;
+        }
+
+        private void RefreshEnemyObservations()
+        {
+            registeredEnemies.Clear();
+            var targets = UnitAttackTargetRegistry.All;
+            for (var i = 0; i < targets.Count; i++)
+            {
+                var target = targets[i];
+                if (IsMissingTarget(target)
+                    || !target.IsAlive
+                    || target.Team == playerTeam
+                    || target.SelectionTransform == null)
+                {
+                    continue;
+                }
+
+                registeredEnemies.Add(target);
+                var position = target.SelectionTransform.position;
+                var isVisible = IsWorldPositionVisible(position);
+                if (isVisible)
+                {
+                    if (!enemyObservations.TryGetValue(target, out var observation))
+                    {
+                        observation = new EnemyObservation();
+                        enemyObservations.Add(target, observation);
+                    }
+
+                    observation.Team = target.Team;
+                    observation.LastObservedPosition = position;
+                    observation.IsCurrentlyVisible = true;
+                }
+                else if (enemyObservations.TryGetValue(target, out var observation))
+                {
+                    observation.IsCurrentlyVisible = false;
+                }
+            }
+
+            enemyObservationsToRemove.Clear();
+            foreach (var pair in enemyObservations)
+            {
+                if (!registeredEnemies.Contains(pair.Key))
+                {
+                    enemyObservationsToRemove.Add(pair.Key);
+                }
+            }
+
+            for (var i = 0; i < enemyObservationsToRemove.Count; i++)
+            {
+                enemyObservations.Remove(enemyObservationsToRemove[i]);
+            }
+
+            observedEnemySnapshots.Clear();
+            foreach (var pair in enemyObservations)
+            {
+                var observation = pair.Value;
+                observedEnemySnapshots.Add(new FogObservedEnemy(
+                    pair.Key,
+                    observation.Team,
+                    observation.LastObservedPosition,
+                    observation.IsCurrentlyVisible));
+            }
+        }
+
+        private void ClearEnemyObservations()
+        {
+            enemyObservations.Clear();
+            registeredEnemies.Clear();
+            enemyObservationsToRemove.Clear();
+            observedEnemySnapshots.Clear();
+        }
+
+        private static bool IsMissingTarget(IUnitAttackTarget target)
+        {
+            return target == null || target is UnityEngine.Object unityObject && unityObject == null;
         }
 
         private void RefreshIfNeeded()

@@ -1,0 +1,741 @@
+fileFormatVersion: 2
+guid: 6db0a81e819a14a42953649d33899e40
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 6984695058512481011
+    second: MainMenu_Command_Button_0
+  - first:
+      213: 3925018396261016898
+    second: MainMenu_Command_Button_1
+  - first:
+      213: 2609473284379551784
+    second: MainMenu_Command_Button_2
+  - first:
+      213: 6287816201713854104
+    second: MainMenu_Command_Button_3
+  - first:
+      213: -2562645768887092745
+    second: MainMenu_Command_Button_4
+  - first:
+      213: 6448005921764327547
+    second: MainMenu_Command_Button_5
+  - first:
+      213: -6125168064310670331
+    second: MainMenu_Command_Button_6
+  - first:
+      213: 4464297740921104561
+    second: MainMenu_Command_Button_7
+  - first:
+      213: -583582658216646894
+    second: MainMenu_Command_Button_8
+  - first:
+      213: -4575640693444852935
+    second: MainMenu_Command_Button_9
+  - first:
+      213: -6193309778275892460
+    second: MainMenu_Command_Button_10
+  - first:
+      213: 1254332849894159957
+    second: MainMenu_Command_Button_11
+  - first:
+      213: -5481732266905299604
+    second: MainMenu_Command_Button_12
+  - first:
+      213: -53607218080785605
+    second: MainMenu_Command_Button_13
+  - first:
+      213: 6192023011504305270
+    second: MainMenu_Command_Button_14
+  - first:
+      213: -9144575685599252871
+    second: MainMenu_Command_Button_15
+  - first:
+      213: 6329458996548506888
+    second: MainMenu_Command_Button_16
+  - first:
+      213: 2887380552042165972
+    second: MainMenu_Command_Button_17
+  - first:
+      213: 279786608960758194
+    second: MainMenu_Command_Button_18
+  - first:
+      213: -3938172961785398082
+    second: MainMenu_Command_Button_19
+  - first:
+      213: 64555882349706959
+    second: MainMenu_Command_Button_20
+  - first:
+      213: -1335433809274351607
+    second: MainMenu_Command_Button_21
+  - first:
+      213: 7908353861995358322
+    second: MainMenu_Command_Button_22
+  - first:
+      213: -4420855147889474136
+    second: MainMenu_Command_Button_23
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_0
+      rect:
+        serializedVersion: 2
+        x: 65
+        y: 63
+        width: 2044
+        height: 615
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3fa0013362f9ee060800000000000000
+      internalID: 6984695058512481011
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_1
+      rect:
+        serializedVersion: 2
+        x: 489
+        y: 657
+        width: 14
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 245e20e8f67787630800000000000000
+      internalID: 3925018396261016898
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_2
+      rect:
+        serializedVersion: 2
+        x: 551
+        y: 663
+        width: 174
+        height: 39
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 828a0566026b63420800000000000000
+      internalID: 2609473284379551784
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_3
+      rect:
+        serializedVersion: 2
+        x: 732
+        y: 619
+        width: 9
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 896a91c658fc24750800000000000000
+      internalID: 6287816201713854104
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_4
+      rect:
+        serializedVersion: 2
+        x: 1285
+        y: 95
+        width: 15
+        height: 22
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7f9b35c2047af6cd0800000000000000
+      internalID: -2562645768887092745
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_5
+      rect:
+        serializedVersion: 2
+        x: 1800
+        y: 111
+        width: 31
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b70c06c093beb7950800000000000000
+      internalID: 6448005921764327547
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_6
+      rect:
+        serializedVersion: 2
+        x: 764
+        y: 74
+        width: 68
+        height: 26
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 50c023919180ffaa0800000000000000
+      internalID: -6125168064310670331
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_7
+      rect:
+        serializedVersion: 2
+        x: 796
+        y: 90
+        width: 12
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1b86e2b742f54fd30800000000000000
+      internalID: 4464297740921104561
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_8
+      rect:
+        serializedVersion: 2
+        x: 808
+        y: 93
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2172bef0aa2b6e7f0800000000000000
+      internalID: -583582658216646894
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_9
+      rect:
+        serializedVersion: 2
+        x: 981
+        y: 95
+        width: 19
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 933c567380f0080c0800000000000000
+      internalID: -4575640693444852935
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_10
+      rect:
+        serializedVersion: 2
+        x: 1207
+        y: 79
+        width: 31
+        height: 26
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 41389e9f191fc0aa0800000000000000
+      internalID: -6193309778275892460
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_11
+      rect:
+        serializedVersion: 2
+        x: 1518
+        y: 86
+        width: 10
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5567b0cc419486110800000000000000
+      internalID: 1254332849894159957
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_12
+      rect:
+        serializedVersion: 2
+        x: 957
+        y: 79
+        width: 7
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c651055fb89fce3b0800000000000000
+      internalID: -5481732266905299604
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_13
+      rect:
+        serializedVersion: 2
+        x: 1158
+        y: 81
+        width: 12
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b3bd5e8e48c814ff0800000000000000
+      internalID: -53607218080785605
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_14
+      rect:
+        serializedVersion: 2
+        x: 1263
+        y: 79
+        width: 7
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 67432c94f1c7ee550800000000000000
+      internalID: 6192023011504305270
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_15
+      rect:
+        serializedVersion: 2
+        x: 1351
+        y: 79
+        width: 14
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 97eae2e2dd0f71180800000000000000
+      internalID: -9144575685599252871
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_16
+      rect:
+        serializedVersion: 2
+        x: 1400
+        y: 79
+        width: 13
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8059ca52c61c6d750800000000000000
+      internalID: 6329458996548506888
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_17
+      rect:
+        serializedVersion: 2
+        x: 1526
+        y: 85
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4d638d76059021820800000000000000
+      internalID: 2887380552042165972
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_18
+      rect:
+        serializedVersion: 2
+        x: 1583
+        y: 81
+        width: 12
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2b16400407002e300800000000000000
+      internalID: 279786608960758194
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_19
+      rect:
+        serializedVersion: 2
+        x: 1607
+        y: 79
+        width: 21
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ebcbbbc7e8cc859c0800000000000000
+      internalID: -3938172961785398082
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_20
+      rect:
+        serializedVersion: 2
+        x: 1711
+        y: 85
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fcebd93ab3955e000800000000000000
+      internalID: 64555882349706959
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_21
+      rect:
+        serializedVersion: 2
+        x: 1713
+        y: 79
+        width: 12
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 900d721a606977de0800000000000000
+      internalID: -1335433809274351607
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_22
+      rect:
+        serializedVersion: 2
+        x: 1723
+        y: 81
+        width: 12
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 278625eefed10cd60800000000000000
+      internalID: 7908353861995358322
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: MainMenu_Command_Button_23
+      rect:
+        serializedVersion: 2
+        x: 1486
+        y: 71
+        width: 7
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8a5479a6aa7f5a2c0800000000000000
+      internalID: -4420855147889474136
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      MainMenu_Command_Button_0: 6984695058512481011
+      MainMenu_Command_Button_1: 3925018396261016898
+      MainMenu_Command_Button_10: -6193309778275892460
+      MainMenu_Command_Button_11: 1254332849894159957
+      MainMenu_Command_Button_12: -5481732266905299604
+      MainMenu_Command_Button_13: -53607218080785605
+      MainMenu_Command_Button_14: 6192023011504305270
+      MainMenu_Command_Button_15: -9144575685599252871
+      MainMenu_Command_Button_16: 6329458996548506888
+      MainMenu_Command_Button_17: 2887380552042165972
+      MainMenu_Command_Button_18: 279786608960758194
+      MainMenu_Command_Button_19: -3938172961785398082
+      MainMenu_Command_Button_2: 2609473284379551784
+      MainMenu_Command_Button_20: 64555882349706959
+      MainMenu_Command_Button_21: -1335433809274351607
+      MainMenu_Command_Button_22: 7908353861995358322
+      MainMenu_Command_Button_23: -4420855147889474136
+      MainMenu_Command_Button_3: 6287816201713854104
+      MainMenu_Command_Button_4: -2562645768887092745
+      MainMenu_Command_Button_5: 6448005921764327547
+      MainMenu_Command_Button_6: -6125168064310670331
+      MainMenu_Command_Button_7: 4464297740921104561
+      MainMenu_Command_Button_8: -583582658216646894
+      MainMenu_Command_Button_9: -4575640693444852935
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -12,6 +12,7 @@ namespace ProjectS.Buildings
         private float currentHealth;
         private bool isDestroyed;
         private float recentAttackerTime = float.NegativeInfinity;
+        private BuildingStatus status;
 
         public event Action<BuildingHealth> Destroyed;
         public event Action<BuildingHealth, float> HealthChanged;
@@ -23,6 +24,7 @@ namespace ProjectS.Buildings
 
         private void Awake()
         {
+            status = GetComponent<BuildingStatus>();
             ResetHealth();
         }
 
@@ -57,6 +59,10 @@ namespace ProjectS.Buildings
                 return;
             }
 
+            CombatFeedbackEvents.Publish(
+                CombatFeedbackType.Damaged,
+                transform.position,
+                status != null ? status.Team : UnitTeam.Team1);
             currentHealth = Mathf.Max(0f, currentHealth - amount);
             HealthChanged?.Invoke(this, currentHealth);
 
@@ -74,6 +80,10 @@ namespace ProjectS.Buildings
             }
 
             isDestroyed = true;
+            CombatFeedbackEvents.Publish(
+                CombatFeedbackType.Death,
+                transform.position,
+                status != null ? status.Team : UnitTeam.Team1);
             Destroyed?.Invoke(this);
             gameObject.SetActive(false);
         }

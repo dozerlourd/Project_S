@@ -207,6 +207,7 @@ MonoBehaviour:
   maxAttackTargets: 1
   occupiedCells: {x: 1, y: 1}
   supplyCost: 2
+  visionRadius: 7
   hasHealthRegeneration: 0
   healthRegenerationAmount: 0
   hasShield: 0

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ProjectS.Resources;
 using ProjectS.Units;
@@ -196,6 +197,195 @@ namespace ProjectS.Upgrades
             }
 
             registered = false;
+        }
+    }
+}
+
+namespace ProjectS.Unlocks
+{
+    public enum UnlockRequirementKind
+    {
+        None,
+        TeamUnlock
+    }
+
+    public sealed class TeamUnlockState : MonoBehaviour
+    {
+        private static readonly Dictionary<UnitTeam, TeamUnlockState> StatesByTeam =
+            new Dictionary<UnitTeam, TeamUnlockState>();
+
+        [SerializeField] private UnitTeam team = UnitTeam.Team1;
+        [SerializeField] private string[] initiallyUnlockedIds = Array.Empty<string>();
+
+        private readonly HashSet<string> unlockedIds = new HashSet<string>(StringComparer.Ordinal);
+        private bool initialized;
+
+        public UnitTeam Team => team;
+
+        private void OnEnable()
+        {
+            InitializeUnlocks();
+            Register();
+        }
+
+        private void OnDisable()
+        {
+            Unregister();
+        }
+
+        public static TeamUnlockState FindForTeam(UnitTeam team)
+        {
+            return StatesByTeam.TryGetValue(team, out var state) ? state : null;
+        }
+
+        public static bool IsUnlocked(UnitTeam team, string unlockId)
+        {
+            if (string.IsNullOrWhiteSpace(unlockId))
+            {
+                return true;
+            }
+
+            var state = FindForTeam(team);
+            return state != null && state.IsUnlocked(unlockId);
+        }
+
+        public void Configure(UnitTeam ownerTeam, string[] unlockedIdsAtStart = null)
+        {
+            Unregister();
+            team = ownerTeam;
+            initiallyUnlockedIds = unlockedIdsAtStart ?? Array.Empty<string>();
+            initialized = false;
+            InitializeUnlocks();
+            if (isActiveAndEnabled)
+            {
+                Register();
+            }
+        }
+
+        public bool IsUnlocked(string unlockId)
+        {
+            InitializeUnlocks();
+            return !string.IsNullOrWhiteSpace(unlockId) && unlockedIds.Contains(unlockId.Trim());
+        }
+
+        public void Unlock(string unlockId)
+        {
+            InitializeUnlocks();
+            if (!string.IsNullOrWhiteSpace(unlockId))
+            {
+                unlockedIds.Add(unlockId.Trim());
+            }
+        }
+
+        public void Revoke(string unlockId)
+        {
+            InitializeUnlocks();
+            if (!string.IsNullOrWhiteSpace(unlockId))
+            {
+                unlockedIds.Remove(unlockId.Trim());
+            }
+        }
+
+        private void InitializeUnlocks()
+        {
+            if (initialized)
+            {
+                return;
+            }
+
+            unlockedIds.Clear();
+            var startingIds = initiallyUnlockedIds ?? Array.Empty<string>();
+            for (var i = 0; i < startingIds.Length; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(startingIds[i]))
+                {
+                    unlockedIds.Add(startingIds[i].Trim());
+                }
+            }
+
+            initialized = true;
+        }
+
+        private void Register()
+        {
+            if (StatesByTeam.TryGetValue(team, out var existing) && existing != null && existing != this)
+            {
+                return;
+            }
+
+            StatesByTeam[team] = this;
+        }
+
+        private void Unregister()
+        {
+            if (StatesByTeam.TryGetValue(team, out var state) && state == this)
+            {
+                StatesByTeam.Remove(team);
+            }
+        }
+    }
+
+    [Serializable]
+    public sealed class UnlockRequirement
+    {
+        [SerializeField] private UnlockRequirementKind kind;
+        [SerializeField] private string requiredUnlockId = string.Empty;
+
+        public UnlockRequirementKind Kind => kind;
+        public string RequiredUnlockId => requiredUnlockId;
+
+        public bool IsMet(UnitTeam team)
+        {
+            switch (kind)
+            {
+                case UnlockRequirementKind.None:
+                    return true;
+                case UnlockRequirementKind.TeamUnlock:
+                    return TeamUnlockState.IsUnlocked(team, requiredUnlockId);
+                default:
+                    return false;
+            }
+        }
+
+        public string GetFailureReason(string action, string itemName)
+        {
+            switch (kind)
+            {
+                case UnlockRequirementKind.TeamUnlock:
+                    return $"Cannot {action} {itemName}: requires team unlock '{requiredUnlockId}'.";
+                default:
+                    return $"Cannot {action} {itemName}: unlock requirement is not met.";
+            }
+        }
+
+        public void ConfigureTeamUnlock(string unlockId)
+        {
+            kind = UnlockRequirementKind.TeamUnlock;
+            requiredUnlockId = unlockId?.Trim() ?? string.Empty;
+        }
+
+        public static bool AreMet(
+            IReadOnlyList<UnlockRequirement> requirements,
+            UnitTeam team,
+            string action,
+            string itemName,
+            out string failureReason)
+        {
+            if (requirements != null)
+            {
+                for (var i = 0; i < requirements.Count; i++)
+                {
+                    var requirement = requirements[i];
+                    if (requirement != null && !requirement.IsMet(team))
+                    {
+                        failureReason = requirement.GetFailureReason(action, itemName);
+                        return false;
+                    }
+                }
+            }
+
+            failureReason = string.Empty;
+            return true;
         }
     }
 }

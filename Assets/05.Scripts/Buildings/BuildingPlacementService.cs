@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.Units;
+using ProjectS.Unlocks;
 using UnityEngine;
 
 namespace ProjectS.Buildings
@@ -20,6 +21,7 @@ namespace ProjectS.Buildings
         [SerializeField] private GameObject supplyDepotBuildingPrefab;
         [SerializeField] private GameObject resourceDropOffBuildingPrefab;
         [SerializeField] private GameObject mainBaseBuildingPrefab;
+        [SerializeField] private BuildingConstructionDefinition[] constructionDefinitions = new BuildingConstructionDefinition[0];
         [SerializeField] private BuildingKind defaultBuildingKind = BuildingKind.MainBase;
         [SerializeField] private ResourceAmount defaultCost = new ResourceAmount(150, 0);
         [SerializeField, Min(0.1f)] private float defaultBuildTime = 8f;
@@ -29,6 +31,7 @@ namespace ProjectS.Buildings
         public Vector2Int DefaultFootprint => new Vector2Int(Mathf.Max(1, defaultFootprint.x), Mathf.Max(1, defaultFootprint.y));
         public BuildingKind SelectedBuildingKind => defaultBuildingKind;
         public ResourceAmount SelectedBuildingCost => defaultCost;
+        public IReadOnlyList<BuildingConstructionDefinition> ConstructionDefinitions => constructionDefinitions;
         public string LastPlacementFailureReason { get; private set; }
 
         private void Awake()
@@ -48,6 +51,13 @@ namespace ProjectS.Buildings
         public bool TryPlaceDefaultConstructionSite(Vector3 worldPosition, out ConstructionSite site)
         {
             ResolveReferences();
+            if (!CanSelectBuilding(defaultBuildingKind, out var unlockFailureReason))
+            {
+                site = null;
+                LastPlacementFailureReason = unlockFailureReason;
+                return false;
+            }
+
             var placed = ConstructionSite.TryCreate(
                 worldPosition,
                 team,
@@ -67,6 +77,12 @@ namespace ProjectS.Buildings
         public bool CanPlaceDefaultConstructionSite(Vector3 worldPosition)
         {
             ResolveReferences();
+            if (!CanSelectBuilding(defaultBuildingKind, out var unlockFailureReason))
+            {
+                LastPlacementFailureReason = unlockFailureReason;
+                return false;
+            }
+
             var placementFailureReason = ConstructionSite.GetPlacementFailureReason(tilemapWorld, worldPosition, DefaultFootprint);
             if (!string.IsNullOrEmpty(placementFailureReason))
             {
@@ -164,8 +180,33 @@ namespace ProjectS.Buildings
             mainBaseBuildingPrefab = mainBasePrefab;
         }
 
+        public void ConfigureConstructionDefinitions(BuildingConstructionDefinition[] definitions)
+        {
+            constructionDefinitions = definitions ?? new BuildingConstructionDefinition[0];
+        }
+
+        public bool CanSelectBuilding(BuildingKind buildingKind, out string failureReason)
+        {
+            ResolveReferences();
+            var definition = FindConstructionDefinition(buildingKind);
+            if (definition != null && !definition.CanBeBuiltBy(team, out failureReason))
+            {
+                return false;
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
         public bool SelectBuilding(BuildingKind buildingKind)
         {
+            ResolveReferences();
+            if (!CanSelectBuilding(buildingKind, out var unlockFailureReason))
+            {
+                LastPlacementFailureReason = unlockFailureReason;
+                return false;
+            }
+
             switch (buildingKind)
             {
                 case BuildingKind.MainBase:
@@ -217,6 +258,25 @@ namespace ProjectS.Buildings
             return true;
         }
 
+        private BuildingConstructionDefinition FindConstructionDefinition(BuildingKind buildingKind)
+        {
+            if (constructionDefinitions == null)
+            {
+                return null;
+            }
+
+            for (var i = 0; i < constructionDefinitions.Length; i++)
+            {
+                var definition = constructionDefinitions[i];
+                if (definition != null && definition.BuildingKind == buildingKind)
+                {
+                    return definition;
+                }
+            }
+
+            return null;
+        }
+
         private void ResolveReferences()
         {
             if (tilemapWorld == null)
@@ -228,6 +288,27 @@ namespace ProjectS.Buildings
             {
                 wallet = PlayerResourceWallet.FindForTeam(team);
             }
+        }
+    }
+
+    [System.Serializable]
+    public sealed class BuildingConstructionDefinition
+    {
+        [SerializeField] private BuildingKind buildingKind = BuildingKind.Other;
+        [SerializeField] private UnlockRequirement[] unlockRequirements = new UnlockRequirement[0];
+
+        public BuildingKind BuildingKind => buildingKind;
+        public IReadOnlyList<UnlockRequirement> UnlockRequirements => unlockRequirements;
+
+        public void Configure(BuildingKind kind, UnlockRequirement[] requirements = null)
+        {
+            buildingKind = kind;
+            unlockRequirements = requirements ?? new UnlockRequirement[0];
+        }
+
+        public bool CanBeBuiltBy(UnitTeam team, out string failureReason)
+        {
+            return UnlockRequirement.AreMet(unlockRequirements, team, "build", buildingKind.ToString(), out failureReason);
         }
     }
 }

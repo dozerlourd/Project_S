@@ -16,6 +16,7 @@ namespace ProjectS.UI
         private const float MapToInfoGap = 8f;
         private const float UnitSize = 4f;
         private const float BuildingSize = 8f;
+        private const float LastObservedEnemySize = 3f;
 
         private static readonly Color TeamOneColor = new Color(0.2f, 0.7f, 1f);
         private static readonly Color TeamTwoColor = new Color(1f, 0.28f, 0.2f);
@@ -25,6 +26,7 @@ namespace ProjectS.UI
         private static readonly Color GasColor = new Color(0.4f, 0.92f, 0.36f);
         private static readonly Color SelectedUnitColor = new Color(1f, 1f, 1f, 0.95f);
         private static readonly Color CombatTargetColor = new Color(1f, 0.72f, 0.16f, 0.72f);
+        private static readonly Color LastObservedEnemyColor = new Color(0.72f, 0.72f, 0.72f, 0.42f);
         private static readonly Color WalkableTerrainColor = new Color(0.19f, 0.31f, 0.22f, 1f);
         private static readonly Color NonBuildableTerrainColor = new Color(0.37f, 0.3f, 0.17f, 1f);
         private static readonly Color BlockedTerrainColor = new Color(0.1f, 0.11f, 0.14f, 1f);
@@ -91,6 +93,7 @@ namespace ProjectS.UI
             DrawViewport(mapRect, worldBounds);
             DrawUnits(mapRect, worldBounds);
             DrawBuildings(mapRect, worldBounds);
+            DrawLastObservedEnemies(mapRect, worldBounds);
             DrawBattleInfo(mapRect);
             HandleCameraDrag(mapRect, worldBounds);
         }
@@ -321,6 +324,36 @@ namespace ProjectS.UI
 
                 DrawMarker(mapRect, worldBounds, building.transform.position, BuildingSize, GetTeamColor(building.Team));
             }
+        }
+
+        private void DrawLastObservedEnemies(Rect mapRect, Bounds worldBounds)
+        {
+            if (fogOfWar == null)
+            {
+                return;
+            }
+
+            var observations = fogOfWar.ObservedEnemies;
+            for (var i = 0; i < observations.Count; i++)
+            {
+                var observation = observations[i];
+                if (!ShouldDrawLastObservedEnemy(observation))
+                {
+                    continue;
+                }
+
+                DrawMarker(
+                    mapRect,
+                    worldBounds,
+                    observation.LastObservedPosition,
+                    LastObservedEnemySize,
+                    LastObservedEnemyColor);
+            }
+        }
+
+        private bool ShouldDrawLastObservedEnemy(FogObservedEnemy observation)
+        {
+            return observation.Team != playerTeam && !observation.IsCurrentlyVisible;
         }
 
         private bool ShouldDisplayEntity(UnitTeam team, Vector3 worldPosition)

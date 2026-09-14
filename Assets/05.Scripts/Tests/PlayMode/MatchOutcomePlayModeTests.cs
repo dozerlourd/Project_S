@@ -138,6 +138,60 @@ namespace ProjectS.Tests.PlayMode
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator PostMatchActions_RequireResolvedMatchAndRecordOnlyOneChoice()
+        {
+            var controllerObject = CreateMatchController(out var controller);
+            Invoke(controller, "ConfigurePostMatchActions", false, false);
+
+            Assert.That((bool)Invoke(controller, "TryRequestRematch"), Is.False);
+            Assert.That(GetProperty(controller, "RequestedPostMatchAction").ToString(), Is.EqualTo("None"));
+
+            var playerBase = CreateBuilding("PostMatchPlayerBase", UnitTeam.Team1, "MainBase", Vector3.left);
+            var enemyBase = CreateBuilding("PostMatchEnemyBase", UnitTeam.Team2, "MainBase", Vector3.right);
+            yield return null;
+            ((IUnitAttackTarget)enemyBase.GetComponent(BuildingStatusType)).TakeDamage(10000f);
+            yield return null;
+            Invoke(controller, "ForceEvaluate");
+
+            Assert.That(GetProperty(controller, "Result").ToString(), Is.EqualTo("Victory"));
+            Assert.That((bool)Invoke(controller, "TryRequestRematch"), Is.True);
+            Assert.That(GetProperty(controller, "RequestedPostMatchAction").ToString(), Is.EqualTo("Rematch"));
+            Assert.That((bool)Invoke(controller, "TryRequestEndMatch"), Is.False);
+
+            Object.Destroy(controllerObject);
+            Object.Destroy(playerBase);
+            Object.Destroy(enemyBase);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator MainMenuAction_RequiresResolvedMatchAndRecordsOnlyOneChoice()
+        {
+            var controllerObject = CreateMatchController(out var controller);
+            Invoke(controller, "ConfigurePostMatchActions", false, false);
+            Invoke(controller, "ConfigureMainMenuAction", false, "MainMenu");
+
+            Assert.That((bool)Invoke(controller, "TryRequestMainMenu"), Is.False);
+
+            var playerBase = CreateBuilding("MenuPlayerBase", UnitTeam.Team1, "MainBase", Vector3.left);
+            var enemyBase = CreateBuilding("MenuEnemyBase", UnitTeam.Team2, "MainBase", Vector3.right);
+            yield return null;
+            ((IUnitAttackTarget)enemyBase.GetComponent(BuildingStatusType)).TakeDamage(10000f);
+            yield return null;
+            Invoke(controller, "ForceEvaluate");
+
+            Assert.That((bool)Invoke(controller, "TryRequestMainMenu"), Is.True);
+            Assert.That(GetProperty(controller, "RequestedPostMatchAction").ToString(), Is.EqualTo("MainMenu"));
+            Assert.That((bool)Invoke(controller, "TryRequestRematch"), Is.False);
+            Assert.That((bool)Invoke(controller, "TryRequestEndMatch"), Is.False);
+
+            Object.Destroy(controllerObject);
+            Object.Destroy(playerBase);
+            Object.Destroy(enemyBase);
+            yield return null;
+        }
+
         private static GameObject CreateMatchController(out Component controller)
         {
             var controllerObject = new GameObject("MatchController");

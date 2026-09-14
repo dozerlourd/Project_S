@@ -9,6 +9,8 @@ namespace ProjectS.Buildings
     public sealed class ConstructionSite : MonoBehaviour, IUnitInteractableTarget
     {
         private static readonly List<ConstructionSite> ActiveSites = new List<ConstructionSite>();
+        private const int ResourceProtectionDiagonalRadius = 2;
+        private const int ResourceProtectionCardinalRadius = 3;
 
         [SerializeField] private UnitTeam team = UnitTeam.Team1;
         [SerializeField] private BuildingKind completedBuildingKind = BuildingKind.MainBase;
@@ -293,6 +295,11 @@ namespace ProjectS.Buildings
                 return $"cell {cell} is occupied by a resource node.";
             }
 
+            if (IsProtectedByResource(tilemapWorld, cell))
+            {
+                return $"cell {cell} is within a resource node protection area.";
+            }
+
             if (IsOccupiedByUnit(tilemapWorld, cell, cellCenter))
             {
                 return $"cell {cell} is occupied by a unit.";
@@ -367,6 +374,36 @@ namespace ProjectS.Buildings
                 }
 
                 if (OccupiesColliderCell(tilemapWorld, resource.GetComponent<Collider2D>(), resource.transform.position, cell, cellCenter))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsProtectedByResource(ProjectSTilemapWorld tilemapWorld, Vector3Int queriedCell)
+        {
+            var resources = ResourceNode.AllNodes;
+            for (var i = 0; i < resources.Count; i++)
+            {
+                var resource = resources[i];
+                if (resource == null || !resource.isActiveAndEnabled || resource.IsDepleted)
+                {
+                    continue;
+                }
+
+                var resourceCell = tilemapWorld != null
+                    ? tilemapWorld.WorldToCell(resource.transform.position)
+                    : new Vector3Int(
+                        Mathf.RoundToInt(resource.transform.position.x),
+                        Mathf.RoundToInt(resource.transform.position.y),
+                        queriedCell.z);
+                var deltaX = Mathf.Abs(queriedCell.x - resourceCell.x);
+                var deltaY = Mathf.Abs(queriedCell.y - resourceCell.y);
+                var maximumDistance = Mathf.Max(deltaX, deltaY);
+                if (maximumDistance <= ResourceProtectionDiagonalRadius
+                    || (maximumDistance <= ResourceProtectionCardinalRadius && (deltaX == 0 || deltaY == 0)))
                 {
                     return true;
                 }

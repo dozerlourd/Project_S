@@ -23,6 +23,7 @@ namespace ProjectS.Buildings
         public Vector3 InteractionPoint => transform.position;
         public float InteractionRange => Mathf.Max(0.1f, interactionRange);
         public UnitTeam Team => status != null ? status.Team : UnitTeam.Team1;
+        public static IReadOnlyList<ResourceDropOff> All => AllDropOffs;
         public bool CanAcceptDeposits => status != null && status.Completed && status.IsAlive && wallet != null;
         public string LastDepositFailureReason => lastDepositFailureReason;
 

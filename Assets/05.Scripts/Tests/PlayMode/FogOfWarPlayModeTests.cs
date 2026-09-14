@@ -112,6 +112,56 @@ namespace ProjectS.Tests.PlayMode
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator Minimap_UsesLastObservedPositionAfterEnemyEntersFog()
+        {
+            var worldRoot = CreateWorld(8, out _, out var groundTile);
+            var world = worldRoot.GetComponent<ProjectSTilemapWorld>();
+            var provider = CreateUnit("Observation Provider", new Vector3(0.5f, 0.5f), UnitTeam.Team1, 2.1f);
+            var enemy = CreateUnit("Observed Enemy", new Vector3(1.5f, 0.5f), UnitTeam.Team2, 1f);
+            var enemyTarget = enemy.GetComponent<PrototypeUnitStatus>();
+            var manager = GetOrCreateManager();
+            manager.Configure(world, UnitTeam.Team1);
+            var minimapObject = new GameObject("Observation Minimap");
+            var minimap = minimapObject.AddComponent(GetGameplayType("ProjectS.UI.RtsMinimap"));
+            SetPrivateField(minimap, "tilemapWorld", world);
+            SetPrivateField(minimap, "fogOfWar", manager);
+
+            Assert.That(manager.TryGetEnemyObservation(enemyTarget, out var visibleObservation), Is.True);
+            Assert.That(visibleObservation.LastObservedPosition, Is.EqualTo(enemy.transform.position));
+            Assert.That(visibleObservation.IsCurrentlyVisible, Is.True);
+            Assert.That(ShouldDrawLastObservedEnemy(minimap, visibleObservation), Is.False);
+
+            var lastVisiblePosition = enemy.transform.position;
+            enemy.transform.position = new Vector3(6.5f, 0.5f);
+            yield return null;
+
+            Assert.That(manager.TryGetEnemyObservation(enemyTarget, out var hiddenObservation), Is.True);
+            Assert.That(hiddenObservation.LastObservedPosition, Is.EqualTo(lastVisiblePosition));
+            Assert.That(hiddenObservation.IsCurrentlyVisible, Is.False);
+            Assert.That(ShouldDrawLastObservedEnemy(minimap, hiddenObservation), Is.True);
+
+            provider.transform.position = new Vector3(5.5f, 0.5f);
+            yield return null;
+            yield return null;
+
+            Assert.That(manager.TryGetEnemyObservation(enemyTarget, out var rediscoveredObservation), Is.True);
+            Assert.That(rediscoveredObservation.LastObservedPosition, Is.EqualTo(enemy.transform.position));
+            Assert.That(rediscoveredObservation.IsCurrentlyVisible, Is.True);
+            Assert.That(ShouldDrawLastObservedEnemy(minimap, rediscoveredObservation), Is.False);
+
+            Object.Destroy(enemy);
+            yield return null;
+            yield return null;
+            Assert.That(manager.TryGetEnemyObservation(enemyTarget, out _), Is.False);
+
+            Object.Destroy(minimapObject);
+            Object.Destroy(provider);
+            Object.Destroy(worldRoot);
+            Object.Destroy(groundTile);
+            yield return null;
+        }
+
         private static GameObject CreateWorld(int width, out Tilemap tilemap, out Tile groundTile)
         {
             var root = new GameObject("Fog Test Grid");
@@ -178,6 +228,15 @@ namespace ProjectS.Tests.PlayMode
             var method = minimap.GetType().GetMethod("ShouldDisplayEntity", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
             return (bool)method.Invoke(minimap, new object[] { team, position });
+        }
+
+        private static bool ShouldDrawLastObservedEnemy(Component minimap, FogObservedEnemy observation)
+        {
+            var method = minimap.GetType().GetMethod(
+                "ShouldDrawLastObservedEnemy",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            return (bool)method.Invoke(minimap, new object[] { observation });
         }
 
         private static Type GetGameplayType(string typeName)

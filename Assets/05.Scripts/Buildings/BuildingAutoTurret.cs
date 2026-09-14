@@ -45,6 +45,11 @@ namespace ProjectS.Buildings
             }
 
             UnitTargetPriority.RecordRecentAttacker(currentTarget, status);
+            CombatFeedbackEvents.Publish(
+                CombatFeedbackType.AttackHit,
+                currentTarget.SelectionTransform.position,
+                currentTarget.Team,
+                status.Team);
             currentTarget.TakeDamage(attackDamage, status);
             nextAttackTime = Time.time + 1f / Mathf.Max(0.1f, attacksPerSecond);
         }
