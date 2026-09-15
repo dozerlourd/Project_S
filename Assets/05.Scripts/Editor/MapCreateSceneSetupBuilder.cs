@@ -17,13 +17,17 @@ namespace ProjectS.Editor
     {
         private const string ScenePath = "Assets/06.Scenes/MapCreate_Scene.unity";
         private const string BuildingPrefabFolder = "Assets/03.Prefabs/Buildings";
+        private const string CoreBuildingPrefabFolder = BuildingPrefabFolder + "/Core";
+        private const string ConstructionPrefabFolder = BuildingPrefabFolder + "/Construction";
+        private const string FutureTechPrefabFolder = BuildingPrefabFolder + "/FutureTech";
+        private const string UniqueBuildingTextureFolder = "Assets/01.Textures/Buildings/Unique";
         private const string SetupRootName = "ProjectS Match Test Setup";
-        private const string MainBasePrefabPath = BuildingPrefabFolder + "/PrototypeMainBase.prefab";
-        private const string ProductionPrefabPath = BuildingPrefabFolder + "/PrototypeProductionBuilding.prefab";
-        private const string SpliterProductionPrefabPath = BuildingPrefabFolder + "/PrototypeSpliterProductionBuilding.prefab";
-        private const string AutoTurretPrefabPath = BuildingPrefabFolder + "/PrototypeAutoTurretBuilding.prefab";
-        private const string SpeedAuraPrefabPath = BuildingPrefabFolder + "/PrototypeSpeedAuraBuilding.prefab";
-        private const string ConstructionSitePrefabPath = BuildingPrefabFolder + "/PrototypeConstructionSite.prefab";
+        private const string MainBasePrefabPath = CoreBuildingPrefabFolder + "/PrototypeMainBase.prefab";
+        private const string ProductionPrefabPath = CoreBuildingPrefabFolder + "/PrototypeProductionBuilding.prefab";
+        private const string SpliterProductionPrefabPath = CoreBuildingPrefabFolder + "/PrototypeSpliterProductionBuilding.prefab";
+        private const string AutoTurretPrefabPath = CoreBuildingPrefabFolder + "/PrototypeAutoTurretBuilding.prefab";
+        private const string SpeedAuraPrefabPath = CoreBuildingPrefabFolder + "/PrototypeSpeedAuraBuilding.prefab";
+        private const string ConstructionSitePrefabPath = ConstructionPrefabFolder + "/PrototypeConstructionSite.prefab";
         private const string WorkerPrefabPath = "Assets/03.Prefabs/Units/B_Worker.prefab";
         private const string SoldierPrefabPath = "Assets/03.Prefabs/Units/B_Soldier.prefab";
         private const string SpliterPrefabPath = "Assets/03.Prefabs/Units/B_Spliter.prefab";
@@ -135,30 +139,72 @@ namespace ProjectS.Editor
             AssetDatabase.Refresh();
         }
 
-        private static void CreatePrototypeBuildingPrefabs()
+        [MenuItem("Tools/Project S/Create Missing Building Prefabs")]
+        public static void CreatePrototypeBuildingPrefabs()
         {
             EnsureFolder("Assets/03.Prefabs", "Buildings");
-            CreateBuildingPrefab(MainBasePrefabPath, "PrototypeMainBase", BuildingKind.MainBase, true, true, new Vector2(2.6f, 2.2f));
-            CreateBuildingPrefab(ProductionPrefabPath, "PrototypeProductionBuilding", BuildingKind.Production, false, true, new Vector2(2.4f, 2f));
-            CreateBuildingPrefab(SpliterProductionPrefabPath, "PrototypeSpliterProductionBuilding", BuildingKind.SpliterProduction, false, true, new Vector2(2.5f, 2.5f));
-            CreateBuildingPrefab(AutoTurretPrefabPath, "PrototypeAutoTurretBuilding", BuildingKind.AutoTurret, false, false, new Vector2(2.3f, 2.3f));
-            CreateBuildingPrefab(SpeedAuraPrefabPath, "PrototypeSpeedAuraBuilding", BuildingKind.SpeedAura, false, false, new Vector2(2.6f, 2.6f));
+            EnsureFolder(BuildingPrefabFolder, "Core");
+            EnsureFolder(BuildingPrefabFolder, "Construction");
+            EnsureFolder(BuildingPrefabFolder, "FutureTech");
+            CreateBuildingPrefab(MainBasePrefabPath, "PrototypeMainBase", BuildingKind.MainBase, new Vector2(2.6f, 2.2f));
+            CreateBuildingPrefab(ProductionPrefabPath, "PrototypeProductionBuilding", BuildingKind.Production, new Vector2(2.4f, 2f));
+            CreateBuildingPrefab(SpliterProductionPrefabPath, "PrototypeSpliterProductionBuilding", BuildingKind.SpliterProduction, new Vector2(2.5f, 2.5f));
+            CreateBuildingPrefab(AutoTurretPrefabPath, "PrototypeAutoTurretBuilding", BuildingKind.AutoTurret, new Vector2(2.3f, 2.3f));
+            CreateBuildingPrefab(SpeedAuraPrefabPath, "PrototypeSpeedAuraBuilding", BuildingKind.SpeedAura, new Vector2(2.6f, 2.6f));
+            CreateBuildingPrefab(CoreBuildingPrefabFolder, BuildingKind.ResourceDropOff, new Vector2(2.2f, 2.2f));
+            CreateBuildingPrefab(CoreBuildingPrefabFolder, BuildingKind.SupplyDepot, new Vector2(2.2f, 2.2f));
+            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.ResearchLab);
+            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.DefenseControlCenter);
+            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.VehicleFactory);
+            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.SignalRelay);
+            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.TacticalCommandCenter);
+            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.MaintenanceBay);
+            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.ForwardSupplyPost);
             CreateConstructionSitePrefab();
+        }
+
+        [MenuItem("Tools/Project S/Apply Unique Core Building Sprites")]
+        public static void ApplyUniqueCoreBuildingSprites()
+        {
+            ApplyUniqueBuildingSprite(MainBasePrefabPath, "MainBase_Unique", new Vector2(2.6f, 2.2f), BuildingSortingOrder);
+            ApplyUniqueBuildingSprite(ProductionPrefabPath, "Production_Unique", new Vector2(2.4f, 2f), BuildingSortingOrder);
+            ApplyUniqueBuildingSprite(SpliterProductionPrefabPath, "SpliterProduction_Unique", new Vector2(2.5f, 2.5f), BuildingSortingOrder);
+            ApplyUniqueBuildingSprite(AutoTurretPrefabPath, "AutoTurret_Unique", new Vector2(2.3f, 2.3f), BuildingSortingOrder);
+            ApplyUniqueBuildingSprite(SpeedAuraPrefabPath, "SpeedAura_Unique", new Vector2(2.6f, 2.6f), BuildingSortingOrder);
+            ApplyUniqueBuildingSprite(ConstructionSitePrefabPath, "ConstructionSite_Unique", new Vector2(2.2f, 2f), BuildingSortingOrder - 1);
+            AssetDatabase.SaveAssets();
+        }
+
+        private static void CreateBuildingPrefab(string folder, BuildingKind kind, Vector2? size = null)
+        {
+            var name = $"Prototype{kind}Building";
+            CreateBuildingPrefab(folder + "/" + name + ".prefab", name, kind,
+                size ?? (Vector2)StructureFactory.GetDefaultFootprint(kind));
         }
 
         private static void CreateBuildingPrefab(
             string path,
             string name,
             BuildingKind kind,
-            bool dropOff,
-            bool production,
             Vector2 size)
         {
+            // Existing assets retain their component file IDs and customized settings.
+            if (File.Exists(path))
+            {
+                return;
+            }
+
+            var previewScene = EditorSceneManager.NewPreviewScene();
             var root = new GameObject(name);
+            SceneManager.MoveGameObjectToScene(root, previewScene);
             try
             {
                 var renderer = root.AddComponent<SpriteRenderer>();
+                renderer.sortingLayerName = "Structures";
                 renderer.sortingOrder = BuildingSortingOrder;
+                renderer.sprite = LoadBuildingSprite(kind);
+                renderer.drawMode = SpriteDrawMode.Sliced;
+                renderer.size = size;
                 var visual = root.AddComponent<PrototypeBuildingVisual>();
                 var body = kind == BuildingKind.MainBase
                     ? new Color(0.28f, 0.52f, 0.76f, 1f)
@@ -169,44 +215,121 @@ namespace ProjectS.Editor
                 collider.size = size;
                 collider.isTrigger = true;
 
-                var status = root.AddComponent<BuildingStatus>();
-                status.Initialize(UnitTeam.Team1, kind, Vector2Int.CeilToInt(size), true);
-                if (dropOff)
-                {
-                    root.AddComponent<ResourceDropOff>();
-                }
-
-                if (production)
-                {
-                    root.AddComponent<UnitProductionQueue>();
-                }
-
-                if (kind == BuildingKind.AutoTurret)
-                {
-                    root.AddComponent<BuildingAutoTurret>();
-                }
-                else if (kind == BuildingKind.SpeedAura)
-                {
-                    root.AddComponent<BuildingSpeedAura>();
-                }
+                var status = StructureFactory.AddTo(root, kind);
+                status.Initialize(UnitTeam.Team1, kind, StructureFactory.GetDefaultFootprint(kind), true);
 
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
             finally
             {
                 Object.DestroyImmediate(root);
+                EditorSceneManager.ClosePreviewScene(previewScene);
+            }
+        }
+
+        private static Sprite LoadBuildingSprite(BuildingKind kind)
+        {
+            var uniqueAssetPath = GetUniqueBuildingSpriteAssetPath(kind);
+            var uniqueSprite = LoadLargestSprite(uniqueAssetPath);
+            if (uniqueSprite != null)
+            {
+                return uniqueSprite;
+            }
+
+            var resourcePath = MapCreateSceneAutoBootstrap.GetBuildingSpriteResourcePath(kind);
+            return string.IsNullOrEmpty(resourcePath)
+                ? null
+                : LoadLargestSprite("Assets/Resources/" + resourcePath + ".png");
+        }
+
+        private static string GetUniqueBuildingSpriteAssetPath(BuildingKind kind)
+        {
+            switch (kind)
+            {
+                case BuildingKind.MainBase: return UniqueBuildingTextureFolder + "/MainBase_Unique.png";
+                case BuildingKind.Production: return UniqueBuildingTextureFolder + "/Production_Unique.png";
+                case BuildingKind.SpliterProduction: return UniqueBuildingTextureFolder + "/SpliterProduction_Unique.png";
+                case BuildingKind.AutoTurret: return UniqueBuildingTextureFolder + "/AutoTurret_Unique.png";
+                case BuildingKind.SpeedAura: return UniqueBuildingTextureFolder + "/SpeedAura_Unique.png";
+                default: return string.Empty;
+            }
+        }
+
+        private static Sprite LoadLargestSprite(string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath))
+            {
+                return null;
+            }
+
+            Sprite largest = null;
+            foreach (var asset in AssetDatabase.LoadAllAssetsAtPath(assetPath))
+            {
+                if (asset is Sprite sprite && (largest == null
+                    || sprite.rect.width * sprite.rect.height > largest.rect.width * largest.rect.height))
+                {
+                    largest = sprite;
+                }
+            }
+            return largest;
+        }
+
+        private static void ApplyUniqueBuildingSprite(
+            string prefabPath,
+            string textureName,
+            Vector2 size,
+            int sortingOrder)
+        {
+            var sprite = LoadLargestSprite(UniqueBuildingTextureFolder + "/" + textureName + ".png");
+            if (sprite == null || !File.Exists(prefabPath))
+            {
+                return;
+            }
+
+            var root = PrefabUtility.LoadPrefabContents(prefabPath);
+            try
+            {
+                var renderer = root.GetComponent<SpriteRenderer>() ?? root.AddComponent<SpriteRenderer>();
+                renderer.sprite = sprite;
+                renderer.color = Color.white;
+                renderer.drawMode = SpriteDrawMode.Sliced;
+                renderer.size = size;
+                renderer.sortingLayerName = "Structures";
+                renderer.sortingOrder = sortingOrder;
+
+                var collider = root.GetComponent<BoxCollider2D>() ?? root.AddComponent<BoxCollider2D>();
+                collider.size = size;
+                collider.isTrigger = true;
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
             }
         }
 
         private static void CreateConstructionSitePrefab()
         {
+            if (File.Exists(ConstructionSitePrefabPath))
+            {
+                return;
+            }
+
+            var previewScene = EditorSceneManager.NewPreviewScene();
             var root = new GameObject("PrototypeConstructionSite");
+            SceneManager.MoveGameObjectToScene(root, previewScene);
             try
             {
                 var renderer = root.AddComponent<SpriteRenderer>();
+                renderer.sprite = LoadLargestSprite(UniqueBuildingTextureFolder + "/ConstructionSite_Unique.png");
+                renderer.sortingLayerName = "Structures";
                 renderer.sortingOrder = BuildingSortingOrder - 1;
                 var visual = root.AddComponent<PrototypeBuildingVisual>();
-                visual.Configure(new Color(0.52f, 0.48f, 0.4f, 0.85f), new Color(0.95f, 0.82f, 0.38f, 1f), new Vector2(2.2f, 2f));
+                visual.Configure(
+                    new Color(0.52f, 0.48f, 0.4f, 0.85f),
+                    new Color(0.95f, 0.82f, 0.38f, 1f),
+                    new Vector2(2.2f, 2f),
+                    renderOrder: BuildingSortingOrder - 1);
 
                 var collider = root.AddComponent<BoxCollider2D>();
                 collider.size = new Vector2(2.2f, 2f);
@@ -218,6 +341,7 @@ namespace ProjectS.Editor
             finally
             {
                 Object.DestroyImmediate(root);
+                EditorSceneManager.ClosePreviewScene(previewScene);
             }
         }
 
@@ -328,7 +452,7 @@ namespace ProjectS.Editor
             var status = building.GetComponent<BuildingStatus>();
             if (status != null)
             {
-                status.Initialize(team, kind, kind == BuildingKind.MainBase ? new Vector2Int(3, 3) : new Vector2Int(2, 2), true);
+                status.Initialize(team, kind, status.Footprint, true);
             }
 
             var productionQueue = building.GetComponent<UnitProductionQueue>();

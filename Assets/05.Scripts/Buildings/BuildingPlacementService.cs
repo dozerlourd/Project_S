@@ -13,25 +13,15 @@ namespace ProjectS.Buildings
         [SerializeField] private ProjectSTilemapWorld tilemapWorld;
         [SerializeField] private PlayerResourceWallet wallet;
         [SerializeField] private GameObject constructionSitePrefab;
-        [SerializeField] private GameObject completedBuildingPrefab;
-        [SerializeField] private GameObject combatProductionBuildingPrefab;
-        [SerializeField] private GameObject spliterProductionBuildingPrefab;
-        [SerializeField] private GameObject autoTurretBuildingPrefab;
-        [SerializeField] private GameObject speedAuraBuildingPrefab;
-        [SerializeField] private GameObject supplyDepotBuildingPrefab;
-        [SerializeField] private GameObject resourceDropOffBuildingPrefab;
-        [SerializeField] private GameObject mainBaseBuildingPrefab;
         [SerializeField] private BuildingConstructionDefinition[] constructionDefinitions = new BuildingConstructionDefinition[0];
-        [SerializeField] private BuildingKind defaultBuildingKind = BuildingKind.MainBase;
-        [SerializeField] private ResourceAmount defaultCost = new ResourceAmount(150, 0);
-        [SerializeField, Min(0.1f)] private float defaultBuildTime = 8f;
-        [SerializeField] private Vector2Int defaultFootprint = new Vector2Int(2, 2);
+        [SerializeField] private BuildingConstructionDefinition selectedDefinition;
 
         public static BuildingPlacementService ActiveInstance { get; private set; }
-        public Vector2Int DefaultFootprint => new Vector2Int(Mathf.Max(1, defaultFootprint.x), Mathf.Max(1, defaultFootprint.y));
-        public BuildingKind SelectedBuildingKind => defaultBuildingKind;
-        public ResourceAmount SelectedBuildingCost => defaultCost;
+        public Vector2Int DefaultFootprint => selectedDefinition != null ? selectedDefinition.Footprint : Vector2Int.one;
+        public BuildingKind SelectedBuildingKind => selectedDefinition != null ? selectedDefinition.BuildingKind : BuildingKind.Other;
+        public ResourceAmount SelectedBuildingCost => selectedDefinition != null ? selectedDefinition.Cost : default;
         public IReadOnlyList<BuildingConstructionDefinition> ConstructionDefinitions => constructionDefinitions;
+        public BuildingConstructionDefinition SelectedDefinition => selectedDefinition;
         public string LastPlacementFailureReason { get; private set; }
 
         private void Awake()
@@ -51,10 +41,10 @@ namespace ProjectS.Buildings
         public bool TryPlaceDefaultConstructionSite(Vector3 worldPosition, out ConstructionSite site)
         {
             ResolveReferences();
-            if (!CanSelectBuilding(defaultBuildingKind, out var unlockFailureReason))
+            if (!CanPlaceSelectedBuilding(out var failureReason))
             {
                 site = null;
-                LastPlacementFailureReason = unlockFailureReason;
+                LastPlacementFailureReason = failureReason;
                 return false;
             }
 
@@ -64,11 +54,11 @@ namespace ProjectS.Buildings
                 wallet,
                 tilemapWorld,
                 constructionSitePrefab,
-                completedBuildingPrefab,
-                defaultBuildingKind,
-                defaultCost,
-                defaultBuildTime,
-                defaultFootprint,
+                selectedDefinition.CompletedBuildingPrefab,
+                selectedDefinition.BuildingKind,
+                selectedDefinition.Cost,
+                selectedDefinition.BuildTime,
+                selectedDefinition.Footprint,
                 out site);
             LastPlacementFailureReason = placed ? string.Empty : ConstructionSite.LastCreateFailureReason;
             return placed;
@@ -77,21 +67,21 @@ namespace ProjectS.Buildings
         public bool CanPlaceDefaultConstructionSite(Vector3 worldPosition)
         {
             ResolveReferences();
-            if (!CanSelectBuilding(defaultBuildingKind, out var unlockFailureReason))
+            if (!CanPlaceSelectedBuilding(out var failureReason))
             {
-                LastPlacementFailureReason = unlockFailureReason;
+                LastPlacementFailureReason = failureReason;
                 return false;
             }
 
-            var placementFailureReason = ConstructionSite.GetPlacementFailureReason(tilemapWorld, worldPosition, DefaultFootprint);
+            var placementFailureReason = ConstructionSite.GetPlacementFailureReason(tilemapWorld, worldPosition, selectedDefinition.Footprint);
             if (!string.IsNullOrEmpty(placementFailureReason))
             {
                 LastPlacementFailureReason =
-                    $"Cannot place {defaultBuildingKind} construction site at {worldPosition}: {placementFailureReason}";
+                    $"Cannot place {selectedDefinition.BuildingKind} construction site at {worldPosition}: {placementFailureReason}";
                 return false;
             }
 
-            if (defaultCost.IsEmpty)
+            if (selectedDefinition.Cost.IsEmpty)
             {
                 LastPlacementFailureReason = string.Empty;
                 return true;
@@ -100,14 +90,14 @@ namespace ProjectS.Buildings
             if (wallet == null)
             {
                 LastPlacementFailureReason =
-                    $"Cannot place {defaultBuildingKind} construction site: no resource wallet is available for {team}.";
+                    $"Cannot place {selectedDefinition.BuildingKind} construction site: no resource wallet is available for {team}.";
                 return false;
             }
 
-            if (!wallet.CanAfford(defaultCost))
+            if (!wallet.CanAfford(selectedDefinition.Cost))
             {
                 LastPlacementFailureReason =
-                    $"Cannot place {defaultBuildingKind} construction site: insufficient resources for cost ({defaultCost}).";
+                    $"Cannot place {selectedDefinition.BuildingKind} construction site: insufficient resources for cost ({selectedDefinition.Cost}).";
                 return false;
             }
 
@@ -118,7 +108,9 @@ namespace ProjectS.Buildings
         public IReadOnlyList<UnitBuildPlacementPreviewCell> GetDefaultConstructionSitePreviewCells(Vector3 worldPosition)
         {
             ResolveReferences();
-            return ConstructionSite.GetPlacementPreviewCells(tilemapWorld, worldPosition, DefaultFootprint);
+            return selectedDefinition != null
+                ? ConstructionSite.GetPlacementPreviewCells(tilemapWorld, worldPosition, selectedDefinition.Footprint)
+                : new UnitBuildPlacementPreviewCell[0];
         }
 
         bool IUnitBuildPlacementService.CanPlaceDefaultConstructionSite(Vector3 worldPosition)
@@ -156,14 +148,23 @@ namespace ProjectS.Buildings
             wallet = resourceWallet;
             tilemapWorld = world;
             constructionSitePrefab = sitePrefab;
-            completedBuildingPrefab = finishedPrefab;
-            combatProductionBuildingPrefab = finishedPrefab;
-            defaultBuildingKind = buildingKind;
-            defaultCost = cost;
-            defaultBuildTime = Mathf.Max(0.1f, buildTime);
-            defaultFootprint = new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
+            ConfigureConstructionDefinitions(new[]
+            {
+                BuildingConstructionDefinition.Create("Building", buildingKind, cost, buildTime, footprint, finishedPrefab)
+            });
+            SelectBuilding(buildingKind);
         }
 
+        public void ConfigureConstructionDefinitions(BuildingConstructionDefinition[] definitions)
+        {
+            constructionDefinitions = definitions ?? new BuildingConstructionDefinition[0];
+            if (selectedDefinition != null)
+            {
+                selectedDefinition = FindConstructionDefinition(selectedDefinition.BuildingKind);
+            }
+        }
+
+        // Compatibility bridge for existing scene setup; selection still reads only constructionDefinitions.
         public void ConfigureBuildOptions(
             GameObject spliterProductionPrefab,
             GameObject autoTurretPrefab,
@@ -172,24 +173,32 @@ namespace ProjectS.Buildings
             GameObject resourceDropOffPrefab = null,
             GameObject mainBasePrefab = null)
         {
-            spliterProductionBuildingPrefab = spliterProductionPrefab;
-            autoTurretBuildingPrefab = autoTurretPrefab;
-            speedAuraBuildingPrefab = speedAuraPrefab;
-            supplyDepotBuildingPrefab = supplyDepotPrefab;
-            resourceDropOffBuildingPrefab = resourceDropOffPrefab;
-            mainBaseBuildingPrefab = mainBasePrefab;
-        }
+            var definitions = new List<BuildingConstructionDefinition>();
+            if (selectedDefinition != null)
+            {
+                definitions.Add(selectedDefinition);
+            }
 
-        public void ConfigureConstructionDefinitions(BuildingConstructionDefinition[] definitions)
-        {
-            constructionDefinitions = definitions ?? new BuildingConstructionDefinition[0];
+            definitions.Add(BuildingConstructionDefinition.Create("Spliter Production", BuildingKind.SpliterProduction, new ResourceAmount(175, 0), 9f, new Vector2Int(2, 2), spliterProductionPrefab));
+            definitions.Add(BuildingConstructionDefinition.Create("Auto Turret", BuildingKind.AutoTurret, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2), autoTurretPrefab));
+            definitions.Add(BuildingConstructionDefinition.Create("Speed Aura", BuildingKind.SpeedAura, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2), speedAuraPrefab));
+            definitions.Add(BuildingConstructionDefinition.Create("Supply Depot", BuildingKind.SupplyDepot, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2), supplyDepotPrefab));
+            definitions.Add(BuildingConstructionDefinition.Create("Resource Drop-off", BuildingKind.ResourceDropOff, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2), resourceDropOffPrefab));
+            definitions.Add(BuildingConstructionDefinition.Create("Main Base", BuildingKind.MainBase, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3), mainBasePrefab));
+            ConfigureConstructionDefinitions(definitions.ToArray());
         }
 
         public bool CanSelectBuilding(BuildingKind buildingKind, out string failureReason)
         {
             ResolveReferences();
             var definition = FindConstructionDefinition(buildingKind);
-            if (definition != null && !definition.CanBeBuiltBy(team, out failureReason))
+            if (definition == null)
+            {
+                failureReason = $"Building type {buildingKind} is not available.";
+                return false;
+            }
+
+            if (!definition.CanBeBuiltBy(team, out failureReason))
             {
                 return false;
             }
@@ -207,55 +216,27 @@ namespace ProjectS.Buildings
                 return false;
             }
 
-            switch (buildingKind)
-            {
-                case BuildingKind.MainBase:
-                    return SelectConfiguredBuilding(buildingKind, mainBaseBuildingPrefab, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3));
-                case BuildingKind.Production:
-                    if (combatProductionBuildingPrefab == null)
-                    {
-                        LastPlacementFailureReason = "Combat production building prefab is not configured.";
-                        return false;
-                    }
-
-                    completedBuildingPrefab = combatProductionBuildingPrefab;
-                    defaultBuildingKind = BuildingKind.Production;
-                    defaultCost = new ResourceAmount(150, 0);
-                    defaultBuildTime = 8f;
-                    defaultFootprint = new Vector2Int(2, 2);
-                    LastPlacementFailureReason = string.Empty;
-                    return true;
-                case BuildingKind.SpliterProduction:
-                    return SelectConfiguredBuilding(buildingKind, spliterProductionBuildingPrefab, new ResourceAmount(175, 0), 9f, new Vector2Int(2, 2));
-                case BuildingKind.AutoTurret:
-                    return SelectConfiguredBuilding(buildingKind, autoTurretBuildingPrefab, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2));
-                case BuildingKind.SpeedAura:
-                    return SelectConfiguredBuilding(buildingKind, speedAuraBuildingPrefab, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2));
-                case BuildingKind.SupplyDepot:
-                    return SelectConfiguredBuilding(buildingKind, supplyDepotBuildingPrefab, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2));
-                case BuildingKind.ResourceDropOff:
-                    return SelectConfiguredBuilding(buildingKind, resourceDropOffBuildingPrefab, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2));
-                default:
-                    LastPlacementFailureReason = $"Building type {buildingKind} is not available.";
-                    return false;
-            }
-        }
-
-        private bool SelectConfiguredBuilding(BuildingKind buildingKind, GameObject prefab, ResourceAmount cost, float buildTime, Vector2Int footprint)
-        {
-            if (prefab == null)
+            var definition = FindConstructionDefinition(buildingKind);
+            if (definition.CompletedBuildingPrefab == null)
             {
                 LastPlacementFailureReason = $"Building type {buildingKind} has no configured prefab.";
                 return false;
             }
 
-            completedBuildingPrefab = prefab;
-            defaultBuildingKind = buildingKind;
-            defaultCost = cost;
-            defaultBuildTime = buildTime;
-            defaultFootprint = footprint;
+            selectedDefinition = definition;
             LastPlacementFailureReason = string.Empty;
             return true;
+        }
+
+        private bool CanPlaceSelectedBuilding(out string failureReason)
+        {
+            if (selectedDefinition == null)
+            {
+                failureReason = "No building type is selected.";
+                return false;
+            }
+
+            return CanSelectBuilding(selectedDefinition.BuildingKind, out failureReason);
         }
 
         private BuildingConstructionDefinition FindConstructionDefinition(BuildingKind buildingKind)
@@ -294,16 +275,58 @@ namespace ProjectS.Buildings
     [System.Serializable]
     public sealed class BuildingConstructionDefinition
     {
+        [SerializeField] private string displayName = "Building";
         [SerializeField] private BuildingKind buildingKind = BuildingKind.Other;
+        [SerializeField] private ResourceAmount cost;
+        [SerializeField, Min(0.1f)] private float buildTime = 1f;
+        [SerializeField] private Vector2Int footprint = Vector2Int.one;
+        [SerializeField] private GameObject completedBuildingPrefab;
         [SerializeField] private UnlockRequirement[] unlockRequirements = new UnlockRequirement[0];
 
+        public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? buildingKind.ToString() : displayName;
         public BuildingKind BuildingKind => buildingKind;
+        public ResourceAmount Cost => cost;
+        public float BuildTime => Mathf.Max(0.1f, buildTime);
+        public Vector2Int Footprint => new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
+        public GameObject CompletedBuildingPrefab => completedBuildingPrefab;
         public IReadOnlyList<UnlockRequirement> UnlockRequirements => unlockRequirements;
 
         public void Configure(BuildingKind kind, UnlockRequirement[] requirements = null)
         {
             buildingKind = kind;
             unlockRequirements = requirements ?? new UnlockRequirement[0];
+        }
+
+        public void Configure(
+            string name,
+            BuildingKind kind,
+            ResourceAmount buildingCost,
+            float duration,
+            Vector2Int occupiedFootprint,
+            GameObject finishedPrefab,
+            UnlockRequirement[] requirements = null)
+        {
+            displayName = name;
+            buildingKind = kind;
+            cost = buildingCost;
+            buildTime = Mathf.Max(0.1f, duration);
+            footprint = new Vector2Int(Mathf.Max(1, occupiedFootprint.x), Mathf.Max(1, occupiedFootprint.y));
+            completedBuildingPrefab = finishedPrefab;
+            unlockRequirements = requirements ?? new UnlockRequirement[0];
+        }
+
+        public static BuildingConstructionDefinition Create(
+            string name,
+            BuildingKind kind,
+            ResourceAmount cost,
+            float buildTime,
+            Vector2Int footprint,
+            GameObject prefab,
+            UnlockRequirement[] unlockRequirements = null)
+        {
+            var definition = new BuildingConstructionDefinition();
+            definition.Configure(name, kind, cost, buildTime, footprint, prefab, unlockRequirements);
+            return definition;
         }
 
         public bool CanBeBuiltBy(UnitTeam team, out string failureReason)

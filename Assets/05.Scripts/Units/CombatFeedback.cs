@@ -73,6 +73,10 @@ namespace ProjectS.Units
         [SerializeField, Min(1)] private int maximumPoolSize = 48;
         [SerializeField] private string sortingLayerName = "Default";
         [SerializeField] private int sortingOrder = 45;
+        [SerializeField, Min(0.01f)] private float attackHitDuration = 0.08f;
+        [SerializeField, Min(0.01f)] private float damagedDuration = 0.28f;
+        [SerializeField, Min(0.01f)] private float deathDuration = 0.75f;
+        [SerializeField, Min(0.01f)] private float activeSkillDuration = 0.65f;
 
         private readonly List<PooledVisual> visuals = new List<PooledVisual>();
         private Material sharedMaterial;
@@ -240,16 +244,16 @@ namespace ProjectS.Units
             switch (feedbackEvent.Type)
             {
                 case CombatFeedbackType.AttackHit:
-                    SetStyle(visual, new Color(1f, 0.85f, 0.25f, 0.9f), 0.12f, 0.12f, 0.38f);
+                    SetStyle(visual, new Color(1f, 0.85f, 0.25f, 0.9f), attackHitDuration, 0.12f, 0.38f);
                     break;
                 case CombatFeedbackType.Damaged:
-                    SetStyle(visual, new Color(1f, 0.2f, 0.12f, 0.78f), 0.16f, 0.16f, 0.5f);
+                    SetStyle(visual, new Color(1f, 0.2f, 0.12f, 0.78f), damagedDuration, 0.16f, 0.5f);
                     break;
                 case CombatFeedbackType.Death:
-                    SetStyle(visual, new Color(1f, 0.32f, 0.2f, 0.82f), 0.42f, 0.24f, 1.05f);
+                    SetStyle(visual, new Color(1f, 0.32f, 0.2f, 0.82f), deathDuration, 0.24f, 1.05f);
                     break;
                 case CombatFeedbackType.ActiveSkill:
-                    SetStyle(visual, new Color(0.2f, 0.95f, 0.82f, 0.86f), 0.34f, 0.28f, 0.9f);
+                    SetStyle(visual, new Color(0.2f, 0.95f, 0.82f, 0.86f), activeSkillDuration, 0.28f, 0.9f);
                     break;
             }
 

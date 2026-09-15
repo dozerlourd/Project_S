@@ -132,7 +132,7 @@ namespace ProjectS.Resources
             NotifySupplyChanged();
         }
 
-        public void RegisterBuilding(BuildingStatus building, int suppliedAmount)
+        public void RegisterBuilding(Structure building, int suppliedAmount)
         {
             if (building == null || building.Team != team || !building.Completed)
             {
@@ -147,7 +147,7 @@ namespace ProjectS.Resources
             NotifySupplyChanged();
         }
 
-        public void UnregisterBuilding(BuildingStatus building)
+        public void UnregisterBuilding(Structure building)
         {
             if (building == null || !buildingSupplyByInstanceId.TryGetValue(building.GetInstanceID(), out var suppliedAmount))
             {

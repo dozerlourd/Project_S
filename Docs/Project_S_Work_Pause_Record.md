@@ -1,5 +1,61 @@
 # 작업 일시정지 기록
 
+## 2026-09-15: 건물 Structure 계층 1단계
+
+### 대상 작업
+
+- 모든 건물이 공통 `Structure` 기반 생명주기와 API를 사용하도록 구조를 정리한다.
+- 기존 `BuildingStatus` 직렬화 참조와 레지스트리, 승패, 선택, 안개, 생산, 보급 흐름의 호환성을 유지한다.
+- 기존 건물 역할 7종과 신규 건물 역할 7종의 파생 컴포넌트를 추가한다.
+- 신규 건물 프리팹과 공통 상태 PlayMode 테스트를 추가한다.
+- `BuildingPlacementService`, 건설 UI, 해금, 동적 경로 점유는 이번 단계에서 변경하지 않는다.
+
+### 현재까지 반영된 내용
+
+- 공통 `Structure` 기반 클래스와 `StructureFactory`를 추가했다.
+- 기존 `BuildingStatus`를 `Structure` 상속 호환 계층으로 변경하고 `BuildingKind`에 신규 7종을 추가했다.
+- 기존 역할용 파생 클래스 `MainBaseStructure`, `ProductionStructure`, `SpliterProductionStructure`, `ResourceDropOffStructure`, `SupplyDepotStructure`, `AutoTurretStructure`, `SpeedAuraStructure`를 추가했다.
+- 신규 역할용 파생 클래스 `ResearchLabStructure`, `DefenseControlCenterStructure`, `VehicleFactoryStructure`, `SignalRelayStructure`, `TacticalCommandCenterStructure`, `MaintenanceBayStructure`, `ForwardSupplyPostStructure`를 추가했다.
+- `BuildingHealth`에 최대 체력 설정 API를 추가하고 `SupplyManager`가 공통 `Structure` 타입을 받을 수 있도록 변경했다.
+- 런타임 부트스트랩과 에디터 셋업 빌더에 역할 컴포넌트 및 신규 건물 템플릿/프리팹 생성 경로를 연결하는 초안이 반영됐다.
+- 기존 특수 건물 프리팹 4종에 파생 역할 컴포넌트 전환 변경이 반영됐다.
+- `StructurePlayModeTests` 초안이 추가됐다.
+
+### 미완료 및 재개 지점
+
+- 신규 건물 프리팹 7종은 아직 실제 `.prefab` 파일로 생성되지 않았다. 에디터 생성 메뉴 또는 검토된 YAML 생성 방식으로 완성해야 한다.
+- `PrototypeMainBase`를 포함한 기존 건물 프리팹의 역할 컴포넌트 적용 상태가 일관적인지 전체 점검해야 한다.
+- `Structure`, `StructureFactory`, 부트스트랩, 셋업 빌더의 변경을 다시 읽고 직렬화 호환성과 런타임 등록 순서를 검토해야 한다.
+- `StructurePlayModeTests`는 컴파일 안정성과 의도한 검증 범위를 아직 최종 검토하지 않았다.
+- 커스텀 targets를 사용한 `dotnet build`를 시작했으나 최종 종료 결과를 확인하지 못했다. 현재 빌드 성공으로 간주하면 안 된다.
+- Unity Editor 프로세스가 실행 중이어서 프로젝트 잠금에 영향을 줄 수 있다. 프로세스를 임의로 종료하지 말고 사용자 상태를 먼저 확인한다.
+
+### 주요 변경 파일
+
+- `Assets/05.Scripts/Buildings/Structure.cs`
+- `Assets/05.Scripts/Buildings/StructureFactory.cs`
+- `Assets/05.Scripts/Buildings/BuildingStatus.cs`
+- `Assets/05.Scripts/Buildings/BuildingHealth.cs`
+- `Assets/05.Scripts/Buildings/*Structure.cs`
+- `Assets/05.Scripts/Resources/SupplyManager.cs`
+- `Assets/05.Scripts/MapCreateSceneAutoBootstrap.cs`
+- `Assets/05.Scripts/Editor/MapCreateSceneSetupBuilder.cs`
+- `Assets/05.Scripts/Tests/PlayMode/StructurePlayModeTests.cs`
+- `Assets/03.Prefabs/Buildings/Core/PrototypeAutoTurretBuilding.prefab`
+- `Assets/03.Prefabs/Buildings/Core/PrototypeProductionBuilding.prefab`
+- `Assets/03.Prefabs/Buildings/Core/PrototypeSpeedAuraBuilding.prefab`
+- `Assets/03.Prefabs/Buildings/Core/PrototypeSpliterProductionBuilding.prefab`
+
+### 작업 상태 및 주의 사항
+
+- 구현/수정 작업은 이 기록 시점에서 일시정지했다.
+- 커밋과 푸시는 수행하지 않았다.
+- 서브 에이전트 2개가 프리팹/생성기와 테스트를 나눠 작업했으나 사용량 제한으로 종료됐으며, 공유 워크트리에 남은 변경은 메인 에이전트의 최종 통합 검토를 거치지 않았다.
+- 작업 전부터 존재하던 `Assets/_Recovery/0 (3).unity`, `Assets/_Recovery/0 (4).unity` 및 각 `.meta`는 사용자 변경으로 간주하며 수정하거나 삭제하지 않는다.
+- 유닛 행동은 변경하지 않았으므로 `Docs/Unit_Behavior_Guidelines.md`는 갱신하지 않았다.
+
+---
+
 ## 대상 작업
 
 - 우선순위 3: 건물별 생산 역할 분리

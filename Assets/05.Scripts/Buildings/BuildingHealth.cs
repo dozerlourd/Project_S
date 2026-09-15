@@ -28,6 +28,12 @@ namespace ProjectS.Buildings
             ResetHealth();
         }
 
+        public void ConfigureMaxHealth(float amount)
+        {
+            maxHealth = Mathf.Max(1f, amount);
+            ResetHealth();
+        }
+
         public void ResetHealth()
         {
             currentHealth = MaxHealth;

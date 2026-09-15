@@ -24,7 +24,6 @@ namespace ProjectS
         private const int ResourceSortingOrder = 12;
         private const int UnitSortingOrder = 20;
         private const int MainBaseSupplyProvided = 20;
-        private const int SupplyDepotSupplyProvided = 10;
 
         private static Sprite squareSprite;
         private static Sprite mineralsResourceSprite;
@@ -81,12 +80,6 @@ namespace ProjectS
             {
                 CreateExpansionResourceClusters(playerStart, aiStart, root, ProjectSTilemapWorld.ActiveInstance);
             }
-            var placementService = FindFirstObjectByType<BuildingPlacementService>();
-            if (placementService == null)
-            {
-                return;
-            }
-
             var templates = root.Find("Runtime Building Templates");
             if (templates == null)
             {
@@ -95,26 +88,33 @@ namespace ProjectS
                 templates = templatesObject.transform;
             }
 
+            EnsureAdditionalBuildingTemplates(templates);
+            var placementService = FindFirstObjectByType<BuildingPlacementService>();
+            if (placementService == null)
+            {
+                return;
+            }
+
             placementService.ConfigureBuildOptions(
                 ConfigureProductionTemplate(
-                    FindOrCreateBuildingTemplate(templates, "Spliter Production Building Template", BuildingKind.SpliterProduction, true, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f)),
+                    FindOrCreateBuildingTemplate(templates, "Spliter Production Building Template", BuildingKind.SpliterProduction, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f)),
                     GetRequiredUnitPrefab(PrototypeUnitType.Spliter),
                     new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, GetRequiredUnitPrefab(PrototypeUnitType.Spliter), new ResourceAmount(125, 0), 8f, 3, allowedProductionBuildings: new[] { BuildingKind.SpliterProduction }) },
                     new Vector3(2.5f, -0.5f, 0f),
                     new Vector3(5f, -1f, 0f)),
-                FindOrCreateBuildingTemplate(templates, "Auto Turret Building Template", BuildingKind.AutoTurret, false, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f)),
-                FindOrCreateBuildingTemplate(templates, "Speed Aura Building Template", BuildingKind.SpeedAura, false, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f)),
-                FindOrCreateBuildingTemplate(templates, "Supply Depot Building Template", BuildingKind.SupplyDepot, false, new Vector2(2.2f, 2.2f), new Color(0.78f, 0.62f, 0.24f, 1f)),
-                FindOrCreateBuildingTemplate(templates, "Resource Drop-off Building Template", BuildingKind.ResourceDropOff, false, new Vector2(2.2f, 2.2f), new Color(0.28f, 0.68f, 0.48f, 1f)),
+                FindOrCreateBuildingTemplate(templates, "Auto Turret Building Template", BuildingKind.AutoTurret, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f)),
+                FindOrCreateBuildingTemplate(templates, "Speed Aura Building Template", BuildingKind.SpeedAura, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f)),
+                FindOrCreateBuildingTemplate(templates, "Supply Depot Building Template", BuildingKind.SupplyDepot, new Vector2(2.2f, 2.2f), new Color(0.78f, 0.62f, 0.24f, 1f)),
+                FindOrCreateBuildingTemplate(templates, "Resource Drop-off Building Template", BuildingKind.ResourceDropOff, new Vector2(2.2f, 2.2f), new Color(0.28f, 0.68f, 0.48f, 1f)),
                 ConfigureProductionTemplate(
-                    FindOrCreateBuildingTemplate(templates, "Main Base Building Template", BuildingKind.MainBase, true, new Vector2(2.6f, 2.2f), new Color(0.28f, 0.52f, 0.76f, 1f)),
+                    FindOrCreateBuildingTemplate(templates, "Main Base Building Template", BuildingKind.MainBase, new Vector2(2.6f, 2.2f), new Color(0.28f, 0.52f, 0.76f, 1f)),
                     GetRequiredUnitPrefab(PrototypeUnitType.Worker),
                     new[] { CreateProductionDefinition("Worker", PrototypeUnitType.Worker, GetRequiredUnitPrefab(PrototypeUnitType.Worker), new ResourceAmount(50, 0), 5f, 1, allowedProductionBuildings: new[] { BuildingKind.MainBase }) },
                     new Vector3(2.5f, -1.5f, 0f),
                     new Vector3(5f, -2f, 0f)));
         }
 
-        private static GameObject FindOrCreateBuildingTemplate(Transform parent, string name, BuildingKind kind, bool hasProductionQueue, Vector2 size, Color color)
+        private static GameObject FindOrCreateBuildingTemplate(Transform parent, string name, BuildingKind kind, Vector2 size, Color color)
         {
             var existing = parent.Find(name);
             return existing != null
@@ -122,11 +122,27 @@ namespace ProjectS
                 : CreateBuildingPrototype(
                     name,
                     kind,
-                    kind == BuildingKind.MainBase || kind == BuildingKind.ResourceDropOff,
-                    hasProductionQueue,
                     size,
                     color,
                     parent);
+        }
+
+        private static void EnsureAdditionalBuildingTemplates(Transform parent)
+        {
+            CreateAdditionalBuildingTemplate(parent, "Research Lab", BuildingKind.ResearchLab, new Color(0.25f, 0.65f, 0.75f, 1f));
+            CreateAdditionalBuildingTemplate(parent, "Defense Control Center", BuildingKind.DefenseControlCenter, new Color(0.6f, 0.35f, 0.35f, 1f));
+            CreateAdditionalBuildingTemplate(parent, "Vehicle Factory", BuildingKind.VehicleFactory, new Color(0.45f, 0.5f, 0.55f, 1f));
+            CreateAdditionalBuildingTemplate(parent, "Signal Relay", BuildingKind.SignalRelay, new Color(0.25f, 0.65f, 0.5f, 1f));
+            CreateAdditionalBuildingTemplate(parent, "Tactical Command Center", BuildingKind.TacticalCommandCenter, new Color(0.4f, 0.5f, 0.8f, 1f));
+            CreateAdditionalBuildingTemplate(parent, "Maintenance Bay", BuildingKind.MaintenanceBay, new Color(0.7f, 0.6f, 0.3f, 1f));
+            CreateAdditionalBuildingTemplate(parent, "Forward Supply Post", BuildingKind.ForwardSupplyPost, new Color(0.5f, 0.7f, 0.35f, 1f));
+        }
+
+        private static void CreateAdditionalBuildingTemplate(Transform parent, string name, BuildingKind kind, Color color)
+        {
+            var template = FindOrCreateBuildingTemplate(parent, name + " Building Template", kind,
+                StructureFactory.GetDefaultFootprint(kind), color);
+            template.SetActive(false);
         }
 
         private static GameObject ConfigureProductionTemplate(
@@ -156,6 +172,7 @@ namespace ProjectS
             var root = new GameObject(SetupRootName);
             var prototypeRoot = CreateChild(root.transform, "Runtime Prototypes");
             prototypeRoot.SetActive(false);
+            EnsureAdditionalBuildingTemplates(prototypeRoot.transform);
 
             GetStartPositions(tilemapWorld, out var playerStart, out var aiStart);
             var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(100, 0), root.transform);
@@ -177,24 +194,20 @@ namespace ProjectS
             var mainBasePrototype = CreateBuildingPrototype(
                 "Main Base Prototype",
                 BuildingKind.MainBase,
-                true,
-                true,
                 new Vector2(2.6f, 2.2f),
                 new Color(0.28f, 0.52f, 0.76f, 1f),
                 prototypeRoot.transform);
             var productionPrototype = CreateBuildingPrototype(
                 "Production Building Prototype",
                 BuildingKind.Production,
-                false,
-                true,
                 new Vector2(2.4f, 2f),
                 new Color(0.48f, 0.36f, 0.68f, 1f),
                 prototypeRoot.transform);
-            var spliterProductionPrototype = CreateBuildingPrototype("Spliter Production Building Prototype", BuildingKind.SpliterProduction, false, true, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f), prototypeRoot.transform);
-            var autoTurretPrototype = CreateBuildingPrototype("Auto Turret Building Prototype", BuildingKind.AutoTurret, false, false, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f), prototypeRoot.transform);
-            var speedAuraPrototype = CreateBuildingPrototype("Speed Aura Building Prototype", BuildingKind.SpeedAura, false, false, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f), prototypeRoot.transform);
-            var supplyDepotPrototype = CreateBuildingPrototype("Supply Depot Building Prototype", BuildingKind.SupplyDepot, false, false, new Vector2(2.2f, 2.2f), new Color(0.78f, 0.62f, 0.24f, 1f), prototypeRoot.transform);
-            var resourceDropOffPrototype = CreateBuildingPrototype("Resource Drop-off Building Prototype", BuildingKind.ResourceDropOff, true, false, new Vector2(2.2f, 2.2f), new Color(0.28f, 0.68f, 0.48f, 1f), prototypeRoot.transform);
+            var spliterProductionPrototype = CreateBuildingPrototype("Spliter Production Building Prototype", BuildingKind.SpliterProduction, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f), prototypeRoot.transform);
+            var autoTurretPrototype = CreateBuildingPrototype("Auto Turret Building Prototype", BuildingKind.AutoTurret, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f), prototypeRoot.transform);
+            var speedAuraPrototype = CreateBuildingPrototype("Speed Aura Building Prototype", BuildingKind.SpeedAura, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f), prototypeRoot.transform);
+            var supplyDepotPrototype = CreateBuildingPrototype("Supply Depot Building Prototype", BuildingKind.SupplyDepot, new Vector2(2.2f, 2.2f), new Color(0.78f, 0.62f, 0.24f, 1f), prototypeRoot.transform);
+            var resourceDropOffPrototype = CreateBuildingPrototype("Resource Drop-off Building Prototype", BuildingKind.ResourceDropOff, new Vector2(2.2f, 2.2f), new Color(0.28f, 0.68f, 0.48f, 1f), prototypeRoot.transform);
             var constructionPrototype = CreateConstructionSitePrototype(prototypeRoot.transform);
 
             var workerDefinitions = new[]
@@ -504,15 +517,15 @@ namespace ProjectS
         private static GameObject CreateBuildingPrototype(
             string name,
             BuildingKind kind,
-            bool dropOff,
-            bool production,
             Vector2 size,
             Color color,
             Transform parent)
         {
             var root = CreateChild(parent, name);
             root.SetActive(false);
-            root.AddComponent<SpriteRenderer>();
+            var renderer = root.AddComponent<SpriteRenderer>();
+            renderer.sortingLayerName = "Structures";
+            renderer.sortingOrder = 20;
             var visual = root.AddComponent<PrototypeBuildingVisual>();
             visual.Configure(color, new Color(0.08f, 0.13f, 0.18f, 1f), size, GetBuildingSpriteResourcePath(kind));
 
@@ -520,38 +533,23 @@ namespace ProjectS
             collider.size = size;
             collider.isTrigger = true;
 
-            var status = root.AddComponent<BuildingStatus>();
-            status.Initialize(UnitTeam.Team1, kind, Vector2Int.CeilToInt(size), true);
-            status.ConfigureSupplyProvided(GetSupplyProvided(kind));
-            if (dropOff)
-            {
-                root.AddComponent<ResourceDropOff>();
-            }
-
-            if (production)
-            {
-                root.AddComponent<UnitProductionQueue>();
-            }
-
-            if (kind == BuildingKind.AutoTurret)
-            {
-                root.AddComponent<BuildingAutoTurret>();
-            }
-            else if (kind == BuildingKind.SpeedAura)
-            {
-                root.AddComponent<BuildingSpeedAura>();
-            }
+            var status = StructureFactory.AddTo(root, kind);
+            status.Initialize(UnitTeam.Team1, kind, StructureFactory.GetDefaultFootprint(kind), true);
 
             return root;
         }
 
-        private static string GetBuildingSpriteResourcePath(BuildingKind kind)
+        public static string GetBuildingSpriteResourcePath(BuildingKind kind)
         {
             switch (kind)
             {
+                case BuildingKind.MainBase: return "Temp/Buildings/MainBaseBuilding";
+                case BuildingKind.Production: return "Temp/Buildings/ProductionBuilding";
                 case BuildingKind.SpliterProduction: return "Temp/Buildings/SpliterProductionBuilding";
                 case BuildingKind.AutoTurret: return "Temp/Buildings/AutoTurretBuilding";
                 case BuildingKind.SpeedAura: return "Temp/Buildings/SpeedAuraBuilding";
+                case BuildingKind.ResourceDropOff: return "Temp/Buildings/ResourceDropOffBuilding";
+                case BuildingKind.SupplyDepot: return "Temp/Buildings/SupplyDepotBuilding";
                 default: return string.Empty;
             }
         }
@@ -560,9 +558,16 @@ namespace ProjectS
         {
             var root = CreateChild(parent, "Construction Site Prototype");
             root.SetActive(false);
-            root.AddComponent<SpriteRenderer>();
+            var renderer = root.AddComponent<SpriteRenderer>();
+            renderer.sortingLayerName = "Structures";
+            renderer.sortingOrder = 19;
             var visual = root.AddComponent<PrototypeBuildingVisual>();
-            visual.Configure(new Color(0.52f, 0.48f, 0.4f, 0.85f), new Color(0.95f, 0.82f, 0.38f, 1f), new Vector2(2.2f, 2f));
+            visual.Configure(
+                new Color(0.52f, 0.48f, 0.4f, 0.85f),
+                new Color(0.95f, 0.82f, 0.38f, 1f),
+                new Vector2(2.2f, 2f),
+                "Temp/Buildings/ConstructionSite",
+                19);
 
             var collider = root.AddComponent<BoxCollider2D>();
             collider.size = new Vector2(2.2f, 2f);
@@ -591,8 +596,7 @@ namespace ProjectS
             var status = building.GetComponent<BuildingStatus>();
             if (status != null)
             {
-                status.Initialize(team, kind, kind == BuildingKind.MainBase ? new Vector2Int(3, 3) : new Vector2Int(2, 2), true);
-                status.ConfigureSupplyProvided(GetSupplyProvided(kind));
+                status.Initialize(team, kind, status.Footprint, true);
             }
 
             var productionQueue = building.GetComponent<UnitProductionQueue>();
@@ -600,13 +604,6 @@ namespace ProjectS
             {
                 productionQueue.Configure(wallet, tilemapWorld, definitions, 5, spawnOffset, rallyOffset);
             }
-        }
-
-        private static int GetSupplyProvided(BuildingKind kind)
-        {
-            return kind == BuildingKind.MainBase
-                ? MainBaseSupplyProvided
-                : kind == BuildingKind.SupplyDepot ? SupplyDepotSupplyProvided : 0;
         }
 
         private static void CreateResourceCluster(Vector3 center, Transform parent, ProjectSTilemapWorld tilemapWorld)

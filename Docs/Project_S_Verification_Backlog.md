@@ -8,6 +8,23 @@
 
 ## 검증 대기 항목
 
+### 핵심 건물 역할 및 고유 텍스처
+
+- [ ] `Assets/01.Textures/Buildings/Unique`에 `MainBase_Unique.png`, `Production_Unique.png`, `SpliterProduction_Unique.png`, `AutoTurret_Unique.png`, `SpeedAura_Unique.png`, `ConstructionSite_Unique.png`를 가져온 뒤 `Tools > Project S > Apply Unique Core Building Sprites`를 실행한다.
+- [ ] 핵심 건물 프리팹 6종의 `SpriteRenderer`가 서로 다른 Sprite GUID를 참조하고 다른 건물 텍스처를 공유하지 않는지 확인한다.
+- [ ] MainBase는 Worker 생산과 자원 반납, Production은 일반 전투 유닛 생산, SpliterProduction은 Spliter 생산, AutoTurret은 고정 공격, SpeedAura는 이동 오라, ConstructionSite는 미완성 건설 대상으로만 동작하는지 PlayMode에서 확인한다.
+- [ ] MainBase와 완성 건물은 Structures 정렬 레이어 20, ConstructionSite는 Structures 정렬 레이어 19를 사용하며 렌더러와 콜라이더 크기가 프리팹 역할 크기와 일치하는지 확인한다.
+- [ ] 런타임 부트스트랩이 핵심 건물 종류별 고유 Resources 경로를 조회하고, 리소스가 없을 때에만 역할별 절차적 표시로 대체되는지 확인한다.
+
+### 건물 Structure 계층 1단계
+
+- [ ] 신규 및 기존 `Structure` 파생 스크립트와 `StructurePlayModeTests`가 포함된 전체 솔루션 빌드가 오류 없이 완료되는지 확인한다.
+- [ ] 신규 건물 프리팹 7종이 실제 에셋으로 존재하고 각각 올바른 파생 컴포넌트, `BuildingHealth`, Collider, 시각 요소, footprint, SpriteRenderer 정렬 값을 가지는지 확인한다.
+- [ ] 기존 건물 프리팹과 씬의 `BuildingStatus` 직렬화 참조가 손상되지 않고 레지스트리, 승패, 선택, 공격 대상, 안개, 생산, 보급 흐름이 유지되는지 Unity PlayMode에서 확인한다.
+- [ ] Signal Relay가 시야 반경 12를 제공하고 Forward Supply Post가 자원 반납처와 보급량 5를 제공하는지 확인한다.
+- [ ] 비활성 신규 건물 템플릿이 보급량이나 시야 제공자로 잘못 등록되지 않는지 확인한다.
+- [ ] `StructurePlayModeTests`를 Unity Test Runner에서 실행한다.
+
 ### Unity 테스트 실행 환경
 
 - [ ] Unity Headless PlayMode 테스트가 테스트 러너에 진입하지 못하고 즉시 종료되는 원인을 확인한다.
@@ -264,3 +281,11 @@
 - [ ] 팀별 `TeamUnlockState`에 해금 ID를 부여했을 때 해당 조건을 가진 생산 버튼과 건설 버튼이 `LOCKED` 상태로 보이고, 클릭 및 `Q/E/R/T/Y/U/I` 단축키가 같은 실패 사유를 표시하는지 확인한다.
 - [ ] 잠긴 생산 요청과 건설 배치 요청이 자원·보급을 소비하지 않으며, 해금 직후에는 즉시 다시 사용할 수 있는지 확인한다.
 - [ ] `UnlockRequirement_UsesSameTeamStateForProductionAndConstruction` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+
+### 건설 정의 및 배치 보강 후속
+
+- [ ] `BuildingConstructionDefinition`에 권장 트리 전체의 표시명, 비용, 건설 시간, 풋프린트, 완성 프리팹, TeamUnlock 및 CompletedBuilding 조건을 연결하고 MapCreate 런타임·에디터 셋업에서 동일 정의 배열을 주입한다.
+- [ ] MainBase, Production, SupplyDepot, ResourceDropOff는 기본 해금 상태로 유지하면서 ResearchLab 이후 field-engineering, adaptive-combat, mechanized-systems, tactical-command 분기와 Tank, Striker, Swarm, Spliter 생산 조건을 연결한다.
+- [ ] B 건설 메뉴를 하드코딩 슬롯 대신 `BuildingPlacementService.ConstructionDefinitions` 목록으로 렌더링하고, 잠김 항목의 정확한 조건 사유와 페이지 또는 슬롯 이동을 제공한다.
+- [ ] 선택한 건설 정의의 프리뷰, 실제 배치, 비용 차감이 동일한 cost/footprint를 사용하며 성공한 배치만 비용을 한 번 차감하고 메뉴를 닫는지 PlayMode 테스트를 추가하고 실행한다.
+- [ ] 공사 중 ConstructionSite 풋프린트를 등록 기반 동적 경로 장애물로 노출하고 완료·비활성화 때 해제하며, 작업자가 접근 가능한 인접 칸으로 이동하는 처리는 Structure 및 경로 담당 변경과 조율한 뒤 구현한다.

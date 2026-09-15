@@ -27,6 +27,7 @@ namespace ProjectS.UI
 
         private void Awake()
         {
+            EnsureMenuCamera();
             ResolveTextures();
         }
 
@@ -140,6 +141,23 @@ namespace ProjectS.UI
                 focused = { background = buttonTexture, textColor = Color.white }
             };
             return style;
+        }
+
+        private static void EnsureMenuCamera()
+        {
+            if (Camera.main != null || FindFirstObjectByType<Camera>() != null)
+            {
+                return;
+            }
+
+            var cameraObject = new GameObject("Main Menu Camera");
+            cameraObject.tag = "MainCamera";
+            cameraObject.transform.position = new Vector3(0f, 0f, -10f);
+            var menuCamera = cameraObject.AddComponent<Camera>();
+            menuCamera.orthographic = true;
+            menuCamera.clearFlags = CameraClearFlags.SolidColor;
+            menuCamera.backgroundColor = new Color(0.02f, 0.04f, 0.06f, 1f);
+            menuCamera.depth = -100f;
         }
 
         private void ResolveTextures()

@@ -8,6 +8,8 @@ namespace ProjectS.Buildings
         [SerializeField] private Color trimColor = new Color(0.08f, 0.14f, 0.24f, 1f);
         [SerializeField] private Vector2 worldSize = new Vector2(2f, 2f);
         [SerializeField] private string spriteResourcePath;
+        [SerializeField] private string sortingLayerName = "Structures";
+        [SerializeField] private int sortingOrder = 20;
 
         private SpriteRenderer spriteRenderer;
         private BoxCollider2D boxCollider;
@@ -33,12 +35,18 @@ namespace ProjectS.Buildings
             worldSize = new Vector2(Mathf.Max(0.25f, worldSize.x), Mathf.Max(0.25f, worldSize.y));
         }
 
-        public void Configure(Color body, Color trim, Vector2 size, string resourcePath = null)
+        public void Configure(
+            Color body,
+            Color trim,
+            Vector2 size,
+            string resourcePath = null,
+            int renderOrder = 20)
         {
             bodyColor = body;
             trimColor = trim;
             worldSize = new Vector2(Mathf.Max(0.25f, size.x), Mathf.Max(0.25f, size.y));
             spriteResourcePath = resourcePath ?? string.Empty;
+            sortingOrder = renderOrder;
             if (Application.isPlaying)
             {
                 ApplyVisual();
@@ -61,10 +69,13 @@ namespace ProjectS.Buildings
                 return;
             }
 
-            spriteRenderer.sprite = CreateSpriteFromResource() ?? CreateSprite();
+            spriteRenderer.sprite = CreateSpriteFromResource() ?? spriteRenderer.sprite ?? CreateSprite();
             spriteRenderer.drawMode = SpriteDrawMode.Sliced;
             spriteRenderer.size = worldSize;
-            spriteRenderer.sortingOrder = 20;
+            spriteRenderer.sortingLayerName = string.IsNullOrWhiteSpace(sortingLayerName)
+                ? "Structures"
+                : sortingLayerName;
+            spriteRenderer.sortingOrder = sortingOrder;
 
             if (boxCollider == null)
             {

@@ -36,12 +36,17 @@ namespace ProjectS.Buildings
         public string GetFailureReason(UnitProductionDefinition definition)
         {
             var displayName = definition != null ? definition.DisplayName : "production";
+            return GetFailureReason("enqueue", displayName);
+        }
+
+        public string GetFailureReason(string action, string displayName)
+        {
             switch (kind)
             {
                 case UnitProductionRequirementKind.CompletedBuilding:
-                    return $"Cannot enqueue {displayName}: requires {RequiredCount} completed {requiredBuildingKind} building(s).";
+                    return $"Cannot {action} {displayName}: requires {RequiredCount} completed {requiredBuildingKind} building(s).";
                 default:
-                    return $"Cannot enqueue {displayName}: production requirement is not met.";
+                    return $"Cannot {action} {displayName}: building requirement is not met.";
             }
         }
 
