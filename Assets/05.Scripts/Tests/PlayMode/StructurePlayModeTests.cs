@@ -6,6 +6,7 @@ using NUnit.Framework;
 using ProjectS.Units;
 using ProjectS.Visibility;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
 namespace ProjectS.Tests.PlayMode
@@ -39,6 +40,86 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(registryMethod, Is.Not.Null);
             Assert.That(registryMethod.ReturnType,
                 Is.EqualTo(typeof(IReadOnlyList<>).MakeGenericType(statusType)));
+        }
+
+        [UnityTest]
+        public IEnumerator RuntimeBuildingCatalog_UsesCorePrefabsWithDistinctPersistentSprites()
+        {
+            var catalog = Resources.Load<ScriptableObject>("Buildings/BuildingPrefabCatalog");
+            Assert.That(catalog, Is.Not.Null);
+            var sprites = new HashSet<Sprite>();
+            var instances = new List<GameObject>();
+
+            try
+            {
+                foreach (var kind in new[] { "MainBase", "Production", "SpliterProduction", "AutoTurret", "SpeedAura" })
+                {
+                    var prefab = (GameObject)Invoke(catalog, "GetPrefab", ParseKind(kind));
+                    Assert.That(prefab, Is.Not.Null, kind + " catalog prefab");
+                    var status = prefab.GetComponent(BuildingType("BuildingStatus"));
+                    Assert.That(status, Is.Not.Null);
+                    Assert.That(Property(status, "Kind").ToString(), Is.EqualTo(kind));
+
+                    var expectedSprite = prefab.GetComponent<SpriteRenderer>()?.sprite;
+                    Assert.That(expectedSprite, Is.Not.Null, kind + " sprite");
+                    Assert.That(sprites.Add(expectedSprite), Is.True, kind + " must use a unique Sprite asset");
+
+                    var instance = Object.Instantiate(prefab);
+                    instances.Add(instance);
+                    yield return null;
+                    Assert.That(instance.GetComponent<SpriteRenderer>()?.sprite, Is.SameAs(expectedSprite),
+                        kind + " runtime visual must preserve the prefab Sprite");
+                }
+
+                var constructionPrefab = (GameObject)Property(catalog, "ConstructionSitePrefab");
+                Assert.That(constructionPrefab, Is.Not.Null);
+                var constructionSprite = constructionPrefab.GetComponent<SpriteRenderer>()?.sprite;
+                Assert.That(constructionSprite, Is.Not.Null);
+                Assert.That(sprites.Add(constructionSprite), Is.True,
+                    "ConstructionSite must use a Sprite distinct from completed buildings");
+                Assert.That(catalog.GetType().GetMethod("GetPrefab")?.Invoke(catalog, new[] { ParseKind("SupplyDepot") }), Is.Null);
+                Assert.That(catalog.GetType().GetMethod("GetPrefab")?.Invoke(catalog, new[] { ParseKind("ResourceDropOff") }), Is.Null);
+            }
+            finally
+            {
+                for (var i = instances.Count - 1; i >= 0; i--)
+                {
+                    Object.DestroyImmediate(instances[i]);
+                }
+            }
+        }
+
+        [TestCase("VehicleFactory", 3, 3, 1250f)]
+        [TestCase("MaintenanceBay", 3, 2, 850f)]
+        [TestCase("SignalRelay", 2, 2, 550f)]
+        public void SpecializedProductionCatalog_PrefabsExposeDedicatedEmptyQueues(
+            string kind,
+            int footprintWidth,
+            int footprintHeight,
+            float maxHealth)
+        {
+            var catalog = Resources.Load<ScriptableObject>("Buildings/BuildingPrefabCatalog");
+            Assert.That(catalog, Is.Not.Null);
+            var prefab = (GameObject)Invoke(catalog, "GetPrefab", ParseKind(kind));
+            Assert.That(prefab, Is.Not.Null, kind + " catalog prefab");
+
+            var status = prefab.GetComponent(BuildingType("BuildingStatus"));
+            Assert.That(status, Is.Not.Null);
+            Assert.That(status.GetType(), Is.EqualTo(BuildingType(kind + "Structure")));
+            Assert.That(Property(status, "Kind").ToString(), Is.EqualTo(kind));
+            Assert.That(Property(status, "Footprint"), Is.EqualTo(new Vector2Int(footprintWidth, footprintHeight)));
+
+            var queue = prefab.GetComponent(BuildingType("UnitProductionQueue"));
+            Assert.That(queue, Is.Not.Null);
+            Assert.That((IEnumerable)Property(queue, "ProducibleUnits"), Is.Empty,
+                kind + " must not expose a production entry before its unit prefab exists");
+            Assert.That(prefab.GetComponents(BuildingType("UnitProductionQueue")), Has.Length.EqualTo(1));
+            Assert.That(prefab.GetComponent<SpriteRenderer>(), Is.Not.Null);
+            Assert.That(prefab.GetComponent<BoxCollider2D>(), Is.Not.Null);
+
+            var health = prefab.GetComponent(BuildingType("BuildingHealth"));
+            Assert.That(health, Is.Not.Null);
+            Assert.That(Property(health, "MaxHealth"), Is.EqualTo(maxHealth));
         }
 
         [TestCaseSource(nameof(Kinds))]
@@ -373,7 +454,12 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(root.GetComponents(BuildingType("Structure")), Has.Length.EqualTo(1));
             Assert.That(root.GetComponents(BuildingType("BuildingStatus")), Has.Length.EqualTo(1));
             Assert.That(root.GetComponents(BuildingType("BuildingHealth")), Has.Length.EqualTo(1));
-            if (kind == "MainBase" || kind == "Production" || kind == "SpliterProduction")
+            if (kind == "MainBase"
+                || kind == "Production"
+                || kind == "SpliterProduction"
+                || kind == "VehicleFactory"
+                || kind == "MaintenanceBay"
+                || kind == "SignalRelay")
             {
                 Assert.That(root.GetComponents(BuildingType("UnitProductionQueue")), Has.Length.EqualTo(1));
             }

@@ -179,12 +179,36 @@ namespace ProjectS.Buildings
                 definitions.Add(selectedDefinition);
             }
 
-            definitions.Add(BuildingConstructionDefinition.Create("Spliter Production", BuildingKind.SpliterProduction, new ResourceAmount(175, 0), 9f, new Vector2Int(2, 2), spliterProductionPrefab));
-            definitions.Add(BuildingConstructionDefinition.Create("Auto Turret", BuildingKind.AutoTurret, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2), autoTurretPrefab));
-            definitions.Add(BuildingConstructionDefinition.Create("Speed Aura", BuildingKind.SpeedAura, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2), speedAuraPrefab));
-            definitions.Add(BuildingConstructionDefinition.Create("Supply Depot", BuildingKind.SupplyDepot, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2), supplyDepotPrefab));
-            definitions.Add(BuildingConstructionDefinition.Create("Resource Drop-off", BuildingKind.ResourceDropOff, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2), resourceDropOffPrefab));
-            definitions.Add(BuildingConstructionDefinition.Create("Main Base", BuildingKind.MainBase, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3), mainBasePrefab));
+            if (spliterProductionPrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Spliter Production", BuildingKind.SpliterProduction, new ResourceAmount(175, 0), 9f, new Vector2Int(2, 2), spliterProductionPrefab));
+            }
+
+            if (autoTurretPrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Auto Turret", BuildingKind.AutoTurret, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2), autoTurretPrefab));
+            }
+
+            if (speedAuraPrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Speed Aura", BuildingKind.SpeedAura, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2), speedAuraPrefab));
+            }
+
+            if (supplyDepotPrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Supply Depot", BuildingKind.SupplyDepot, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2), supplyDepotPrefab));
+            }
+
+            if (resourceDropOffPrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Resource Drop-off", BuildingKind.ResourceDropOff, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2), resourceDropOffPrefab));
+            }
+
+            if (mainBasePrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Main Base", BuildingKind.MainBase, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3), mainBasePrefab));
+            }
+
             ConfigureConstructionDefinitions(definitions.ToArray());
         }
 

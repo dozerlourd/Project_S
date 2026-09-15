@@ -28,6 +28,9 @@ namespace ProjectS.Editor
         private const string AutoTurretPrefabPath = CoreBuildingPrefabFolder + "/PrototypeAutoTurretBuilding.prefab";
         private const string SpeedAuraPrefabPath = CoreBuildingPrefabFolder + "/PrototypeSpeedAuraBuilding.prefab";
         private const string ConstructionSitePrefabPath = ConstructionPrefabFolder + "/PrototypeConstructionSite.prefab";
+        private const string VehicleFactoryPrefabPath = FutureTechPrefabFolder + "/PrototypeVehicleFactoryBuilding.prefab";
+        private const string MaintenanceBayPrefabPath = FutureTechPrefabFolder + "/PrototypeMaintenanceBayBuilding.prefab";
+        private const string SignalRelayPrefabPath = FutureTechPrefabFolder + "/PrototypeSignalRelayBuilding.prefab";
         private const string WorkerPrefabPath = "Assets/03.Prefabs/Units/B_Worker.prefab";
         private const string SoldierPrefabPath = "Assets/03.Prefabs/Units/B_Soldier.prefab";
         private const string SpliterPrefabPath = "Assets/03.Prefabs/Units/B_Spliter.prefab";
@@ -151,16 +154,11 @@ namespace ProjectS.Editor
             CreateBuildingPrefab(SpliterProductionPrefabPath, "PrototypeSpliterProductionBuilding", BuildingKind.SpliterProduction, new Vector2(2.5f, 2.5f));
             CreateBuildingPrefab(AutoTurretPrefabPath, "PrototypeAutoTurretBuilding", BuildingKind.AutoTurret, new Vector2(2.3f, 2.3f));
             CreateBuildingPrefab(SpeedAuraPrefabPath, "PrototypeSpeedAuraBuilding", BuildingKind.SpeedAura, new Vector2(2.6f, 2.6f));
-            CreateBuildingPrefab(CoreBuildingPrefabFolder, BuildingKind.ResourceDropOff, new Vector2(2.2f, 2.2f));
-            CreateBuildingPrefab(CoreBuildingPrefabFolder, BuildingKind.SupplyDepot, new Vector2(2.2f, 2.2f));
-            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.ResearchLab);
-            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.DefenseControlCenter);
-            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.VehicleFactory);
-            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.SignalRelay);
-            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.TacticalCommandCenter);
-            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.MaintenanceBay);
-            CreateBuildingPrefab(FutureTechPrefabFolder, BuildingKind.ForwardSupplyPost);
+            CreateBuildingPrefab(VehicleFactoryPrefabPath, "PrototypeVehicleFactoryBuilding", BuildingKind.VehicleFactory, new Vector2(3f, 3f));
+            CreateBuildingPrefab(MaintenanceBayPrefabPath, "PrototypeMaintenanceBayBuilding", BuildingKind.MaintenanceBay, new Vector2(3f, 2f));
+            CreateBuildingPrefab(SignalRelayPrefabPath, "PrototypeSignalRelayBuilding", BuildingKind.SignalRelay, new Vector2(2f, 2f));
             CreateConstructionSitePrefab();
+            ApplyUniqueCoreBuildingSprites();
         }
 
         [MenuItem("Tools/Project S/Apply Unique Core Building Sprites")]
@@ -171,15 +169,11 @@ namespace ProjectS.Editor
             ApplyUniqueBuildingSprite(SpliterProductionPrefabPath, "SpliterProduction_Unique", new Vector2(2.5f, 2.5f), BuildingSortingOrder);
             ApplyUniqueBuildingSprite(AutoTurretPrefabPath, "AutoTurret_Unique", new Vector2(2.3f, 2.3f), BuildingSortingOrder);
             ApplyUniqueBuildingSprite(SpeedAuraPrefabPath, "SpeedAura_Unique", new Vector2(2.6f, 2.6f), BuildingSortingOrder);
+            ApplyUniqueBuildingSprite(VehicleFactoryPrefabPath, "VehicleFactory_Unique", new Vector2(3f, 3f), BuildingSortingOrder);
+            ApplyUniqueBuildingSprite(MaintenanceBayPrefabPath, "MaintenanceBay_Unique", new Vector2(3f, 2f), BuildingSortingOrder);
+            ApplyUniqueBuildingSprite(SignalRelayPrefabPath, "SignalRelay_Unique", new Vector2(2f, 2f), BuildingSortingOrder);
             ApplyUniqueBuildingSprite(ConstructionSitePrefabPath, "ConstructionSite_Unique", new Vector2(2.2f, 2f), BuildingSortingOrder - 1);
             AssetDatabase.SaveAssets();
-        }
-
-        private static void CreateBuildingPrefab(string folder, BuildingKind kind, Vector2? size = null)
-        {
-            var name = $"Prototype{kind}Building";
-            CreateBuildingPrefab(folder + "/" + name + ".prefab", name, kind,
-                size ?? (Vector2)StructureFactory.GetDefaultFootprint(kind));
         }
 
         private static void CreateBuildingPrefab(
@@ -236,10 +230,7 @@ namespace ProjectS.Editor
                 return uniqueSprite;
             }
 
-            var resourcePath = MapCreateSceneAutoBootstrap.GetBuildingSpriteResourcePath(kind);
-            return string.IsNullOrEmpty(resourcePath)
-                ? null
-                : LoadLargestSprite("Assets/Resources/" + resourcePath + ".png");
+            return null;
         }
 
         private static string GetUniqueBuildingSpriteAssetPath(BuildingKind kind)
@@ -251,6 +242,9 @@ namespace ProjectS.Editor
                 case BuildingKind.SpliterProduction: return UniqueBuildingTextureFolder + "/SpliterProduction_Unique.png";
                 case BuildingKind.AutoTurret: return UniqueBuildingTextureFolder + "/AutoTurret_Unique.png";
                 case BuildingKind.SpeedAura: return UniqueBuildingTextureFolder + "/SpeedAura_Unique.png";
+                case BuildingKind.VehicleFactory: return UniqueBuildingTextureFolder + "/VehicleFactory_Unique.png";
+                case BuildingKind.MaintenanceBay: return UniqueBuildingTextureFolder + "/MaintenanceBay_Unique.png";
+                case BuildingKind.SignalRelay: return UniqueBuildingTextureFolder + "/SignalRelay_Unique.png";
                 default: return string.Empty;
             }
         }

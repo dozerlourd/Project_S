@@ -7,6 +7,7 @@ namespace ProjectS.Buildings
         protected override void EnsureRoleComponents()
         {
             EnsureComponent<BuildingAutoTurret>();
+            EnsureComponent<BuildingRangeIndicator>().Configure(BuildingRangeIndicatorSource.AutoTurretAttack);
         }
     }
 }

@@ -51,8 +51,6 @@ MonoBehaviour:
   edgeThickness: 1
   enableKeyboardMovement: 1
   keyboardMoveSpeed: 24
-  enableKeyboardRotation: 1
-  keyboardRotationSpeed: 90
   minOrthographicSize: 8
   maxOrthographicSize: 36
   zoomSpeed: 40

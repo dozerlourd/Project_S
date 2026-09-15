@@ -69,7 +69,7 @@ namespace ProjectS.Buildings
                 return;
             }
 
-            spriteRenderer.sprite = CreateSpriteFromResource() ?? spriteRenderer.sprite ?? CreateSprite();
+            spriteRenderer.sprite = CreateSpriteFromResource() ?? spriteRenderer.sprite;
             spriteRenderer.drawMode = SpriteDrawMode.Sliced;
             spriteRenderer.size = worldSize;
             spriteRenderer.sortingLayerName = string.IsNullOrWhiteSpace(sortingLayerName)
@@ -88,34 +88,6 @@ namespace ProjectS.Buildings
 
             boxCollider.size = worldSize;
             boxCollider.isTrigger = true;
-        }
-
-        private Sprite CreateSprite()
-        {
-            const int width = 48;
-            const int height = 48;
-            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
-            {
-                name = "PrototypeBuildingSprite",
-                filterMode = FilterMode.Point
-            };
-
-            for (var y = 0; y < height; y++)
-            {
-                for (var x = 0; x < width; x++)
-                {
-                    var border = x < 3 || x >= width - 3 || y < 3 || y >= height - 3;
-                    var roof = y >= height - 10;
-                    var door = x >= 20 && x <= 28 && y < 16;
-                    var window = (x >= 9 && x <= 15 && y >= 22 && y <= 29)
-                        || (x >= 33 && x <= 39 && y >= 22 && y <= 29);
-                    var color = border || roof || door || window ? trimColor : bodyColor;
-                    texture.SetPixel(x, y, color);
-                }
-            }
-
-            texture.Apply();
-            return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 24f);
         }
 
         private Sprite CreateSpriteFromResource()

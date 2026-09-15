@@ -16,6 +16,8 @@ namespace ProjectS.Tests.PlayMode
         [TestCase(PrototypeUnitType.Tank, UnitEngagementStyle.Artillery)]
         [TestCase(PrototypeUnitType.Striker, UnitEngagementStyle.CloseAssault)]
         [TestCase(PrototypeUnitType.Swarm, UnitEngagementStyle.CloseAssault)]
+        [TestCase(PrototypeUnitType.Siege, UnitEngagementStyle.Artillery)]
+        [TestCase(PrototypeUnitType.Scout, UnitEngagementStyle.Standard)]
         public void TacticalProfile_MapsEachCombatUnitToItsDocumentedStyle(
             PrototypeUnitType unitType,
             UnitEngagementStyle expectedStyle)
@@ -94,6 +96,64 @@ namespace ProjectS.Tests.PlayMode
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator ExtendedUnitDefaults_ConfigureDocumentedRolesStatsAndCombatComponents()
+        {
+            var medic = CreateDefaultUnit("Default Medic", PrototypeUnitType.Medic);
+            var siege = CreateDefaultUnit("Default Siege", PrototypeUnitType.Siege);
+            var scout = CreateDefaultUnit("Default Scout", PrototypeUnitType.Scout);
+            yield return null;
+
+            var medicStatus = medic.GetComponent<PrototypeUnitStatus>();
+            Assert.That(medicStatus.Team, Is.EqualTo(UnitTeam.Team3));
+            Assert.That(medicStatus.Roles, Is.EqualTo(UnitRole.Support));
+            Assert.That(medicStatus.MaxHealth, Is.EqualTo(90f));
+            Assert.That(medicStatus.PhysicalAttackPower, Is.Zero);
+            Assert.That(medicStatus.AttackRange, Is.Zero);
+            Assert.That(medicStatus.DetectionRange, Is.Zero);
+            Assert.That(medicStatus.AttackSpeed, Is.Zero);
+            Assert.That(medicStatus.MovementSpeed, Is.EqualTo(3.6f));
+            Assert.That(medicStatus.VisionRadius, Is.EqualTo(10f));
+            Assert.That(medicStatus.SupplyCost, Is.EqualTo(2));
+            Assert.That(medic.GetComponent<UnitCombat>(), Is.Null);
+            Assert.That(medic.GetComponent<TemporaryAttackEffect>(), Is.Null);
+
+            var siegeStatus = siege.GetComponent<PrototypeUnitStatus>();
+            Assert.That(siegeStatus.Roles, Is.EqualTo(UnitRole.Combat | UnitRole.Siege));
+            Assert.That(siegeStatus.MaxHealth, Is.EqualTo(180f));
+            Assert.That(siegeStatus.PhysicalAttackPower, Is.EqualTo(36f));
+            Assert.That(siegeStatus.AttackRange, Is.EqualTo(8.5f));
+            Assert.That(siegeStatus.DetectionRange, Is.EqualTo(9.5f));
+            Assert.That(siegeStatus.AttackSpeed, Is.EqualTo(0.45f));
+            Assert.That(siegeStatus.MovementSpeed, Is.EqualTo(1.7f));
+            Assert.That(siegeStatus.VisionRadius, Is.EqualTo(8f));
+            Assert.That(siegeStatus.SupplyCost, Is.EqualTo(4));
+            Assert.That(siege.GetComponent<UnitCombat>(), Is.Not.Null);
+
+            var scoutStatus = scout.GetComponent<PrototypeUnitStatus>();
+            Assert.That(scoutStatus.Roles, Is.EqualTo(UnitRole.Combat));
+            Assert.That(scoutStatus.MaxHealth, Is.EqualTo(55f));
+            Assert.That(scoutStatus.PhysicalAttackPower, Is.EqualTo(5f));
+            Assert.That(scoutStatus.AttackRange, Is.EqualTo(4.5f));
+            Assert.That(scoutStatus.DetectionRange, Is.EqualTo(7f));
+            Assert.That(scoutStatus.AttackSpeed, Is.EqualTo(1.2f));
+            Assert.That(scoutStatus.MovementSpeed, Is.EqualTo(4.8f));
+            Assert.That(scoutStatus.VisionRadius, Is.EqualTo(11f));
+            Assert.That(scoutStatus.SupplyCost, Is.EqualTo(1));
+            Assert.That(scout.GetComponent<UnitCombat>(), Is.Not.Null);
+
+            foreach (var unit in new[] { medic, siege, scout })
+            {
+                Assert.That(unit.GetComponent<UnitPathAgent>(), Is.Not.Null);
+                Assert.That(unit.GetComponent<UnitCommandAgent>(), Is.Not.Null);
+                Assert.That(unit.GetComponent<UnitHealth>(), Is.Not.Null);
+                Assert.That(unit.GetComponent<ProjectS.Visibility.FogVisibilityTarget>(), Is.Not.Null);
+                Object.Destroy(unit);
+            }
+
+            yield return null;
+        }
+
         private static GameObject CreateUnit(
             string name,
             Vector3 position,
@@ -131,6 +191,14 @@ namespace ProjectS.Tests.PlayMode
                 !canAttack,
                 false,
                 0f);
+            return unit;
+        }
+
+        private static GameObject CreateDefaultUnit(string name, PrototypeUnitType unitType)
+        {
+            var unit = new GameObject(name);
+            unit.AddComponent<BoxCollider2D>().isTrigger = true;
+            unit.AddComponent<PrototypeUnitStatus>().ConfigurePrototypeDefaults(unitType, UnitTeam.Team3);
             return unit;
         }
 

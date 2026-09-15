@@ -8,13 +8,22 @@
 
 ## 검증 대기 항목
 
+### 특수 생산 건물 3종
+
+- [ ] `VehicleFactory_Unique.png`, `MaintenanceBay_Unique.png`, `SignalRelay_Unique.png`를 `Assets/01.Textures/Buildings/Unique`에 추가한 뒤 각 FutureTech 프리팹의 고유 Sprite 슬롯이 연결되는지 확인한다.
+- [ ] Siege, Medic, Scout 유닛 타입과 프리팹이 준비되면 생산 정의의 허용 건물을 각각 VehicleFactory, MaintenanceBay, SignalRelay로 제한하고 다른 생산 건물에서 거부되는지 확인한다.
+- [ ] VehicleFactory 3x3/1250 HP, MaintenanceBay 3x2/850 HP, SignalRelay 2x2/550 HP 및 시야 12가 실제 프리팹 인스턴스에 적용되는지 확인한다.
+- [ ] 세 건물이 각각 `UnitProductionQueue`를 하나만 가지며 유닛 프리팹이 없는 현재 상태에서는 생산 항목을 노출하지 않는지 확인한다.
+- [ ] `SpecializedProductionCatalog_PrefabsExposeDedicatedEmptyQueues` PlayMode 테스트를 Unity Test Runner에서 실행한다. 2026-09-15 배치 실행은 반환 코드 1로 즉시 종료되어 결과 XML이 생성되지 않았다.
+
 ### 핵심 건물 역할 및 고유 텍스처
 
-- [ ] `Assets/01.Textures/Buildings/Unique`에 `MainBase_Unique.png`, `Production_Unique.png`, `SpliterProduction_Unique.png`, `AutoTurret_Unique.png`, `SpeedAura_Unique.png`, `ConstructionSite_Unique.png`를 가져온 뒤 `Tools > Project S > Apply Unique Core Building Sprites`를 실행한다.
-- [ ] 핵심 건물 프리팹 6종의 `SpriteRenderer`가 서로 다른 Sprite GUID를 참조하고 다른 건물 텍스처를 공유하지 않는지 확인한다.
+- [x] `Assets/01.Textures/Buildings/Unique`의 6개 고유 텍스처를 각 핵심 건물 프리팹 `SpriteRenderer`에 서로 다른 Sprite GUID로 연결했다.
 - [ ] MainBase는 Worker 생산과 자원 반납, Production은 일반 전투 유닛 생산, SpliterProduction은 Spliter 생산, AutoTurret은 고정 공격, SpeedAura는 이동 오라, ConstructionSite는 미완성 건설 대상으로만 동작하는지 PlayMode에서 확인한다.
 - [ ] MainBase와 완성 건물은 Structures 정렬 레이어 20, ConstructionSite는 Structures 정렬 레이어 19를 사용하며 렌더러와 콜라이더 크기가 프리팹 역할 크기와 일치하는지 확인한다.
-- [ ] 런타임 부트스트랩이 핵심 건물 종류별 고유 Resources 경로를 조회하고, 리소스가 없을 때에만 역할별 절차적 표시로 대체되는지 확인한다.
+- [ ] `MapCreateSceneAutoBootstrap`이 `BuildingPrefabCatalog`에서 실제 핵심 프리팹을 복제하고 절차적 사각형 템플릿을 만들지 않는지 확인한다.
+- [ ] 실제 프리팹이 없는 SupplyDepot과 ResourceDropOff가 플레이어 및 AI 건설 목록에 나타나지 않는지 확인한다.
+- [ ] `RuntimeBuildingCatalog_UsesCorePrefabsWithDistinctPersistentSprites` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 
 ### 건물 Structure 계층 1단계
 
@@ -217,6 +226,11 @@
 
 ### 유닛별 전술 행동
 
+- [ ] `Tools > Project S > Create B Prototype Unit Assets`를 실행해 `B_Medic`, `B_Siege`, `B_Scout` 프리팹과 전용 텍스처가 생성되는지 확인한다.
+- [ ] Medic가 팀 선택과 안개 시야, 이동 명령에는 참여하지만 자동 표적 획득, 공격, 반격을 수행하지 않고 `UnitCombat` 및 `TemporaryAttackEffect`를 갖지 않는지 확인한다.
+- [ ] Siege가 체력 180, 공격력 36, 사거리 8.5, 감지 9.5, 공격 속도 0.45, 이동 속도 1.7, 시야 8로 기존 포격 프로필과 단일 대상 공격을 사용하는지 확인한다.
+- [ ] Scout가 체력 55, 공격력 5, 사거리 4.5, 감지 7, 공격 속도 1.2, 이동 속도 4.8, 시야 11로 기존 원거리 공격과 표준 추적을 사용하는지 확인한다.
+- [ ] `ExtendedUnitDefaults_ConfigureDocumentedRolesStatsAndCombatComponents` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 - [ ] Soldier가 표준 사거리 경계에서 안정적으로 정지하고, 새 직접 명령을 받으면 추격이나 공격을 즉시 중단하는지 확인한다.
 - [ ] Ranger가 공격 사거리 45% 안에서 `RetreatingFromTarget`으로 전환되고 72% 거리에서 재교전하며, 후퇴 경로가 장애물과 아군 점유 셀을 통과하지 않는지 확인한다.
 - [ ] Ranger의 `HoldPosition`과 일반 `Move`가 자동 후퇴보다 우선하고, `FocusAttack`은 지정 대상을 유지한 채 거리 조절만 수행하는지 확인한다.

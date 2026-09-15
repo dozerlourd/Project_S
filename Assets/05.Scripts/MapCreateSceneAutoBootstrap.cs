@@ -7,6 +7,7 @@ using ProjectS.UI;
 using ProjectS.Units;
 using ProjectS.Unlocks;
 using ProjectS.Upgrades;
+using ProjectS.Visibility;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -56,19 +57,54 @@ namespace ProjectS
         {
             yield return null;
 
-            var existingRoot = GameObject.Find(SetupRootName);
-            if (existingRoot != null)
+            EnsureGameplayPresentation();
+
+            var buildingPrefabs = BuildingPrefabCatalog.Load();
+            var catalogFailureReason = string.Empty;
+            if (buildingPrefabs == null || !buildingPrefabs.TryValidate(out catalogFailureReason))
             {
-                UpgradeExistingSetup(existingRoot.transform);
+                Debug.LogError(
+                    $"MapCreate runtime setup requires Resources/{BuildingPrefabCatalog.ResourcesPath}.asset. "
+                    + (buildingPrefabs == null ? "The catalog asset was not found." : catalogFailureReason));
                 Destroy(gameObject);
                 yield break;
             }
 
-            BuildTestSetup();
+            var existingRoot = GameObject.Find(SetupRootName);
+            if (existingRoot != null)
+            {
+                UpgradeExistingSetup(existingRoot.transform, buildingPrefabs);
+                Destroy(gameObject);
+                yield break;
+            }
+
+            BuildTestSetup(buildingPrefabs);
             Destroy(gameObject);
         }
 
-        private void UpgradeExistingSetup(Transform root)
+        private static void EnsureGameplayPresentation()
+        {
+            var tilemapWorld = ProjectSTilemapWorld.ActiveInstance
+                ?? FindFirstObjectByType<ProjectSTilemapWorld>();
+
+            var fog = FindFirstObjectByType<FogOfWarManager>();
+            if (fog == null)
+            {
+                fog = new GameObject("Fog Of War").AddComponent<FogOfWarManager>();
+            }
+
+            if (tilemapWorld != null)
+            {
+                fog.Configure(tilemapWorld, UnitTeam.Team1);
+            }
+
+            if (FindFirstObjectByType<RtsMinimap>() == null)
+            {
+                new GameObject("RtsMinimap").AddComponent<RtsMinimap>();
+            }
+        }
+
+        private void UpgradeExistingSetup(Transform root, BuildingPrefabCatalog buildingPrefabs)
         {
             EnsureSupplyManagers(root);
             EnsureTeamUpgradeResearch(root, UnitTeam.Team1);
@@ -88,61 +124,63 @@ namespace ProjectS
                 templates = templatesObject.transform;
             }
 
-            EnsureAdditionalBuildingTemplates(templates);
             var placementService = FindFirstObjectByType<BuildingPlacementService>();
             if (placementService == null)
             {
                 return;
             }
 
+            var spliterProductionTemplate = CreateBuildingTemplate(
+                templates,
+                "Spliter Production Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.SpliterProduction));
+            var autoTurretTemplate = CreateBuildingTemplate(
+                templates,
+                "Auto Turret Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.AutoTurret));
+            var speedAuraTemplate = CreateBuildingTemplate(
+                templates,
+                "Speed Aura Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.SpeedAura));
+            var mainBaseTemplate = CreateBuildingTemplate(
+                templates,
+                "Main Base Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.MainBase));
+
             placementService.ConfigureBuildOptions(
                 ConfigureProductionTemplate(
-                    FindOrCreateBuildingTemplate(templates, "Spliter Production Building Template", BuildingKind.SpliterProduction, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f)),
+                    spliterProductionTemplate,
                     GetRequiredUnitPrefab(PrototypeUnitType.Spliter),
                     new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, GetRequiredUnitPrefab(PrototypeUnitType.Spliter), new ResourceAmount(125, 0), 8f, 3, allowedProductionBuildings: new[] { BuildingKind.SpliterProduction }) },
                     new Vector3(2.5f, -0.5f, 0f),
                     new Vector3(5f, -1f, 0f)),
-                FindOrCreateBuildingTemplate(templates, "Auto Turret Building Template", BuildingKind.AutoTurret, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f)),
-                FindOrCreateBuildingTemplate(templates, "Speed Aura Building Template", BuildingKind.SpeedAura, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f)),
-                FindOrCreateBuildingTemplate(templates, "Supply Depot Building Template", BuildingKind.SupplyDepot, new Vector2(2.2f, 2.2f), new Color(0.78f, 0.62f, 0.24f, 1f)),
-                FindOrCreateBuildingTemplate(templates, "Resource Drop-off Building Template", BuildingKind.ResourceDropOff, new Vector2(2.2f, 2.2f), new Color(0.28f, 0.68f, 0.48f, 1f)),
-                ConfigureProductionTemplate(
-                    FindOrCreateBuildingTemplate(templates, "Main Base Building Template", BuildingKind.MainBase, new Vector2(2.6f, 2.2f), new Color(0.28f, 0.52f, 0.76f, 1f)),
+                autoTurretTemplate,
+                speedAuraTemplate,
+                mainBasePrefab: ConfigureProductionTemplate(
+                    mainBaseTemplate,
                     GetRequiredUnitPrefab(PrototypeUnitType.Worker),
                     new[] { CreateProductionDefinition("Worker", PrototypeUnitType.Worker, GetRequiredUnitPrefab(PrototypeUnitType.Worker), new ResourceAmount(50, 0), 5f, 1, allowedProductionBuildings: new[] { BuildingKind.MainBase }) },
                     new Vector3(2.5f, -1.5f, 0f),
                     new Vector3(5f, -2f, 0f)));
         }
 
-        private static GameObject FindOrCreateBuildingTemplate(Transform parent, string name, BuildingKind kind, Vector2 size, Color color)
+        private static GameObject CreateBuildingTemplate(Transform parent, string name, GameObject prefab)
         {
+            if (prefab == null)
+            {
+                throw new System.InvalidOperationException($"Runtime building prefab is missing for template {name}.");
+            }
+
             var existing = parent.Find(name);
-            return existing != null
-                ? existing.gameObject
-                : CreateBuildingPrototype(
-                    name,
-                    kind,
-                    size,
-                    color,
-                    parent);
-        }
+            if (existing != null)
+            {
+                Destroy(existing.gameObject);
+            }
 
-        private static void EnsureAdditionalBuildingTemplates(Transform parent)
-        {
-            CreateAdditionalBuildingTemplate(parent, "Research Lab", BuildingKind.ResearchLab, new Color(0.25f, 0.65f, 0.75f, 1f));
-            CreateAdditionalBuildingTemplate(parent, "Defense Control Center", BuildingKind.DefenseControlCenter, new Color(0.6f, 0.35f, 0.35f, 1f));
-            CreateAdditionalBuildingTemplate(parent, "Vehicle Factory", BuildingKind.VehicleFactory, new Color(0.45f, 0.5f, 0.55f, 1f));
-            CreateAdditionalBuildingTemplate(parent, "Signal Relay", BuildingKind.SignalRelay, new Color(0.25f, 0.65f, 0.5f, 1f));
-            CreateAdditionalBuildingTemplate(parent, "Tactical Command Center", BuildingKind.TacticalCommandCenter, new Color(0.4f, 0.5f, 0.8f, 1f));
-            CreateAdditionalBuildingTemplate(parent, "Maintenance Bay", BuildingKind.MaintenanceBay, new Color(0.7f, 0.6f, 0.3f, 1f));
-            CreateAdditionalBuildingTemplate(parent, "Forward Supply Post", BuildingKind.ForwardSupplyPost, new Color(0.5f, 0.7f, 0.35f, 1f));
-        }
-
-        private static void CreateAdditionalBuildingTemplate(Transform parent, string name, BuildingKind kind, Color color)
-        {
-            var template = FindOrCreateBuildingTemplate(parent, name + " Building Template", kind,
-                StructureFactory.GetDefaultFootprint(kind), color);
+            var template = Instantiate(prefab, parent);
+            template.name = name;
             template.SetActive(false);
+            return template;
         }
 
         private static GameObject ConfigureProductionTemplate(
@@ -166,13 +204,12 @@ namespace ProjectS
             return template;
         }
 
-        private void BuildTestSetup()
+        private void BuildTestSetup(BuildingPrefabCatalog buildingPrefabs)
         {
             var tilemapWorld = ProjectSTilemapWorld.ActiveInstance ?? FindFirstObjectByType<ProjectSTilemapWorld>();
             var root = new GameObject(SetupRootName);
             var prototypeRoot = CreateChild(root.transform, "Runtime Prototypes");
             prototypeRoot.SetActive(false);
-            EnsureAdditionalBuildingTemplates(prototypeRoot.transform);
 
             GetStartPositions(tilemapWorld, out var playerStart, out var aiStart);
             var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(100, 0), root.transform);
@@ -191,24 +228,30 @@ namespace ProjectS
             var strikerUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Striker);
             var swarmUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Swarm);
 
-            var mainBasePrototype = CreateBuildingPrototype(
+            var mainBasePrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
                 "Main Base Prototype",
-                BuildingKind.MainBase,
-                new Vector2(2.6f, 2.2f),
-                new Color(0.28f, 0.52f, 0.76f, 1f),
-                prototypeRoot.transform);
-            var productionPrototype = CreateBuildingPrototype(
+                buildingPrefabs.GetPrefab(BuildingKind.MainBase));
+            var productionPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
                 "Production Building Prototype",
-                BuildingKind.Production,
-                new Vector2(2.4f, 2f),
-                new Color(0.48f, 0.36f, 0.68f, 1f),
-                prototypeRoot.transform);
-            var spliterProductionPrototype = CreateBuildingPrototype("Spliter Production Building Prototype", BuildingKind.SpliterProduction, new Vector2(2.5f, 2.5f), new Color(0.45f, 0.2f, 0.66f, 1f), prototypeRoot.transform);
-            var autoTurretPrototype = CreateBuildingPrototype("Auto Turret Building Prototype", BuildingKind.AutoTurret, new Vector2(2.3f, 2.3f), new Color(0.38f, 0.34f, 0.34f, 1f), prototypeRoot.transform);
-            var speedAuraPrototype = CreateBuildingPrototype("Speed Aura Building Prototype", BuildingKind.SpeedAura, new Vector2(2.6f, 2.6f), new Color(0.18f, 0.66f, 0.75f, 1f), prototypeRoot.transform);
-            var supplyDepotPrototype = CreateBuildingPrototype("Supply Depot Building Prototype", BuildingKind.SupplyDepot, new Vector2(2.2f, 2.2f), new Color(0.78f, 0.62f, 0.24f, 1f), prototypeRoot.transform);
-            var resourceDropOffPrototype = CreateBuildingPrototype("Resource Drop-off Building Prototype", BuildingKind.ResourceDropOff, new Vector2(2.2f, 2.2f), new Color(0.28f, 0.68f, 0.48f, 1f), prototypeRoot.transform);
-            var constructionPrototype = CreateConstructionSitePrototype(prototypeRoot.transform);
+                buildingPrefabs.GetPrefab(BuildingKind.Production));
+            var spliterProductionPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
+                "Spliter Production Building Prototype",
+                buildingPrefabs.GetPrefab(BuildingKind.SpliterProduction));
+            var autoTurretPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
+                "Auto Turret Building Prototype",
+                buildingPrefabs.GetPrefab(BuildingKind.AutoTurret));
+            var speedAuraPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
+                "Speed Aura Building Prototype",
+                buildingPrefabs.GetPrefab(BuildingKind.SpeedAura));
+            var constructionPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
+                "Construction Site Prototype",
+                buildingPrefabs.ConstructionSitePrefab);
 
             var workerDefinitions = new[]
             {
@@ -245,13 +288,21 @@ namespace ProjectS
                 spliterProductionPrototype,
                 autoTurretPrototype,
                 speedAuraPrototype,
-                supplyDepotPrototype,
-                resourceDropOffPrototype,
                 mainBasePrototype,
                 combatDefinitions,
                 spliterDefinitions,
                 root.transform);
-            CreateAiController(playerStart, aiWallet, tilemapWorld, constructionPrototype, productionPrototype, spliterProductionPrototype, autoTurretPrototype, speedAuraPrototype, supplyDepotPrototype, resourceDropOffPrototype, mainBasePrototype, root.transform);
+            CreateAiController(
+                playerStart,
+                aiWallet,
+                tilemapWorld,
+                constructionPrototype,
+                productionPrototype,
+                spliterProductionPrototype,
+                autoTurretPrototype,
+                speedAuraPrototype,
+                mainBasePrototype,
+                root.transform);
         }
 
         private GameObject GetRequiredUnitPrefab(PrototypeUnitType unitType)
@@ -300,8 +351,6 @@ namespace ProjectS
             GameObject spliterProductionPrototype,
             GameObject autoTurretPrototype,
             GameObject speedAuraPrototype,
-            GameObject supplyDepotPrototype,
-            GameObject resourceDropOffPrototype,
             GameObject mainBasePrototype,
             UnitProductionDefinition[] combatDefinitions,
             UnitProductionDefinition[] spliterDefinitions,
@@ -350,7 +399,11 @@ namespace ProjectS
                 spliterDefinitions,
                 new Vector3(2.5f, -0.5f, 0f),
                 new Vector3(5f, -1f, 0f));
-            placementService.ConfigureBuildOptions(spliterProductionPrototype, autoTurretPrototype, speedAuraPrototype, supplyDepotPrototype, resourceDropOffPrototype, mainBasePrototype);
+            placementService.ConfigureBuildOptions(
+                spliterProductionPrototype,
+                autoTurretPrototype,
+                speedAuraPrototype,
+                mainBasePrefab: mainBasePrototype);
 
             var hud = FindFirstObjectByType<RtsGameHud>();
             if (hud == null)
@@ -371,8 +424,6 @@ namespace ProjectS
             GameObject spliterProductionPrototype,
             GameObject autoTurretPrototype,
             GameObject speedAuraPrototype,
-            GameObject supplyDepotPrototype,
-            GameObject resourceDropOffPrototype,
             GameObject mainBasePrototype,
             Transform parent)
         {
@@ -387,8 +438,6 @@ namespace ProjectS
             templates.RegisterTemplate(BuildingKind.SpliterProduction, spliterProductionPrototype, new ResourceAmount(175, 0), 9f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.AutoTurret, autoTurretPrototype, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.SpeedAura, speedAuraPrototype, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2));
-            templates.RegisterTemplate(BuildingKind.SupplyDepot, supplyDepotPrototype, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2));
-            templates.RegisterTemplate(BuildingKind.ResourceDropOff, resourceDropOffPrototype, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.MainBase, mainBasePrototype, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3));
         }
 
@@ -512,68 +561,6 @@ namespace ProjectS
             }
 
             supplyManager.Initialize(team);
-        }
-
-        private static GameObject CreateBuildingPrototype(
-            string name,
-            BuildingKind kind,
-            Vector2 size,
-            Color color,
-            Transform parent)
-        {
-            var root = CreateChild(parent, name);
-            root.SetActive(false);
-            var renderer = root.AddComponent<SpriteRenderer>();
-            renderer.sortingLayerName = "Structures";
-            renderer.sortingOrder = 20;
-            var visual = root.AddComponent<PrototypeBuildingVisual>();
-            visual.Configure(color, new Color(0.08f, 0.13f, 0.18f, 1f), size, GetBuildingSpriteResourcePath(kind));
-
-            var collider = root.AddComponent<BoxCollider2D>();
-            collider.size = size;
-            collider.isTrigger = true;
-
-            var status = StructureFactory.AddTo(root, kind);
-            status.Initialize(UnitTeam.Team1, kind, StructureFactory.GetDefaultFootprint(kind), true);
-
-            return root;
-        }
-
-        public static string GetBuildingSpriteResourcePath(BuildingKind kind)
-        {
-            switch (kind)
-            {
-                case BuildingKind.MainBase: return "Temp/Buildings/MainBaseBuilding";
-                case BuildingKind.Production: return "Temp/Buildings/ProductionBuilding";
-                case BuildingKind.SpliterProduction: return "Temp/Buildings/SpliterProductionBuilding";
-                case BuildingKind.AutoTurret: return "Temp/Buildings/AutoTurretBuilding";
-                case BuildingKind.SpeedAura: return "Temp/Buildings/SpeedAuraBuilding";
-                case BuildingKind.ResourceDropOff: return "Temp/Buildings/ResourceDropOffBuilding";
-                case BuildingKind.SupplyDepot: return "Temp/Buildings/SupplyDepotBuilding";
-                default: return string.Empty;
-            }
-        }
-
-        private static GameObject CreateConstructionSitePrototype(Transform parent)
-        {
-            var root = CreateChild(parent, "Construction Site Prototype");
-            root.SetActive(false);
-            var renderer = root.AddComponent<SpriteRenderer>();
-            renderer.sortingLayerName = "Structures";
-            renderer.sortingOrder = 19;
-            var visual = root.AddComponent<PrototypeBuildingVisual>();
-            visual.Configure(
-                new Color(0.52f, 0.48f, 0.4f, 0.85f),
-                new Color(0.95f, 0.82f, 0.38f, 1f),
-                new Vector2(2.2f, 2f),
-                "Temp/Buildings/ConstructionSite",
-                19);
-
-            var collider = root.AddComponent<BoxCollider2D>();
-            collider.size = new Vector2(2.2f, 2f);
-            collider.isTrigger = true;
-            root.AddComponent<ConstructionSite>();
-            return root;
         }
 
         private static void InstantiateBuilding(

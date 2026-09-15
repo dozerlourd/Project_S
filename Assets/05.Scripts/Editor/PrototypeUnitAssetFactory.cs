@@ -13,6 +13,8 @@ namespace ProjectS.Units.Editor
         private const string PrefabFolder = "Assets/03.Prefabs/Units";
         private const string TextureFolder = PrefabFolder + "/Textures";
         private const string PlayerSpriteSheetPath = "Assets/Assets/Cainos/Pixel Art Top Down - Basic/Texture/TX Player.png";
+        private const float ConceptArtPixelsPerUnit = 800f;
+        private const float LegacyPixelsPerUnit = 32f;
 
         [MenuItem("Tools/Project S/Create B Prototype Unit Assets")]
         public static void CreatePrototypeUnitAssets()
@@ -29,6 +31,9 @@ namespace ProjectS.Units.Editor
             CreateOrUpdateUnitPrefab(PrototypeUnitType.Tank, CreateOrUpdateTextureSprite(PrototypeUnitType.Tank, unitSprite), selectionSprite);
             CreateOrUpdateUnitPrefab(PrototypeUnitType.Striker, CreateOrUpdateTextureSprite(PrototypeUnitType.Striker, unitSprite), selectionSprite);
             CreateOrUpdateUnitPrefab(PrototypeUnitType.Swarm, CreateOrUpdateTextureSprite(PrototypeUnitType.Swarm, unitSprite), selectionSprite);
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Medic, CreateOrUpdateTextureSprite(PrototypeUnitType.Medic, unitSprite), selectionSprite);
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Siege, CreateOrUpdateTextureSprite(PrototypeUnitType.Siege, unitSprite), selectionSprite);
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Scout, CreateOrUpdateTextureSprite(PrototypeUnitType.Scout, unitSprite), selectionSprite);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -77,6 +82,51 @@ namespace ProjectS.Units.Editor
             AssetDatabase.Refresh();
         }
 
+        [MenuItem("Tools/Project S/Repair Unit Texture Sprite References")]
+        public static void RepairUnitTextureSpriteReferences()
+        {
+            foreach (PrototypeUnitType unitType in Enum.GetValues(typeof(PrototypeUnitType)))
+            {
+                var texturePath = $"{TextureFolder}/B_{unitType}.png";
+                var prefabPath = $"{PrefabFolder}/B_{unitType}.prefab";
+                if (!File.Exists(texturePath) || !File.Exists(prefabPath))
+                {
+                    continue;
+                }
+
+                var sprite = ConfigureTextureSprite(texturePath, GetPixelsPerUnitForTexture(texturePath));
+                if (sprite == null)
+                {
+                    Debug.LogError($"[UnitAssets] Could not load a sprite from {texturePath}.");
+                    continue;
+                }
+
+                var root = PrefabUtility.LoadPrefabContents(prefabPath);
+                try
+                {
+                    var renderer = root.GetComponent<SpriteRenderer>();
+                    if (renderer == null)
+                    {
+                        Debug.LogError($"[UnitAssets] {prefabPath} is missing its root SpriteRenderer.");
+                        continue;
+                    }
+
+                    renderer.sprite = sprite;
+                    renderer.color = Color.white;
+                    renderer.drawMode = SpriteDrawMode.Simple;
+                    renderer.sortingLayerName = "Units";
+                    renderer.sortingOrder = 20;
+                    PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+                }
+                finally
+                {
+                    PrefabUtility.UnloadPrefabContents(root);
+                }
+            }
+
+            AssetDatabase.SaveAssets();
+        }
+
         private static void CreateOrUpdateUnitPrefab(
             PrototypeUnitType unitType,
             Sprite unitSprite,
@@ -90,6 +140,7 @@ namespace ProjectS.Units.Editor
                 var spriteRenderer = root.AddComponent<SpriteRenderer>();
                 spriteRenderer.sprite = unitSprite;
                 spriteRenderer.color = Color.white;
+                spriteRenderer.sortingLayerName = "Units";
                 spriteRenderer.sortingOrder = 20;
 
                 var collider = root.AddComponent<BoxCollider2D>();
@@ -105,15 +156,18 @@ namespace ProjectS.Units.Editor
                 CreateSelectionRing(root.transform, selectionSprite);
 
                 var status = root.AddComponent<PrototypeUnitStatus>();
-                ApplyStatus(status, unitType);
-                status.ConfigureSupplyCost(GetSupplyCost(unitType));
+                status.ConfigurePrototypeDefaults(unitType);
 
                 root.AddComponent<UnitPathAgent>();
                 root.AddComponent<UnitCommandAgent>();
-                root.AddComponent<UnitCombat>();
                 root.AddComponent<UnitHealth>();
                 root.AddComponent<UnitHealthBar>();
-                root.AddComponent<TemporaryAttackEffect>();
+
+                if (status.Roles.HasFlag(UnitRole.Combat) || status.PhysicalAttackPower > 0f || status.MagicalAttackPower > 0f)
+                {
+                    root.AddComponent<UnitCombat>();
+                    root.AddComponent<TemporaryAttackEffect>();
+                }
 
                 if (unitType == PrototypeUnitType.Worker)
                 {
@@ -140,6 +194,7 @@ namespace ProjectS.Units.Editor
             var renderer = selectionRing.AddComponent<SpriteRenderer>();
             renderer.sprite = selectionSprite;
             renderer.color = new Color(1f, 1f, 1f, 0.75f);
+            renderer.sortingLayerName = "Units";
             renderer.sortingOrder = 18;
         }
 
@@ -156,80 +211,15 @@ namespace ProjectS.Units.Editor
             throw new InvalidOperationException($"Could not find '{spriteName}' in {PlayerSpriteSheetPath}.");
         }
 
-        private static int GetSupplyCost(PrototypeUnitType unitType)
-        {
-            switch (unitType)
-            {
-                case PrototypeUnitType.Worker:
-                    return 1;
-                case PrototypeUnitType.Soldier:
-                case PrototypeUnitType.Ranger:
-                    return 2;
-                case PrototypeUnitType.Spliter:
-                    return 3;
-                case PrototypeUnitType.Tank:
-                    return 3;
-                case PrototypeUnitType.Striker:
-                case PrototypeUnitType.Swarm:
-                    return 1;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(unitType), unitType, null);
-            }
-        }
-
-        private static void ApplyStatus(PrototypeUnitStatus status, PrototypeUnitType unitType)
-        {
-            switch (unitType)
-            {
-                case PrototypeUnitType.Worker:
-                    status.Initialize(UnitTrial.Human, UnitTeam.Team1, unitType, MovementDomain.Ground,
-                        UnitRole.Resource | UnitRole.Builder, AttackDistanceType.Melee, AttackPowerType.Physical,
-                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 60f, 3f, 0f,
-                        1.2f, 4f, 1f, 3f, 1, Vector2Int.one, true, false, 0f);
-                    break;
-                case PrototypeUnitType.Soldier:
-                    status.Initialize(UnitTrial.Human, UnitTeam.Team1, unitType, MovementDomain.Ground,
-                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
-                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 100f, 10f, 0f,
-                        1.5f, 5f, 1f, 3.2f, 1, Vector2Int.one, false, false, 0f);
-                    break;
-                case PrototypeUnitType.Spliter:
-                    status.Initialize(UnitTrial.Human, UnitTeam.Team1, unitType, MovementDomain.Ground,
-                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
-                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.AreaAttack, 90f, 8f, 0f,
-                        1.4f, 5f, 0.9f, 3f, 3, Vector2Int.one, false, true, 2f);
-                    break;
-                case PrototypeUnitType.Ranger:
-                    status.Initialize(UnitTrial.Human, UnitTeam.Team1, unitType, MovementDomain.Ground,
-                        UnitRole.Combat, AttackDistanceType.Ranged, AttackPowerType.Physical,
-                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 70f, 8f, 0f,
-                        6f, 8f, 0.8f, 2.8f, 1, Vector2Int.one, false, false, 0f);
-                    break;
-                case PrototypeUnitType.Tank:
-                    status.Initialize(UnitTrial.Human, UnitTeam.Team1, unitType, MovementDomain.Ground,
-                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
-                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 260f, 5f, 0f,
-                        1.4f, 4.5f, 0.65f, 2.4f, 1, Vector2Int.one, false, false, 0f);
-                    break;
-                case PrototypeUnitType.Striker:
-                    status.Initialize(UnitTrial.Human, UnitTeam.Team1, unitType, MovementDomain.Ground,
-                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
-                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 55f, 6f, 0f,
-                        0.8f, 4f, 3f, 4.2f, 1, Vector2Int.one, false, false, 0f);
-                    break;
-                case PrototypeUnitType.Swarm:
-                    status.Initialize(UnitTrial.Human, UnitTeam.Team1, unitType, MovementDomain.Ground,
-                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
-                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 45f, 4f, 0f,
-                        1.1f, 4.5f, 1.1f, 3.5f, 1, Vector2Int.one, false, false, 0f);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(unitType), unitType, null);
-            }
-        }
-
         private static Sprite CreateOrUpdateTextureSprite(PrototypeUnitType unitType, Sprite sourceSprite)
         {
+            var texturePath = $"{TextureFolder}/B_{unitType}.png";
+            if (File.Exists(texturePath))
+            {
+                // Generated concept art is authoritative. The fallback source sprite is only for missing assets.
+                return ConfigureTextureSprite(texturePath, GetPixelsPerUnitForTexture(texturePath));
+            }
+
             var sourcePath = AssetDatabase.GetAssetPath(sourceSprite.texture);
             var sourceImporter = AssetImporter.GetAtPath(sourcePath) as TextureImporter;
             var wasReadable = sourceImporter != null && sourceImporter.isReadable;
@@ -263,18 +253,10 @@ namespace ProjectS.Units.Editor
                 texture.SetPixels(pixels);
                 texture.Apply();
 
-                var texturePath = $"{TextureFolder}/B_{unitType}.png";
                 File.WriteAllBytes(texturePath, texture.EncodeToPNG());
                 UnityEngine.Object.DestroyImmediate(texture);
                 AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceSynchronousImport);
-
-                var importer = AssetImporter.GetAtPath(texturePath) as TextureImporter;
-                importer.textureType = TextureImporterType.Sprite;
-                importer.spritePixelsPerUnit = sourceSprite.pixelsPerUnit;
-                importer.filterMode = FilterMode.Point;
-                importer.mipmapEnabled = false;
-                importer.SaveAndReimport();
-                return AssetDatabase.LoadAssetAtPath<Sprite>(texturePath);
+                return ConfigureTextureSprite(texturePath, sourceSprite.pixelsPerUnit);
             }
             finally
             {
@@ -284,6 +266,33 @@ namespace ProjectS.Units.Editor
                     sourceImporter.SaveAndReimport();
                 }
             }
+        }
+
+        private static Sprite ConfigureTextureSprite(string texturePath, float pixelsPerUnit)
+        {
+            AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceSynchronousImport);
+            var importer = AssetImporter.GetAtPath(texturePath) as TextureImporter;
+            if (importer == null)
+            {
+                return null;
+            }
+
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = pixelsPerUnit;
+            importer.filterMode = FilterMode.Point;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Sprite>(texturePath);
+        }
+
+        private static float GetPixelsPerUnitForTexture(string texturePath)
+        {
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
+            return texture != null && texture.width > 256
+                ? ConceptArtPixelsPerUnit
+                : LegacyPixelsPerUnit;
         }
 
         private static Color GetTextureColor(PrototypeUnitType unitType)
@@ -297,6 +306,9 @@ namespace ProjectS.Units.Editor
                 case PrototypeUnitType.Tank: return new Color(0.42f, 0.57f, 0.7f, 1f);
                 case PrototypeUnitType.Striker: return new Color(0.9f, 0.42f, 0.22f, 1f);
                 case PrototypeUnitType.Swarm: return new Color(0.72f, 0.78f, 0.28f, 1f);
+                case PrototypeUnitType.Medic: return new Color(0.25f, 0.78f, 0.62f, 1f);
+                case PrototypeUnitType.Siege: return new Color(0.68f, 0.32f, 0.2f, 1f);
+                case PrototypeUnitType.Scout: return new Color(0.25f, 0.65f, 0.86f, 1f);
                 default: throw new ArgumentOutOfRangeException(nameof(unitType), unitType, null);
             }
         }

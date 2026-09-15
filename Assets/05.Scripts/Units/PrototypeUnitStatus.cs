@@ -30,7 +30,10 @@ namespace ProjectS.Units
         Ranger,
         Tank,
         Striker,
-        Swarm
+        Swarm,
+        Medic,
+        Siege,
+        Scout
     }
 
     public enum MovementDomain
@@ -47,7 +50,8 @@ namespace ProjectS.Units
         Resource = 1 << 0,
         Builder = 1 << 1,
         Combat = 1 << 2,
-        Siege = 1 << 3
+        Siege = 1 << 3,
+        Support = 1 << 4
     }
 
     public enum AttackDistanceType
@@ -304,6 +308,97 @@ namespace ProjectS.Units
             }
         }
 
+        public void ConfigurePrototypeDefaults(PrototypeUnitType type, UnitTeam initialTeam = UnitTeam.Team1)
+        {
+            switch (type)
+            {
+                case PrototypeUnitType.Worker:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Resource | UnitRole.Builder, AttackDistanceType.Melee, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 60f, 3f, 0f,
+                        1.2f, 4f, 1f, 3f, 1, Vector2Int.one, true, false, 0f);
+                    ConfigureSupplyCost(1);
+                    ConfigureVisionRadius(6f);
+                    break;
+                case PrototypeUnitType.Soldier:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 100f, 10f, 0f,
+                        1.5f, 5f, 1f, 3.2f, 1, Vector2Int.one, false, false, 0f);
+                    ConfigureSupplyCost(2);
+                    ConfigureVisionRadius(7f);
+                    break;
+                case PrototypeUnitType.Spliter:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.AreaAttack, 90f, 8f, 0f,
+                        1.4f, 5f, 0.9f, 3f, 3, Vector2Int.one, false, true, 2f);
+                    ConfigureSupplyCost(3);
+                    ConfigureVisionRadius(7f);
+                    break;
+                case PrototypeUnitType.Ranger:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Combat, AttackDistanceType.Ranged, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 70f, 8f, 0f,
+                        6f, 8f, 0.8f, 2.8f, 1, Vector2Int.one, false, false, 0f);
+                    ConfigureSupplyCost(2);
+                    ConfigureVisionRadius(9f);
+                    break;
+                case PrototypeUnitType.Tank:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 260f, 5f, 0f,
+                        1.4f, 4.5f, 0.65f, 2.4f, 1, Vector2Int.one, false, false, 0f);
+                    ConfigureSupplyCost(3);
+                    ConfigureVisionRadius(8f);
+                    break;
+                case PrototypeUnitType.Striker:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 55f, 6f, 0f,
+                        0.8f, 4f, 3f, 4.2f, 1, Vector2Int.one, false, false, 0f);
+                    ConfigureSupplyCost(1);
+                    ConfigureVisionRadius(6f);
+                    break;
+                case PrototypeUnitType.Swarm:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Combat, AttackDistanceType.Melee, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 45f, 4f, 0f,
+                        1.1f, 4.5f, 1.1f, 3.5f, 1, Vector2Int.one, false, false, 0f);
+                    ConfigureSupplyCost(1);
+                    ConfigureVisionRadius(5.5f);
+                    break;
+                case PrototypeUnitType.Medic:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Support, AttackDistanceType.Ranged, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 90f, 0f, 0f,
+                        0f, 0f, 0f, 3.6f, 1, Vector2Int.one, false, false, 0f);
+                    ConfigureSupplyCost(2);
+                    ConfigureVisionRadius(10f);
+                    break;
+                case PrototypeUnitType.Siege:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Combat | UnitRole.Siege, AttackDistanceType.Ranged, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 180f, 36f, 0f,
+                        8.5f, 9.5f, 0.45f, 1.7f, 1, Vector2Int.one, false, false, 0f);
+                    ConfigureSupplyCost(4);
+                    ConfigureVisionRadius(8f);
+                    break;
+                case PrototypeUnitType.Scout:
+                    Initialize(UnitTrial.Human, initialTeam, type, MovementDomain.Ground,
+                        UnitRole.Combat, AttackDistanceType.Ranged, AttackPowerType.Physical,
+                        PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 55f, 5f, 0f,
+                        4.5f, 7f, 1.2f, 4.8f, 1, Vector2Int.one, false, false, 0f);
+                    ConfigureSupplyCost(1);
+                    ConfigureVisionRadius(11f);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(type), type, null);
+            }
+
+            SynchronizeCombatComponents();
+        }
+
         public void ConfigureVisionRadius(float radius)
         {
             visionRadius = Mathf.Max(0f, radius);
@@ -403,6 +498,35 @@ namespace ProjectS.Units
             if (GetComponent<TemporaryAttackEffect>() == null)
             {
                 gameObject.AddComponent<TemporaryAttackEffect>();
+            }
+        }
+
+        private void SynchronizeCombatComponents()
+        {
+            if (CanAttack())
+            {
+                EnsureCombatComponents();
+                return;
+            }
+
+            RemoveCombatComponent(GetComponent<UnitCombat>());
+            RemoveCombatComponent(GetComponent<TemporaryAttackEffect>());
+        }
+
+        private static void RemoveCombatComponent(Component component)
+        {
+            if (component == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(component);
+            }
+            else
+            {
+                DestroyImmediate(component);
             }
         }
 

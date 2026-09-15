@@ -16,6 +16,8 @@ namespace ProjectS.Buildings
         private BuildingStatus status;
         private float nextRefreshTime;
 
+        public float Radius => Mathf.Max(0.1f, radius);
+
         private void Awake()
         {
             status = GetComponent<BuildingStatus>();

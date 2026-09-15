@@ -7,6 +7,7 @@ namespace ProjectS.Buildings
         protected override void EnsureRoleComponents()
         {
             EnsureComponent<BuildingSpeedAura>();
+            EnsureComponent<BuildingRangeIndicator>().Configure(BuildingRangeIndicatorSource.SpeedAura);
         }
     }
 }

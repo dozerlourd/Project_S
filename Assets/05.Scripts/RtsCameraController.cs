@@ -22,10 +22,6 @@ namespace ProjectS
         [Header("Mouse Drag Movement")]
         [SerializeField] private bool enableMiddleMouseDrag = true;
 
-        [Header("Rotation")]
-        [SerializeField] private bool enableKeyboardRotation;
-        [SerializeField] private float keyboardRotationSpeed = 90f;
-
         [Header("Zoom")]
         [SerializeField] private float minOrthographicSize = 8f;
         [SerializeField] private float maxOrthographicSize = 36f;
@@ -33,8 +29,6 @@ namespace ProjectS
         [SerializeField] private float zoomSmoothing = 12f;
 
         [Header("Movement Bounds")]
-        [SerializeField] private bool useMovementBounds = true;
-        [SerializeField] private bool autoResolveMapBounds = true;
         [SerializeField] private ProjectSTilemapWorld tilemapWorld;
         [SerializeField] private float boundsPadding;
         [SerializeField] private float mapPlaneZ;
@@ -59,6 +53,8 @@ namespace ProjectS
             targetOrthographicSize = targetCamera != null ? targetCamera.orthographicSize : maxOrthographicSize;
             if (targetCamera != null)
             {
+                targetCamera.clearFlags = CameraClearFlags.SolidColor;
+                targetCamera.backgroundColor = new Color(0.18f, 0.2f, 0.14f, 1f);
                 targetCamera.orthographicSize = Mathf.Min(targetCamera.orthographicSize, GetMaximumOrthographicSizeForMap());
             }
 
@@ -69,7 +65,6 @@ namespace ProjectS
         {
             edgeMoveSpeed = Mathf.Max(0f, edgeMoveSpeed);
             keyboardMoveSpeed = Mathf.Max(0f, keyboardMoveSpeed);
-            keyboardRotationSpeed = Mathf.Max(0f, keyboardRotationSpeed);
             edgeThickness = Mathf.Max(1f, edgeThickness);
             minOrthographicSize = Mathf.Max(0.1f, minOrthographicSize);
             maxOrthographicSize = Mathf.Max(minOrthographicSize, maxOrthographicSize);
@@ -88,7 +83,6 @@ namespace ProjectS
                 return;
             }
 
-            RotateCamera();
             MoveCamera();
             UpdateMiddleMouseDrag();
             UpdateZoomTarget();
@@ -179,28 +173,8 @@ namespace ProjectS
             TryGetGroundPointFromScreenPosition(screenPosition, out previousMouseDragGroundPoint);
         }
 
-        private void RotateCamera()
-        {
-            var rotationInput = GetKeyboardRotationInput();
-            if (Mathf.Approximately(rotationInput, 0f))
-            {
-                return;
-            }
-
-            var lookPointBeforeRotation = GetCameraCenterGroundPoint();
-            transform.Rotate(Vector3.forward, rotationInput * keyboardRotationSpeed * Time.deltaTime, Space.World);
-            var lookPointAfterRotation = GetCameraCenterGroundPoint();
-            var correction = lookPointBeforeRotation - lookPointAfterRotation;
-            transform.position += new Vector3(correction.x, correction.y, 0f);
-        }
-
         private void ResolveMapRoot()
         {
-            if (!autoResolveMapBounds)
-            {
-                return;
-            }
-
             if (tilemapWorld == null)
             {
                 tilemapWorld = ProjectSTilemapWorld.ActiveInstance;
@@ -278,29 +252,6 @@ namespace ProjectS
             return input;
         }
 
-        private float GetKeyboardRotationInput()
-        {
-            if (!enableKeyboardRotation || Keyboard.current == null)
-            {
-                return 0f;
-            }
-
-            var keyboard = Keyboard.current;
-            var input = 0f;
-
-            if (keyboard.qKey.isPressed)
-            {
-                input -= 1f;
-            }
-
-            if (keyboard.eKey.isPressed)
-            {
-                input += 1f;
-            }
-
-            return input;
-        }
-
         private float GetMoveSpeed()
         {
             if (enableKeyboardMovement && Keyboard.current != null)
@@ -345,11 +296,6 @@ namespace ProjectS
 
         private void ClampPositionToBounds()
         {
-            if (!useMovementBounds)
-            {
-                return;
-            }
-
             if (!TryGetTilemapWorldBounds(out var boundsMin, out var boundsMax))
             {
                 return;
@@ -377,7 +323,7 @@ namespace ProjectS
 
         private float GetMaximumOrthographicSizeForMap()
         {
-            if (!useMovementBounds || targetCamera == null || !targetCamera.orthographic ||
+            if (targetCamera == null || !targetCamera.orthographic ||
                 !TryGetTilemapWorldBounds(out var boundsMin, out var boundsMax))
             {
                 return maxOrthographicSize;
@@ -503,7 +449,9 @@ namespace ProjectS
                 return false;
             }
 
-            var cellBounds = tilemapWorld.CellBounds;
+            var cellBounds = tilemapWorld.GroundTilemap != null
+                ? tilemapWorld.GroundTilemap.cellBounds
+                : tilemapWorld.CellBounds;
             var worldMin = CellToWorldCorner(new Vector3Int(cellBounds.xMin, cellBounds.yMin, 0));
             var worldMax = CellToWorldCorner(new Vector3Int(cellBounds.xMax, cellBounds.yMax, 0));
             boundsMin = new Vector2(Mathf.Min(worldMin.x, worldMax.x), Mathf.Min(worldMin.y, worldMax.y));

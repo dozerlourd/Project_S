@@ -21,6 +21,8 @@ namespace ProjectS.Buildings
         private IUnitAttackTarget currentTarget;
         private readonly List<IUnitAttackTarget> targetCandidates = new List<IUnitAttackTarget>();
 
+        public float AttackRange => Mathf.Max(0.1f, attackRange);
+
         private void Awake()
         {
             status = GetComponent<BuildingStatus>();

@@ -56,6 +56,7 @@ namespace ProjectS.Units
                 case PrototypeUnitType.Ranger:
                     return KeepDistance;
                 case PrototypeUnitType.Tank:
+                case PrototypeUnitType.Siege:
                     return Artillery;
                 case PrototypeUnitType.Striker:
                     return StrikerAssault;

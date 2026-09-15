@@ -47,6 +47,12 @@ TagManager:
   - name: BackProps
     uniqueID: 4250941897
     locked: 0
+  - name: Ground
+    uniqueID: -105541197
+    locked: 0
+  - name: RangeIndicators
+    uniqueID: 1609987214
+    locked: 0
   - name: FrontProps
     uniqueID: 4189426099
     locked: 0

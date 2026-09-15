@@ -7,7 +7,7 @@ namespace ProjectS.Visibility
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public sealed class FogOfWarOverlay : MonoBehaviour
     {
-        private static readonly Color UnexploredColor = new Color(0.01f, 0.015f, 0.02f, 0.98f);
+        private static readonly Color UnexploredColor = new Color(0.01f, 0.015f, 0.02f, 1f);
         private static readonly Color ExploredColor = new Color(0.02f, 0.025f, 0.035f, 0.66f);
         private static readonly Color VisibleColor = new Color(0f, 0f, 0f, 0f);
 
