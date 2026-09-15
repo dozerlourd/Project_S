@@ -22,8 +22,10 @@ namespace ProjectS.Buildings
         [SerializeField] private GameObject completedBuildingPrefab;
 
         private static string lastCreateFailureReason;
+        private PlayerResourceWallet wallet;
         private float buildProgress;
         private bool completed;
+        private bool constructionStarted;
 
         public Vector3 InteractionPoint => transform.position;
         public float InteractionRange => interactionRange;
@@ -33,6 +35,7 @@ namespace ProjectS.Buildings
         public float BuildProgress => buildProgress;
         public float BuildProgress01 => Mathf.Clamp01(buildProgress / BuildTime);
         public bool Completed => completed;
+        public bool HasConstructionStarted => constructionStarted;
         public static string LastCreateFailureReason => lastCreateFailureReason;
 
         private void OnValidate()
@@ -76,6 +79,8 @@ namespace ProjectS.Buildings
             completedBuildingPrefab = finishedPrefab;
             buildProgress = 0f;
             completed = false;
+            constructionStarted = true;
+            wallet = null;
             EnsureCollider();
         }
 
@@ -95,6 +100,11 @@ namespace ProjectS.Buildings
                 return false;
             }
 
+            if (!TryBeginConstruction())
+            {
+                return false;
+            }
+
             buildProgress += deltaTime;
             if (buildProgress >= BuildTime)
             {
@@ -102,6 +112,17 @@ namespace ProjectS.Buildings
             }
 
             return true;
+        }
+
+        public void CancelPendingConstruction()
+        {
+            if (completed || constructionStarted)
+            {
+                return;
+            }
+
+            gameObject.SetActive(false);
+            Destroy(gameObject);
         }
 
         public static bool CanPlace(ProjectSTilemapWorld tilemapWorld, Vector3 worldPosition, Vector2Int footprint)
@@ -159,6 +180,63 @@ namespace ProjectS.Buildings
             Vector2Int footprint,
             out ConstructionSite site)
         {
+            return TryCreateInternal(
+                worldPosition,
+                team,
+                wallet,
+                tilemapWorld,
+                sitePrefab,
+                completedBuildingPrefab,
+                buildingKind,
+                cost,
+                buildTime,
+                footprint,
+                true,
+                out site);
+        }
+
+        public static bool TryCreateDeferred(
+            Vector3 worldPosition,
+            UnitTeam team,
+            PlayerResourceWallet wallet,
+            ProjectSTilemapWorld tilemapWorld,
+            GameObject sitePrefab,
+            GameObject completedBuildingPrefab,
+            BuildingKind buildingKind,
+            ResourceAmount cost,
+            float buildTime,
+            Vector2Int footprint,
+            out ConstructionSite site)
+        {
+            return TryCreateInternal(
+                worldPosition,
+                team,
+                wallet,
+                tilemapWorld,
+                sitePrefab,
+                completedBuildingPrefab,
+                buildingKind,
+                cost,
+                buildTime,
+                footprint,
+                false,
+                out site);
+        }
+
+        private static bool TryCreateInternal(
+            Vector3 worldPosition,
+            UnitTeam team,
+            PlayerResourceWallet wallet,
+            ProjectSTilemapWorld tilemapWorld,
+            GameObject sitePrefab,
+            GameObject completedBuildingPrefab,
+            BuildingKind buildingKind,
+            ResourceAmount cost,
+            float buildTime,
+            Vector2Int footprint,
+            bool spendImmediately,
+            out ConstructionSite site)
+        {
             site = null;
             var placementFailureReason = GetPlacementFailureReason(tilemapWorld, worldPosition, footprint);
             if (!string.IsNullOrEmpty(placementFailureReason))
@@ -180,7 +258,13 @@ namespace ProjectS.Buildings
                 return false;
             }
 
-            if (wallet != null && !wallet.TrySpend(cost))
+            if (wallet != null && !wallet.CanAfford(cost))
+            {
+                FailCreate($"Cannot place {buildingKind} construction site: insufficient resources for cost ({cost}).");
+                return false;
+            }
+
+            if (spendImmediately && wallet != null && !wallet.TrySpend(cost))
             {
                 FailCreate($"Cannot place {buildingKind} construction site: insufficient resources for cost ({cost}).");
                 return false;
@@ -198,8 +282,62 @@ namespace ProjectS.Buildings
             }
 
             site.Initialize(team, buildingKind, footprint, cost, buildTime, completedBuildingPrefab);
+            if (!spendImmediately)
+            {
+                site.SetDeferredPayment(wallet);
+            }
+
             lastCreateFailureReason = string.Empty;
             return true;
+        }
+
+        private void SetDeferredPayment(PlayerResourceWallet resourceWallet)
+        {
+            wallet = resourceWallet;
+            constructionStarted = false;
+            SetConstructionSiteVisible(false);
+        }
+
+        private bool TryBeginConstruction()
+        {
+            if (constructionStarted)
+            {
+                return true;
+            }
+
+            if (!cost.IsEmpty && wallet == null)
+            {
+                FailCreate($"Cannot start {completedBuildingKind} construction: no resource wallet is available for {team}.");
+                return false;
+            }
+
+            if (wallet != null && !wallet.TrySpend(cost))
+            {
+                FailCreate($"Cannot start {completedBuildingKind} construction: insufficient resources for cost ({cost}).");
+                return false;
+            }
+
+            constructionStarted = true;
+            SetConstructionSiteVisible(true);
+            return true;
+        }
+
+        private void SetConstructionSiteVisible(bool visible)
+        {
+            var renderers = GetComponentsInChildren<Renderer>(true);
+            for (var i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null)
+                {
+                    renderers[i].enabled = visible;
+                }
+            }
+
+            var collider = GetComponent<Collider2D>();
+            if (collider != null)
+            {
+                collider.enabled = visible;
+            }
         }
 
         private void CompleteConstruction()

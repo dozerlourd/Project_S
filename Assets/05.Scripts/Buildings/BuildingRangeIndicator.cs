@@ -5,35 +5,42 @@ namespace ProjectS.Buildings
     public enum BuildingRangeIndicatorSource
     {
         AutoTurretAttack,
-        SpeedAura
+        SpeedAura,
+        StructureVision
     }
 
     [DisallowMultipleComponent]
     [RequireComponent(typeof(BuildingStatus))]
     public sealed class BuildingRangeIndicator : MonoBehaviour
     {
-        private const int CircleSegmentCount = 64;
+        // Keep the area marker above terrain but below world objects and combat feedback.
         private const string SortingLayerName = "RangeIndicators";
 
         [SerializeField] private BuildingRangeIndicatorSource source;
-        [SerializeField] private Color lineColor = new Color(0.3f, 0.85f, 1f, 0.55f);
-        [SerializeField, Min(0.01f)] private float lineWidth = 0.045f;
+        [SerializeField] private Sprite rangeSprite;
+        [SerializeField, Range(0.1f, 1f)] private float verticalScale = 0.58f;
 
-        private LineRenderer lineRenderer;
+        private SpriteRenderer rangeRenderer;
+        private BuildingStatus structure;
         private BuildingAutoTurret autoTurret;
         private BuildingSpeedAura speedAura;
         private float lastRadius = -1f;
 
-        public void Configure(BuildingRangeIndicatorSource rangeSource)
+        public void Configure(BuildingRangeIndicatorSource rangeSource, Sprite sprite = null)
         {
             source = rangeSource;
+            if (sprite != null)
+            {
+                rangeSprite = sprite;
+            }
+
             RefreshVisual(true);
         }
 
         private void Awake()
         {
             ResolveSources();
-            EnsureLineRenderer();
+            EnsureRenderer();
             RefreshVisual(true);
         }
 
@@ -49,64 +56,72 @@ namespace ProjectS.Buildings
 
         private void OnDisable()
         {
-            if (lineRenderer != null)
+            if (rangeRenderer != null)
             {
-                lineRenderer.enabled = false;
+                rangeRenderer.enabled = false;
             }
         }
 
         private void ResolveSources()
         {
+            structure ??= GetComponent<BuildingStatus>();
             autoTurret ??= GetComponent<BuildingAutoTurret>();
             speedAura ??= GetComponent<BuildingSpeedAura>();
         }
 
-        private void EnsureLineRenderer()
+        private void EnsureRenderer()
         {
-            if (lineRenderer != null)
+            if (rangeRenderer != null)
             {
                 return;
             }
 
-            var rangeObject = new GameObject("RangeIndicator");
+            var rangeTransform = transform.Find("RangeIndicator");
+            var rangeObject = rangeTransform != null ? rangeTransform.gameObject : new GameObject("RangeIndicator");
             rangeObject.transform.SetParent(transform, false);
             rangeObject.transform.localPosition = new Vector3(0f, 0f, 0.01f);
-            lineRenderer = rangeObject.AddComponent<LineRenderer>();
-            lineRenderer.useWorldSpace = false;
-            lineRenderer.loop = true;
-            lineRenderer.positionCount = CircleSegmentCount;
-            lineRenderer.widthMultiplier = lineWidth;
-            lineRenderer.startColor = lineColor;
-            lineRenderer.endColor = lineColor;
-            lineRenderer.numCornerVertices = 2;
-            lineRenderer.numCapVertices = 2;
-            lineRenderer.sortingLayerName = SortingLayerName;
-            lineRenderer.sortingOrder = 0;
+            var legacyLine = rangeObject.GetComponent<LineRenderer>();
+            if (legacyLine != null)
+            {
+                Destroy(legacyLine);
+            }
+
+            rangeSprite ??= BuildingStatusUiSprites.RangeIndicator;
+            rangeRenderer = rangeObject.GetComponent<SpriteRenderer>();
+            if (rangeRenderer == null)
+            {
+                rangeRenderer = rangeObject.AddComponent<SpriteRenderer>();
+            }
+
+            rangeRenderer.sprite = rangeSprite;
+            rangeRenderer.sortingLayerName = SortingLayerName;
+            rangeRenderer.sortingOrder = 0;
         }
 
         private void RefreshVisual(bool force)
         {
             ResolveSources();
-            EnsureLineRenderer();
+            EnsureRenderer();
 
             var radius = GetRadius();
-            if (lineRenderer == null)
+            if (rangeRenderer == null)
             {
                 return;
             }
 
-            lineRenderer.enabled = radius > 0f && isActiveAndEnabled;
+            rangeRenderer.sprite = rangeSprite;
+            rangeRenderer.enabled = radius > 0f && rangeSprite != null && isActiveAndEnabled;
             if (!force && Mathf.Approximately(radius, lastRadius))
             {
                 return;
             }
 
             lastRadius = radius;
-            for (var i = 0; i < CircleSegmentCount; i++)
-            {
-                var angle = i * Mathf.PI * 2f / CircleSegmentCount;
-                lineRenderer.SetPosition(i, new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, 0f));
-            }
+            rangeRenderer.color = Color.white;
+            rangeRenderer.transform.localScale = new Vector3(
+                radius * 2f,
+                radius * 2f * Mathf.Clamp(verticalScale, 0.1f, 1f),
+                1f);
         }
 
         private float GetRadius()
@@ -115,8 +130,10 @@ namespace ProjectS.Buildings
             {
                 BuildingRangeIndicatorSource.AutoTurretAttack => autoTurret != null ? autoTurret.AttackRange : 0f,
                 BuildingRangeIndicatorSource.SpeedAura => speedAura != null ? speedAura.Radius : 0f,
+                BuildingRangeIndicatorSource.StructureVision => structure != null ? structure.VisionRadius : 0f,
                 _ => 0f
             };
         }
+
     }
 }

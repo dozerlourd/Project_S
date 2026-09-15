@@ -52,7 +52,15 @@ namespace ProjectS.Buildings
             }
 
             pathAgent.ClearPath();
-            targetSite.TryContribute(commandAgent, buildPower * Time.deltaTime);
+            if (!targetSite.TryContribute(commandAgent, buildPower * Time.deltaTime)
+                && !targetSite.HasConstructionStarted)
+            {
+                targetSite.CancelPendingConstruction();
+                targetSite = null;
+                commandAgent.Stop();
+                return;
+            }
+
             if (targetSite != null && targetSite.Completed)
             {
                 targetSite = null;
@@ -75,6 +83,11 @@ namespace ProjectS.Buildings
 
         public void OnUnitCommandInterrupted()
         {
+            if (targetSite != null && !targetSite.HasConstructionStarted)
+            {
+                targetSite.CancelPendingConstruction();
+            }
+
             targetSite = null;
             targetInteractionPoint = default;
         }

@@ -60,14 +60,18 @@ namespace ProjectS.Buildings
             ResolveReferences();
             EnsureHealth();
             EnsureRoleComponents();
+            EnsureRangeIndicator();
+            EnsureFogVisibilityTarget();
         }
 
         protected virtual void OnEnable()
         {
             ApplyRoleDefaults();
             EnsureRoleComponents();
+            EnsureRangeIndicator();
             ResolveReferences();
             EnsureHealth();
+            EnsureFogVisibilityTarget();
             RegisterBuilding();
             UnitAttackTargetRegistry.Register(this);
             FogOfWarRegistry.Register(this);
@@ -112,6 +116,8 @@ namespace ProjectS.Buildings
             EnsureHealth();
             health?.ResetHealth();
             EnsureRoleComponents();
+            EnsureRangeIndicator();
+            EnsureFogVisibilityTarget();
 
             if (isActiveAndEnabled)
             {
@@ -219,6 +225,35 @@ namespace ProjectS.Buildings
             {
                 health = gameObject.AddComponent<BuildingHealth>();
             }
+
+            EnsureComponent<BuildingHealthBar>();
+        }
+
+        private void EnsureRangeIndicator()
+        {
+            BuildingRangeIndicatorSource? source = null;
+            if (GetComponent<BuildingAutoTurret>() != null)
+            {
+                source = BuildingRangeIndicatorSource.AutoTurretAttack;
+            }
+            else if (GetComponent<BuildingSpeedAura>() != null)
+            {
+                source = BuildingRangeIndicatorSource.SpeedAura;
+            }
+            else if (Kind == BuildingKind.SignalRelay)
+            {
+                source = BuildingRangeIndicatorSource.StructureVision;
+            }
+
+            if (source.HasValue)
+            {
+                EnsureComponent<BuildingRangeIndicator>().Configure(source.Value);
+            }
+        }
+
+        private void EnsureFogVisibilityTarget()
+        {
+            EnsureComponent<BuildingFogVisibilityTarget>();
         }
 
         private static AttackTargetPriority GetTargetPriority(BuildingKind buildingKind)
@@ -255,4 +290,5 @@ namespace ProjectS.Buildings
             }
         }
     }
+
 }

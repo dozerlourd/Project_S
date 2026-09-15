@@ -78,7 +78,7 @@ namespace ProjectS.Buildings
                 return false;
             }
 
-            return ConstructionSite.TryCreate(
+            return ConstructionSite.TryCreateDeferred(
                 worldPosition,
                 team,
                 wallet,

@@ -7,6 +7,7 @@ namespace ProjectS.Buildings
         protected override void EnsureRoleComponents()
         {
             EnsureComponent<UnitProductionQueue>();
+            EnsureComponent<BuildingRangeIndicator>().Configure(BuildingRangeIndicatorSource.StructureVision);
         }
     }
 }

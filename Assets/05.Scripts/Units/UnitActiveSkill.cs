@@ -9,36 +9,6 @@ namespace ProjectS.Units
         SelfMovementSpeedMultiplier
     }
 
-    [Serializable]
-    public sealed class UnitActiveSkillDefinition
-    {
-        [SerializeField] private string displayName = "Active Skill";
-        [SerializeField] private UnitActiveSkillEffectType effectType;
-        [SerializeField, Min(0.1f)] private float cooldown = 10f;
-        [SerializeField, Min(0.1f)] private float duration = 3f;
-        [SerializeField, Min(1f)] private float movementSpeedMultiplier = 1.25f;
-
-        public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? effectType.ToString() : displayName;
-        public UnitActiveSkillEffectType EffectType => effectType;
-        public float Cooldown => Mathf.Max(0.1f, cooldown);
-        public float Duration => Mathf.Max(0.1f, duration);
-        public float MovementSpeedMultiplier => Mathf.Max(1f, movementSpeedMultiplier);
-
-        public void Configure(
-            string skillName,
-            UnitActiveSkillEffectType skillEffectType,
-            float cooldownSeconds,
-            float durationSeconds,
-            float speedMultiplier)
-        {
-            displayName = skillName;
-            effectType = skillEffectType;
-            cooldown = Mathf.Max(0.1f, cooldownSeconds);
-            duration = Mathf.Max(0.1f, durationSeconds);
-            movementSpeedMultiplier = Mathf.Max(1f, speedMultiplier);
-        }
-    }
-
     [DisallowMultipleComponent]
     [RequireComponent(typeof(PrototypeUnitStatus))]
     public sealed class UnitActiveSkillController : MonoBehaviour
@@ -209,6 +179,36 @@ namespace ProjectS.Units
         {
             LastFailureReason = reason;
             return false;
+        }
+    }
+
+    [Serializable]
+    public sealed class UnitActiveSkillDefinition
+    {
+        [SerializeField] private string displayName = "Active Skill";
+        [SerializeField] private UnitActiveSkillEffectType effectType;
+        [SerializeField, Min(0.1f)] private float cooldown = 10f;
+        [SerializeField, Min(0.1f)] private float duration = 3f;
+        [SerializeField, Min(1f)] private float movementSpeedMultiplier = 1.25f;
+
+        public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? effectType.ToString() : displayName;
+        public UnitActiveSkillEffectType EffectType => effectType;
+        public float Cooldown => Mathf.Max(0.1f, cooldown);
+        public float Duration => Mathf.Max(0.1f, duration);
+        public float MovementSpeedMultiplier => Mathf.Max(1f, movementSpeedMultiplier);
+
+        public void Configure(
+            string skillName,
+            UnitActiveSkillEffectType skillEffectType,
+            float cooldownSeconds,
+            float durationSeconds,
+            float speedMultiplier)
+        {
+            displayName = skillName;
+            effectType = skillEffectType;
+            cooldown = Mathf.Max(0.1f, cooldownSeconds);
+            duration = Mathf.Max(0.1f, durationSeconds);
+            movementSpeedMultiplier = Mathf.Max(1f, speedMultiplier);
         }
     }
 }

@@ -3,6 +3,7 @@ using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.Units;
 using ProjectS.Unlocks;
+using ProjectS.Visibility;
 using UnityEngine;
 
 namespace ProjectS.Buildings
@@ -41,14 +42,13 @@ namespace ProjectS.Buildings
         public bool TryPlaceDefaultConstructionSite(Vector3 worldPosition, out ConstructionSite site)
         {
             ResolveReferences();
-            if (!CanPlaceSelectedBuilding(out var failureReason))
+            if (!CanPlaceDefaultConstructionSite(worldPosition))
             {
                 site = null;
-                LastPlacementFailureReason = failureReason;
                 return false;
             }
 
-            var placed = ConstructionSite.TryCreate(
+            var placed = ConstructionSite.TryCreateDeferred(
                 worldPosition,
                 team,
                 wallet,
@@ -81,6 +81,12 @@ namespace ProjectS.Buildings
                 return false;
             }
 
+            if (IsBlockedByUnexploredFog(worldPosition, selectedDefinition.Footprint, out var fogFailureReason))
+            {
+                LastPlacementFailureReason = fogFailureReason;
+                return false;
+            }
+
             if (selectedDefinition.Cost.IsEmpty)
             {
                 LastPlacementFailureReason = string.Empty;
@@ -108,9 +114,31 @@ namespace ProjectS.Buildings
         public IReadOnlyList<UnitBuildPlacementPreviewCell> GetDefaultConstructionSitePreviewCells(Vector3 worldPosition)
         {
             ResolveReferences();
-            return selectedDefinition != null
-                ? ConstructionSite.GetPlacementPreviewCells(tilemapWorld, worldPosition, selectedDefinition.Footprint)
-                : new UnitBuildPlacementPreviewCell[0];
+            if (selectedDefinition == null)
+            {
+                return new UnitBuildPlacementPreviewCell[0];
+            }
+
+            var previewCells = ConstructionSite.GetPlacementPreviewCells(
+                tilemapWorld,
+                worldPosition,
+                selectedDefinition.Footprint);
+            var fog = FogOfWarManager.ActiveInstance;
+            if (fog == null || fog.TilemapWorld == null || team != fog.PlayerTeam)
+            {
+                return previewCells;
+            }
+
+            var adjustedCells = new List<UnitBuildPlacementPreviewCell>(previewCells.Count);
+            for (var i = 0; i < previewCells.Count; i++)
+            {
+                var cell = previewCells[i];
+                adjustedCells.Add(fog.GetVisibility(cell.WorldCenter) == FogVisibilityState.Unexplored
+                    ? new UnitBuildPlacementPreviewCell(cell.WorldCenter, false, "cell is hidden by unexplored fog.")
+                    : cell);
+            }
+
+            return adjustedCells;
         }
 
         bool IUnitBuildPlacementService.CanPlaceDefaultConstructionSite(Vector3 worldPosition)
@@ -261,6 +289,34 @@ namespace ProjectS.Buildings
             }
 
             return CanSelectBuilding(selectedDefinition.BuildingKind, out failureReason);
+        }
+
+        private bool IsBlockedByUnexploredFog(
+            Vector3 worldPosition,
+            Vector2Int footprint,
+            out string failureReason)
+        {
+            var fog = FogOfWarManager.ActiveInstance;
+            if (fog == null || fog.TilemapWorld == null || team != fog.PlayerTeam)
+            {
+                failureReason = string.Empty;
+                return false;
+            }
+
+            var previewCells = ConstructionSite.GetPlacementPreviewCells(tilemapWorld, worldPosition, footprint);
+            for (var i = 0; i < previewCells.Count; i++)
+            {
+                if (fog.GetVisibility(previewCells[i].WorldCenter) != FogVisibilityState.Unexplored)
+                {
+                    continue;
+                }
+
+                failureReason = $"Cannot place construction site at {worldPosition}: cell is hidden by unexplored fog.";
+                return true;
+            }
+
+            failureReason = string.Empty;
+            return false;
         }
 
         private BuildingConstructionDefinition FindConstructionDefinition(BuildingKind buildingKind)

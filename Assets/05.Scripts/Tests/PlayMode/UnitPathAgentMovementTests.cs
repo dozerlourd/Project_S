@@ -927,6 +927,46 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator ConstructionSite_TryCreateDeferredSpendsCostOnlyWhenBuilderStarts()
+        {
+            var walletObject = new GameObject("DeferredConstructionWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(200, 25));
+            var builder = CreateWorkerUnit("DeferredConstructionWorker", Vector3.left);
+            var tryCreateDeferred = ConstructionSiteType.GetMethod("TryCreateDeferred");
+            var arguments = new[]
+            {
+                (object)Vector3.zero,
+                UnitTeam.Team1,
+                wallet,
+                null,
+                null,
+                null,
+                Enum.Parse(BuildingKindType, "MainBase"),
+                CreateResourceAmount(75, 10),
+                1f,
+                Vector2Int.one,
+                null
+            };
+
+            Assert.That((bool)tryCreateDeferred.Invoke(null, arguments), Is.True);
+            var site = (Component)arguments[10];
+            Assert.That(GetBool(site, "HasConstructionStarted"), Is.False);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(200));
+            Assert.That(GetInt(wallet, "Gas"), Is.EqualTo(25));
+
+            Assert.That((bool)Invoke(site, "TryContribute", builder.GetComponent<UnitCommandAgent>(), 0.1f), Is.True);
+            Assert.That(GetBool(site, "HasConstructionStarted"), Is.True);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(125));
+            Assert.That(GetInt(wallet, "Gas"), Is.EqualTo(15));
+
+            Object.Destroy(site.gameObject);
+            Object.Destroy(builder);
+            Object.Destroy(walletObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator ConstructionSite_CompletesIntoConfiguredBuildingPrefabWithRuntimeFeatures()
         {
             var walletObject = new GameObject("FeatureConstructionWallet");
@@ -1136,7 +1176,7 @@ namespace ProjectS.Tests.PlayMode
 
             Assert.That(placed, Is.True);
             Assert.That(site, Is.Not.Null);
-            Assert.That(GetInt(team1Wallet, "Minerals"), Is.EqualTo(60));
+            Assert.That(GetInt(team1Wallet, "Minerals"), Is.EqualTo(100));
             Assert.That(GetInt(team2Wallet, "Minerals"), Is.EqualTo(100));
 
             Object.Destroy(site.gameObject);
