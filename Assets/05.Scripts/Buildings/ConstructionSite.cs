@@ -167,6 +167,38 @@ namespace ProjectS.Buildings
             return previewCells;
         }
 
+        /// <summary>
+        /// Returns the geometric center of the cells reserved by a placement request.
+        /// A two-by-two footprint anchored on a clicked cell reserves that cell and the
+        /// cell to its upper-right, so its visual pivot must sit between those cells.
+        /// </summary>
+        public static Vector3 GetPlacementCenterWorld(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3 worldPosition,
+            Vector2Int footprint)
+        {
+            if (tilemapWorld == null)
+            {
+                return worldPosition;
+            }
+
+            footprint = SanitizeFootprint(footprint);
+            var anchorCell = tilemapWorld.WorldToCell(worldPosition);
+            var minCell = new Vector3Int(
+                anchorCell.x - (footprint.x - 1) / 2,
+                anchorCell.y - (footprint.y - 1) / 2,
+                anchorCell.z);
+            var maxCell = new Vector3Int(
+                minCell.x + footprint.x - 1,
+                minCell.y + footprint.y - 1,
+                anchorCell.z);
+            var minCenter = tilemapWorld.GetCellCenterWorld(minCell);
+            var maxCenter = tilemapWorld.GetCellCenterWorld(maxCell);
+            var placementCenter = (minCenter + maxCenter) * 0.5f;
+            placementCenter.z = worldPosition.z;
+            return placementCenter;
+        }
+
         public static bool TryCreate(
             Vector3 worldPosition,
             UnitTeam team,
@@ -270,10 +302,11 @@ namespace ProjectS.Buildings
                 return false;
             }
 
+            var placementCenter = GetPlacementCenterWorld(tilemapWorld, worldPosition, footprint);
             var siteObject = sitePrefab != null
-                ? Instantiate(sitePrefab, worldPosition, Quaternion.identity)
+                ? Instantiate(sitePrefab, placementCenter, Quaternion.identity)
                 : new GameObject("ConstructionSite");
-            siteObject.transform.position = worldPosition;
+            siteObject.transform.position = placementCenter;
             siteObject.SetActive(true);
             site = siteObject.GetComponent<ConstructionSite>();
             if (site == null)
@@ -590,7 +623,7 @@ namespace ProjectS.Buildings
             if (tilemapWorld != null)
             {
                 var centerCell = tilemapWorld.WorldToCell(worldPosition);
-                foreach (var occupiedCell in EnumerateFootprintCells(centerCell, occupiedFootprint))
+                foreach (var occupiedCell in EnumerateCenteredFootprintCells(centerCell, occupiedFootprint))
                 {
                     if (occupiedCell == queriedCell)
                     {
@@ -639,6 +672,23 @@ namespace ProjectS.Buildings
             footprint = SanitizeFootprint(footprint);
             var startX = centerCell.x - (footprint.x - 1) / 2;
             var startY = centerCell.y - (footprint.y - 1) / 2;
+
+            for (var y = 0; y < footprint.y; y++)
+            {
+                for (var x = 0; x < footprint.x; x++)
+                {
+                    yield return new Vector3Int(startX + x, startY + y, centerCell.z);
+                }
+            }
+        }
+
+        private static System.Collections.Generic.IEnumerable<Vector3Int> EnumerateCenteredFootprintCells(
+            Vector3Int centerCell,
+            Vector2Int footprint)
+        {
+            footprint = SanitizeFootprint(footprint);
+            var startX = centerCell.x - footprint.x / 2;
+            var startY = centerCell.y - footprint.y / 2;
 
             for (var y = 0; y < footprint.y; y++)
             {

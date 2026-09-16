@@ -35,6 +35,8 @@ namespace ProjectS.Tests.PlayMode
         private static readonly Type BuildingConstructionDefinitionType = GetGameplayType("ProjectS.Buildings.BuildingConstructionDefinition");
         private static readonly Type BuildingAutoTurretType = GetGameplayType("ProjectS.Buildings.BuildingAutoTurret");
         private static readonly Type BuildingSpeedAuraType = GetGameplayType("ProjectS.Buildings.BuildingSpeedAura");
+        private static readonly Type BuildingRangeIndicatorType = GetGameplayType("ProjectS.Buildings.BuildingRangeIndicator");
+        private static readonly Type BuildingFogVisibilityTargetType = GetGameplayType("ProjectS.Buildings.BuildingFogVisibilityTarget");
         private static readonly Type SimpleSkirmishAIType = GetGameplayType("ProjectS.AI.SimpleSkirmishAI");
         private static readonly Type WorkerGatherControllerType = GetGameplayType("ProjectS.Resources.WorkerGatherController");
         private static readonly Type RtsGameHudType = GetGameplayType("ProjectS.UI.RtsGameHud");
@@ -1039,6 +1041,71 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator BuildingRangeIndicator_OnlyRendersForPrimaryBuildingSelection()
+        {
+            var controllerObject = new GameObject("RangeIndicatorSelectionController");
+            var controller = controllerObject.AddComponent<PlayerUnitCommandController>();
+            var building = new GameObject("RangeIndicatorBuilding");
+            building.SetActive(false);
+
+            var rangeObject = new GameObject("RangeIndicator");
+            rangeObject.transform.SetParent(building.transform, false);
+            var rangeRenderer = rangeObject.AddComponent<SpriteRenderer>();
+            rangeRenderer.enabled = true;
+            var legacyLine = rangeObject.AddComponent<LineRenderer>();
+            legacyLine.enabled = true;
+
+            var status = building.AddComponent(BuildingStatusType);
+            building.AddComponent(BuildingAutoTurretType);
+            Invoke(
+                status,
+                "Initialize",
+                UnitTeam.Team1,
+                Enum.Parse(BuildingKindType, "AutoTurret"),
+                new Vector2Int(2, 2),
+                true);
+
+            var rangeIndicator = building.GetComponent(BuildingRangeIndicatorType);
+            var fogVisibility = building.GetComponent(BuildingFogVisibilityTargetType);
+            Assert.That(rangeIndicator, Is.Not.Null);
+            Assert.That(fogVisibility, Is.Not.Null);
+            Assert.That(rangeRenderer.enabled, Is.False);
+            Assert.That(legacyLine.enabled, Is.False);
+
+            building.SetActive(true);
+            Assert.That(rangeRenderer.enabled, Is.False);
+            yield return null;
+            Assert.That(rangeRenderer.enabled, Is.False);
+
+            Invoke(fogVisibility, "ResolveRenderers");
+            Invoke(fogVisibility, "SetRenderersVisible", true);
+            Assert.That(rangeRenderer.enabled, Is.False,
+                "Fog visibility must not enable the selection-owned range renderer.");
+
+            Invoke(controller, "SelectNonUnitTarget", status);
+            yield return null;
+            Assert.That(rangeRenderer.enabled, Is.True);
+
+            var unit = CreateMovableUnit("RangeIndicatorOtherSelection", Vector3.right);
+            Invoke(controller, "ClearSelection");
+            Invoke(controller, "AddSelection", unit.GetComponent<UnitCommandAgent>());
+            yield return null;
+            Assert.That(rangeRenderer.enabled, Is.False);
+
+            Invoke(controller, "ClearSelection");
+            yield return null;
+            Assert.That(rangeRenderer.enabled, Is.False);
+
+            ((Behaviour)rangeIndicator).enabled = false;
+            Assert.That(rangeRenderer.enabled, Is.False);
+
+            Object.Destroy(unit);
+            Object.Destroy(building);
+            Object.Destroy(controllerObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator ConstructionSite_ExpandedMainBaseRegistersAsNearestResourceDropOff()
         {
             var walletObject = new GameObject("ExpansionWallet");
@@ -1380,6 +1447,8 @@ namespace ProjectS.Tests.PlayMode
             var soldier = CreateMovableUnit("NonBuilderSelection", Vector3.zero, UnitTeam.Team1);
 
             Invoke(controller, "AddSelection", soldier.GetComponent<UnitCommandAgent>());
+            controller.ToggleBuildMenu();
+            Assert.That(controller.IsBuildMenuOpen, Is.False);
             controller.BeginBuildPlacement(service);
 
             Assert.That(controller.IsBuildPlacementPending, Is.False);
@@ -1389,11 +1458,22 @@ namespace ProjectS.Tests.PlayMode
             Invoke(controller, "ClearSelection");
             var builder = CreateWorkerUnit("BuilderSelection", Vector3.right);
             Invoke(controller, "AddSelection", builder.GetComponent<UnitCommandAgent>());
+            controller.ToggleBuildMenu();
+            Assert.That(controller.IsBuildMenuOpen, Is.True);
             controller.BeginBuildPlacement(service);
 
             Assert.That(controller.IsBuildPlacementPending, Is.True);
             Assert.That(service.PlacementAttemptCount, Is.EqualTo(0));
 
+            var secondBuilder = CreateWorkerUnit("SecondBuilderSelection", Vector3.up);
+            Invoke(controller, "AddSelection", secondBuilder.GetComponent<UnitCommandAgent>());
+            Assert.That(controller.CanUseBuildCommands, Is.False);
+            controller.ToggleBuildMenu();
+            Assert.That(controller.IsBuildMenuOpen, Is.False);
+            controller.BeginBuildPlacement(service);
+            Assert.That(controller.IsBuildPlacementPending, Is.False);
+
+            Object.Destroy(secondBuilder);
             Object.Destroy(builder);
             Object.Destroy(soldier);
             Object.Destroy(controllerObject);
@@ -2492,13 +2572,16 @@ namespace ProjectS.Tests.PlayMode
                 return Array.Empty<UnitBuildPlacementPreviewCell>();
             }
 
-            public bool CanPlaceDefaultConstructionSite(Vector3 worldPosition)
+            public bool CanPlaceDefaultConstructionSite(UnitCommandAgent builder, Vector3 worldPosition)
             {
                 LastPlacementFailureReason = string.Empty;
                 return true;
             }
 
-            public bool TryPlaceDefaultConstructionSite(Vector3 worldPosition, out IUnitInteractableTarget constructionSite)
+            public bool TryPlaceDefaultConstructionSite(
+                UnitCommandAgent builder,
+                Vector3 worldPosition,
+                out IUnitInteractableTarget constructionSite)
             {
                 PlacementAttemptCount++;
                 constructionSite = ShouldSucceed ? ConstructionSite : null;

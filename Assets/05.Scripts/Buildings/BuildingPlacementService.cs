@@ -39,10 +39,13 @@ namespace ProjectS.Buildings
             }
         }
 
-        public bool TryPlaceDefaultConstructionSite(Vector3 worldPosition, out ConstructionSite site)
+        public bool TryPlaceDefaultConstructionSite(
+            UnitCommandAgent builder,
+            Vector3 worldPosition,
+            out ConstructionSite site)
         {
             ResolveReferences();
-            if (!CanPlaceDefaultConstructionSite(worldPosition))
+            if (!CanPlaceDefaultConstructionSite(builder, worldPosition))
             {
                 site = null;
                 return false;
@@ -64,9 +67,15 @@ namespace ProjectS.Buildings
             return placed;
         }
 
-        public bool CanPlaceDefaultConstructionSite(Vector3 worldPosition)
+        public bool CanPlaceDefaultConstructionSite(UnitCommandAgent builder, Vector3 worldPosition)
         {
             ResolveReferences();
+            if (!CanUseBuilder(builder, out var builderFailureReason))
+            {
+                LastPlacementFailureReason = builderFailureReason;
+                return false;
+            }
+
             if (!CanPlaceSelectedBuilding(out var failureReason))
             {
                 LastPlacementFailureReason = failureReason;
@@ -141,9 +150,11 @@ namespace ProjectS.Buildings
             return adjustedCells;
         }
 
-        bool IUnitBuildPlacementService.CanPlaceDefaultConstructionSite(Vector3 worldPosition)
+        bool IUnitBuildPlacementService.CanPlaceDefaultConstructionSite(
+            UnitCommandAgent builder,
+            Vector3 worldPosition)
         {
-            return CanPlaceDefaultConstructionSite(worldPosition);
+            return CanPlaceDefaultConstructionSite(builder, worldPosition);
         }
 
         IReadOnlyList<UnitBuildPlacementPreviewCell> IUnitBuildPlacementService.GetDefaultConstructionSitePreviewCells(
@@ -153,10 +164,11 @@ namespace ProjectS.Buildings
         }
 
         bool IUnitBuildPlacementService.TryPlaceDefaultConstructionSite(
+            UnitCommandAgent builder,
             Vector3 worldPosition,
             out IUnitInteractableTarget constructionSite)
         {
-            var placed = TryPlaceDefaultConstructionSite(worldPosition, out var site);
+            var placed = TryPlaceDefaultConstructionSite(builder, worldPosition, out var site);
             constructionSite = site;
             return placed;
         }
@@ -289,6 +301,23 @@ namespace ProjectS.Buildings
             }
 
             return CanSelectBuilding(selectedDefinition.BuildingKind, out failureReason);
+        }
+
+        private bool CanUseBuilder(UnitCommandAgent builder, out string failureReason)
+        {
+            var status = builder != null ? builder.Status : null;
+            if (status == null
+                || !status.isActiveAndEnabled
+                || !status.IsAlive
+                || status.Team != team
+                || !status.Roles.HasFlag(UnitRole.Builder))
+            {
+                failureReason = "A living friendly worker is required to place a construction site.";
+                return false;
+            }
+
+            failureReason = string.Empty;
+            return true;
         }
 
         private bool IsBlockedByUnexploredFog(

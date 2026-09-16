@@ -8,6 +8,14 @@
 
 ## 검증 대기 항목
 
+### 건물 배치 중심 및 선택 범위 표시
+
+- [ ] 2x2, 3x2 등 짝수 축을 포함한 footprint의 건설 부지와 완성 건물이 실제 점유 셀 중심에 놓이는지 Unity PlayMode에서 확인한다.
+- [ ] 1x1, 3x3 등 홀수 footprint의 기존 셀 중심 배치가 유지되는지 확인한다.
+- [ ] 중심 보정 뒤 동일 셀 및 일부 겹침 배치는 거부되고, 바로 인접한 비겹침 배치는 허용되는지 확인한다.
+- [ ] 자동 포탑 공격 범위, 이동 속도 오라 범위, 신호 중계소 시야 범위가 해당 건물 선택 중에만 표시되고 선택 전환 및 해제 시 즉시 갱신되는지 확인한다.
+- [ ] 위 동작을 다루는 집중 PlayMode 테스트를 추가하고 Unity 6000.3.9f1 Test Runner에서 실행한다.
+
 ### 특수 생산 건물 3종
 
 - [ ] `VehicleFactory_Unique.png`, `MaintenanceBay_Unique.png`, `SignalRelay_Unique.png`를 `Assets/01.Textures/Buildings/Unique`에 추가한 뒤 각 FutureTech 프리팹의 고유 Sprite 슬롯이 연결되는지 확인한다.
@@ -244,6 +252,7 @@
 - [ ] Striker 선택 HUD에 `Overdrive [F]` 버튼과 준비, 활성 지속시간, 쿨다운이 정상 표시되는지 확인한다.
 - [ ] 이동, 공격 이동, 집중 공격, 위치 사수 중 Overdrive를 사용해도 최신 명령과 현재 목적지가 초기화되지 않는지 확인한다.
 - [ ] Overdrive가 4초 동안 이동 속도를 50% 높이고 종료 뒤 건물 오라와 연구 보너스를 보존한 채 자기 수정자만 제거하는지 확인한다.
+- [ ] 같은 이동 속도 오라가 겹치면 가장 강한 오라 한 번만 적용되고, 강한 원천이 사라지면 남은 오라로 복귀하며, 다른 종류인 Overdrive와는 함께 적용되는지 확인한다.
 - [ ] 여러 Striker 선택 시 사용 가능한 유닛만 실행되고 쿨다운 중인 유닛 수와 실패 사유가 HUD에 표시되는지 확인한다.
 - [ ] Soldier 등 스킬이 없는 유닛과 AI가 Overdrive를 자동으로 실행하지 않는지 확인한다.
 - [ ] `UnitActiveSkillPlayModeTests`를 Unity Test Runner에서 실행한다.

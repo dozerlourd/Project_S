@@ -18,6 +18,7 @@ namespace ProjectS.Units
             public float CooldownEndsAt;
             public float EffectEndsAt;
             public bool EffectActive;
+            public UnitBuffKind ActiveBuffKind;
         }
 
         [SerializeField] private UnitActiveSkillDefinition[] skills = new UnitActiveSkillDefinition[0];
@@ -123,7 +124,11 @@ namespace ProjectS.Units
             switch (definition.EffectType)
             {
                 case UnitActiveSkillEffectType.SelfMovementSpeedMultiplier:
-                    status.SetMovementSpeedModifier(state, definition.MovementSpeedMultiplier);
+                    state.ActiveBuffKind = definition.BuffKind;
+                    status.SetMovementSpeedModifier(
+                        definition.BuffKind,
+                        state,
+                        definition.MovementSpeedMultiplier);
                     return true;
                 default:
                     return false;
@@ -132,7 +137,7 @@ namespace ProjectS.Units
 
         private void RemoveEffect(SkillRuntimeState state)
         {
-            status?.RemoveMovementSpeedModifier(state);
+            status?.RemoveMovementSpeedModifier(state.ActiveBuffKind, state);
             state.EffectActive = false;
             state.EffectEndsAt = 0f;
         }
@@ -187,12 +192,14 @@ namespace ProjectS.Units
     {
         [SerializeField] private string displayName = "Active Skill";
         [SerializeField] private UnitActiveSkillEffectType effectType;
+        [SerializeField] private UnitBuffKind buffKind = UnitBuffKind.Overdrive;
         [SerializeField, Min(0.1f)] private float cooldown = 10f;
         [SerializeField, Min(0.1f)] private float duration = 3f;
         [SerializeField, Min(1f)] private float movementSpeedMultiplier = 1.25f;
 
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? effectType.ToString() : displayName;
         public UnitActiveSkillEffectType EffectType => effectType;
+        public UnitBuffKind BuffKind => buffKind;
         public float Cooldown => Mathf.Max(0.1f, cooldown);
         public float Duration => Mathf.Max(0.1f, duration);
         public float MovementSpeedMultiplier => Mathf.Max(1f, movementSpeedMultiplier);
@@ -204,8 +211,26 @@ namespace ProjectS.Units
             float durationSeconds,
             float speedMultiplier)
         {
+            Configure(
+                skillName,
+                skillEffectType,
+                cooldownSeconds,
+                durationSeconds,
+                speedMultiplier,
+                UnitBuffKind.Overdrive);
+        }
+
+        public void Configure(
+            string skillName,
+            UnitActiveSkillEffectType skillEffectType,
+            float cooldownSeconds,
+            float durationSeconds,
+            float speedMultiplier,
+            UnitBuffKind skillBuffKind)
+        {
             displayName = skillName;
             effectType = skillEffectType;
+            buffKind = skillBuffKind;
             cooldown = Mathf.Max(0.1f, cooldownSeconds);
             duration = Mathf.Max(0.1f, durationSeconds);
             movementSpeedMultiplier = Mathf.Max(1f, speedMultiplier);

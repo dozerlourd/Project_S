@@ -46,7 +46,7 @@ namespace ProjectS.Units
         private bool warnedNoSelectedUnits;
         private static Sprite fallbackRingSprite;
 
-        private const string FriendlyBuilderRequiredMessage = "Select a friendly builder before placing.";
+        private const string FriendlyBuilderRequiredMessage = "Select exactly one friendly worker before placing.";
 
         public static PlayerUnitCommandController ActiveInstance { get; private set; }
         public UnitTeam PlayerTeam => playerTeam;
@@ -55,6 +55,7 @@ namespace ProjectS.Units
         public bool IsBuildPlacementPending => pendingBuildPlacementService != null;
         public bool IsRallyPointPending => pendingRallyQueue != null;
         public bool IsBuildMenuOpen => isBuildMenuOpen;
+        public bool CanUseBuildCommands => TryGetSingleSelectedFriendlyBuilder(out _);
         public string BuildPlacementStatusMessage
         {
             get
@@ -69,7 +70,7 @@ namespace ProjectS.Units
                     return "Release the current click, then left-click a tile to place.";
                 }
 
-                if (!HasSelectedFriendlyBuilder())
+                if (!TryGetSingleSelectedFriendlyBuilder(out var builder))
                 {
                     return FriendlyBuilderRequiredMessage;
                 }
@@ -79,7 +80,7 @@ namespace ProjectS.Units
                     return "Move cursor over the map to place.";
                 }
 
-                return pendingBuildPlacementService.CanPlaceDefaultConstructionSite(destination)
+                return pendingBuildPlacementService.CanPlaceDefaultConstructionSite(builder, destination)
                     ? "Left-click to place. Right-click or Esc to cancel."
                     : pendingBuildPlacementService.LastPlacementFailureReason;
             }
@@ -151,6 +152,11 @@ namespace ProjectS.Units
         {
             ResolveSceneReferences();
             PruneInvalidSelection();
+            if ((isBuildMenuOpen || pendingBuildPlacementService != null) && !CanUseBuildCommands)
+            {
+                CloseBuildMenu();
+                buildPlacementFeedback = FriendlyBuilderRequiredMessage;
+            }
 
             var mouse = Mouse.current;
             if (mouse == null)
@@ -268,16 +274,15 @@ namespace ProjectS.Units
             dragCurrentScreenPosition = screenPosition;
             isLeftMousePressed = false;
 
-            if (IsPointerOverRuntimeHud(screenPosition))
-            {
-                isDraggingSelection = false;
-                return;
-            }
-
             if (isDraggingSelection)
             {
                 SelectUnitsInDragRect();
                 isDraggingSelection = false;
+                return;
+            }
+
+            if (IsPointerOverRuntimeHud(screenPosition))
+            {
                 return;
             }
 
@@ -590,8 +595,9 @@ namespace ProjectS.Units
                 return;
             }
 
-            if (!HasSelectedFriendlyBuilder())
+            if (!TryGetSingleSelectedFriendlyBuilder(out var builder))
             {
+                CloseBuildMenu();
                 buildPlacementFeedback = FriendlyBuilderRequiredMessage;
                 WarnPlacementFailure();
                 return;
@@ -602,7 +608,7 @@ namespace ProjectS.Units
                 return;
             }
 
-            if (pendingBuildPlacementService.TryPlaceDefaultConstructionSite(destination, out var constructionSite)
+            if (pendingBuildPlacementService.TryPlaceDefaultConstructionSite(builder, destination, out var constructionSite)
                 && constructionSite != null)
             {
                 IssueToSelected(new UnitCommand(
@@ -718,9 +724,9 @@ namespace ProjectS.Units
                 return;
             }
 
-            if (!HasSelectedFriendlyBuilder())
+            if (!CanUseBuildCommands)
             {
-                pendingBuildPlacementService = null;
+                CloseBuildMenu();
                 buildPlacementFeedback = FriendlyBuilderRequiredMessage;
                 return;
             }
@@ -740,6 +746,13 @@ namespace ProjectS.Units
             if (isBuildMenuOpen)
             {
                 CloseBuildMenu();
+                return;
+            }
+
+            if (!CanUseBuildCommands)
+            {
+                ResetBuildPlacementState();
+                buildPlacementFeedback = FriendlyBuilderRequiredMessage;
                 return;
             }
 
@@ -964,8 +977,9 @@ namespace ProjectS.Units
             }
         }
 
-        private bool HasSelectedFriendlyBuilder()
+        private bool TryGetSingleSelectedFriendlyBuilder(out UnitCommandAgent builder)
         {
+            builder = null;
             for (var i = selectedUnits.Count - 1; i >= 0; i--)
             {
                 var unit = selectedUnits[i];
@@ -974,19 +988,26 @@ namespace ProjectS.Units
                     selectedUnits.RemoveAt(i);
                     continue;
                 }
-
-                var status = unit.Status;
-                if (status != null
-                    && status.isActiveAndEnabled
-                    && status.IsAlive
-                    && status.Team == playerTeam
-                    && status.Roles.HasFlag(UnitRole.Builder))
-                {
-                    return true;
-                }
             }
 
-            return false;
+            if (selectedUnits.Count != 1)
+            {
+                return false;
+            }
+
+            var candidate = selectedUnits[0];
+            var status = candidate != null ? candidate.Status : null;
+            if (status == null
+                || !status.isActiveAndEnabled
+                || !status.IsAlive
+                || status.Team != playerTeam
+                || !status.Roles.HasFlag(UnitRole.Builder))
+            {
+                return false;
+            }
+
+            builder = candidate;
+            return true;
         }
 
         private bool TryGetCommandPoint(out Vector3 destination)
@@ -1725,7 +1746,8 @@ namespace ProjectS.Units
         {
             const float cellPixelSize = 18f;
             var previewCells = pendingBuildPlacementService.GetDefaultConstructionSitePreviewCells(destination);
-            var canPlace = pendingBuildPlacementService.CanPlaceDefaultConstructionSite(destination);
+            var canPlace = TryGetSingleSelectedFriendlyBuilder(out var builder)
+                && pendingBuildPlacementService.CanPlaceDefaultConstructionSite(builder, destination);
             var invalidBecauseOfGlobalState = !canPlace && !HasInvalidPreviewCell(previewCells);
 
             if (previewCells == null || previewCells.Count == 0)
@@ -1817,21 +1839,41 @@ namespace ProjectS.Units
 
         private static bool IsPointerOverRuntimeHud(Vector2 screenPosition)
         {
+            if (TryGetRuntimeHudPointerHit(screenPosition, out var isOverHud))
+            {
+                return isOverHud;
+            }
+
             var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
 
-            // Keep command input independent from the UI assembly. These bounds mirror the runtime HUD layout.
-            if (new Rect(12f, 12f, 260f, 88f).Contains(guiPosition))
+            if (new Rect(24f, 112f, 220f, 24f).Contains(guiPosition))
             {
                 return true;
             }
 
-            var minimapRect = new Rect(Screen.width - 236f, Screen.height - 206f, 224f, 144f);
-            if (minimapRect.Contains(guiPosition))
+            return false;
+        }
+
+        private static bool TryGetRuntimeHudPointerHit(Vector2 screenPosition, out bool isOverHud)
+        {
+            isOverHud = false;
+
+            var hudType = System.Type.GetType("ProjectS.UI.RtsGameHud, Assembly-CSharp");
+            var activeProperty = hudType != null ? hudType.GetProperty("ActiveInstance") : null;
+            var activeHud = activeProperty != null ? activeProperty.GetValue(null) : null;
+            if (activeHud == null)
             {
-                return true;
+                return false;
             }
 
-            return guiPosition.y >= Screen.height - 128f;
+            var hitMethod = hudType.GetMethod("IsPointerOverInteractiveHud", new[] { typeof(Vector2) });
+            if (hitMethod == null)
+            {
+                return false;
+            }
+
+            isOverHud = (bool)hitMethod.Invoke(activeHud, new object[] { screenPosition });
+            return true;
         }
 
         private static string FormatInteractableTargetName(IUnitInteractableTarget target)

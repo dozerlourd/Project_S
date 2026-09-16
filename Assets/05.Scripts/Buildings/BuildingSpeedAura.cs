@@ -65,7 +65,7 @@ namespace ProjectS.Buildings
                     continue;
                 }
 
-                unitStatus.SetMovementSpeedModifier(this, movementSpeedMultiplier);
+                unitStatus.SetMovementSpeedModifier(UnitBuffKind.MovementSpeedAura, this, movementSpeedMultiplier);
                 refreshedUnits.Add(unitStatus);
             }
 
@@ -76,7 +76,7 @@ namespace ProjectS.Buildings
                     return unit == null;
                 }
 
-                unit.RemoveMovementSpeedModifier(this);
+                unit.RemoveMovementSpeedModifier(UnitBuffKind.MovementSpeedAura, this);
                 return true;
             });
 
@@ -90,7 +90,7 @@ namespace ProjectS.Buildings
         {
             foreach (var unit in affectedUnits)
             {
-                unit?.RemoveMovementSpeedModifier(this);
+                unit?.RemoveMovementSpeedModifier(UnitBuffKind.MovementSpeedAura, this);
             }
 
             affectedUnits.Clear();

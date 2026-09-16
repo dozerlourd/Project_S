@@ -1,3 +1,4 @@
+using ProjectS.Units;
 using UnityEngine;
 
 namespace ProjectS.Buildings
@@ -24,6 +25,8 @@ namespace ProjectS.Buildings
         private BuildingStatus structure;
         private BuildingAutoTurret autoTurret;
         private BuildingSpeedAura speedAura;
+        private Transform rangeRoot;
+        private Renderer[] ownedRenderers;
         private float lastRadius = -1f;
 
         public void Configure(BuildingRangeIndicatorSource rangeSource, Sprite sprite = null)
@@ -41,11 +44,13 @@ namespace ProjectS.Buildings
         {
             ResolveSources();
             EnsureRenderer();
+            SetRangeVisible(false);
             RefreshVisual(true);
         }
 
         private void OnEnable()
         {
+            SetRangeVisible(false);
             RefreshVisual(true);
         }
 
@@ -56,10 +61,19 @@ namespace ProjectS.Buildings
 
         private void OnDisable()
         {
-            if (rangeRenderer != null)
+            SetRangeVisible(false);
+        }
+
+        public bool OwnsRenderer(Renderer renderer)
+        {
+            if (renderer == null)
             {
-                rangeRenderer.enabled = false;
+                return false;
             }
+
+            EnsureRenderer();
+            return rangeRoot != null
+                && (renderer.transform == rangeRoot || renderer.transform.IsChildOf(rangeRoot));
         }
 
         private void ResolveSources()
@@ -71,7 +85,7 @@ namespace ProjectS.Buildings
 
         private void EnsureRenderer()
         {
-            if (rangeRenderer != null)
+            if (rangeRenderer != null && rangeRoot != null)
             {
                 return;
             }
@@ -80,9 +94,18 @@ namespace ProjectS.Buildings
             var rangeObject = rangeTransform != null ? rangeTransform.gameObject : new GameObject("RangeIndicator");
             rangeObject.transform.SetParent(transform, false);
             rangeObject.transform.localPosition = new Vector3(0f, 0f, 0.01f);
-            var legacyLine = rangeObject.GetComponent<LineRenderer>();
-            if (legacyLine != null)
+            rangeRoot = rangeObject.transform;
+
+            var legacyLines = rangeObject.GetComponentsInChildren<LineRenderer>(true);
+            for (var i = 0; i < legacyLines.Length; i++)
             {
+                var legacyLine = legacyLines[i];
+                if (legacyLine == null)
+                {
+                    continue;
+                }
+
+                legacyLine.enabled = false;
                 Destroy(legacyLine);
             }
 
@@ -96,6 +119,8 @@ namespace ProjectS.Buildings
             rangeRenderer.sprite = rangeSprite;
             rangeRenderer.sortingLayerName = SortingLayerName;
             rangeRenderer.sortingOrder = 0;
+            ownedRenderers = rangeObject.GetComponentsInChildren<Renderer>(true);
+            SetRangeVisible(false);
         }
 
         private void RefreshVisual(bool force)
@@ -110,7 +135,10 @@ namespace ProjectS.Buildings
             }
 
             rangeRenderer.sprite = rangeSprite;
-            rangeRenderer.enabled = radius > 0f && rangeSprite != null && isActiveAndEnabled;
+            SetRangeVisible(radius > 0f
+                && rangeSprite != null
+                && isActiveAndEnabled
+                && IsSelected());
             if (!force && Mathf.Approximately(radius, lastRadius))
             {
                 return;
@@ -124,6 +152,25 @@ namespace ProjectS.Buildings
                 1f);
         }
 
+        private void SetRangeVisible(bool visible)
+        {
+            if (ownedRenderers != null)
+            {
+                for (var i = 0; i < ownedRenderers.Length; i++)
+                {
+                    if (ownedRenderers[i] != null)
+                    {
+                        ownedRenderers[i].enabled = false;
+                    }
+                }
+            }
+
+            if (rangeRenderer != null)
+            {
+                rangeRenderer.enabled = visible;
+            }
+        }
+
         private float GetRadius()
         {
             return source switch
@@ -133,6 +180,14 @@ namespace ProjectS.Buildings
                 BuildingRangeIndicatorSource.StructureVision => structure != null ? structure.VisionRadius : 0f,
                 _ => 0f
             };
+        }
+
+        private bool IsSelected()
+        {
+            var commandController = PlayerUnitCommandController.ActiveInstance;
+            return commandController != null
+                && commandController.PrimarySelection != null
+                && commandController.PrimarySelection.SelectionGameObject == gameObject;
         }
 
     }

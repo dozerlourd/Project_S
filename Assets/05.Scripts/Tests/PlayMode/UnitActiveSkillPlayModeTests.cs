@@ -21,7 +21,7 @@ namespace ProjectS.Tests.PlayMode
             var status = unit.GetComponent<PrototypeUnitStatus>();
             var commandAgent = unit.GetComponent<UnitCommandAgent>();
             var skillController = unit.AddComponent<UnitActiveSkillController>();
-            skillController.Configure(new[] { CreateOverdrive(0.2f, 0.05f, 1.5f) });
+            skillController.Configure(new[] { CreateOverdrive(0.2f, 0.1f, 1.5f) });
             commandAgent.HoldPosition();
             var commandId = commandAgent.LatestCommandId;
             var commandMode = commandAgent.Mode;
@@ -36,7 +36,7 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(skillController.TryActivate(0), Is.False);
             Assert.That(skillController.LastFailureReason, Does.Contain("cooldown"));
 
-            yield return new WaitForSeconds(0.08f);
+            yield return new WaitForSeconds(0.12f);
 
             Assert.That(status.MovementSpeed, Is.EqualTo(baseMovementSpeed).Within(0.001f));
             Assert.That(skillController.GetCooldownRemaining(0), Is.GreaterThan(0f));
@@ -72,6 +72,66 @@ namespace ProjectS.Tests.PlayMode
 
             Object.Destroy(hudObject);
             Object.Destroy(commandObject);
+            Object.Destroy(unit);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator MovementSpeedBuffs_DeduplicateSameKindAndCombineDifferentKinds()
+        {
+            var unit = CreateStriker("Buff Stacking Striker");
+            var status = unit.GetComponent<PrototypeUnitStatus>();
+            var baseMovementSpeed = status.MovementSpeed;
+            var weakerAuraSource = new object();
+            var strongerAuraSource = new object();
+            var overdriveSource = new object();
+
+            status.SetMovementSpeedModifier(UnitBuffKind.MovementSpeedAura, weakerAuraSource, 1.2f);
+            status.SetMovementSpeedModifier(UnitBuffKind.MovementSpeedAura, strongerAuraSource, 1.35f);
+            Assert.That(status.MovementSpeed, Is.EqualTo(baseMovementSpeed * 1.35f).Within(0.001f));
+
+            status.SetMovementSpeedModifier(UnitBuffKind.MovementSpeedAura, strongerAuraSource, 1.4f);
+            Assert.That(status.MovementSpeed, Is.EqualTo(baseMovementSpeed * 1.4f).Within(0.001f));
+
+            status.SetMovementSpeedModifier(UnitBuffKind.Overdrive, overdriveSource, 1.5f);
+            Assert.That(status.MovementSpeed, Is.EqualTo(baseMovementSpeed * 1.4f * 1.5f).Within(0.001f));
+
+            status.RemoveMovementSpeedModifier(UnitBuffKind.MovementSpeedAura, strongerAuraSource);
+            Assert.That(status.MovementSpeed, Is.EqualTo(baseMovementSpeed * 1.2f * 1.5f).Within(0.001f));
+
+            status.RemoveMovementSpeedModifier(UnitBuffKind.MovementSpeedAura, weakerAuraSource);
+            status.RemoveMovementSpeedModifier(UnitBuffKind.Overdrive, overdriveSource);
+            Assert.That(status.MovementSpeed, Is.EqualTo(baseMovementSpeed).Within(0.001f));
+
+            Object.Destroy(unit);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator DuplicateOverdriveSkills_ApplyOnceAndFallBackToRemainingSource()
+        {
+            var unit = CreateStriker("Duplicate Overdrive Striker");
+            var status = unit.GetComponent<PrototypeUnitStatus>();
+            var skillController = unit.AddComponent<UnitActiveSkillController>();
+            skillController.Configure(new[]
+            {
+                CreateOverdrive(0.4f, 0.1f, 1.5f),
+                CreateOverdrive(0.4f, 0.3f, 1.25f)
+            });
+            var baseMovementSpeed = status.MovementSpeed;
+
+            Assert.That(skillController.TryActivate(0), Is.True);
+            Assert.That(skillController.TryActivate(1), Is.True);
+            Assert.That(status.MovementSpeed, Is.EqualTo(baseMovementSpeed * 1.5f).Within(0.001f));
+
+            yield return new WaitForSeconds(0.15f);
+
+            Assert.That(status.MovementSpeed, Is.EqualTo(baseMovementSpeed * 1.25f).Within(0.001f));
+
+            yield return new WaitForSeconds(0.2f);
+
+            Assert.That(status.MovementSpeed, Is.EqualTo(baseMovementSpeed).Within(0.001f));
+
             Object.Destroy(unit);
             yield return null;
         }

@@ -50,11 +50,29 @@ namespace ProjectS.Buildings
         {
             for (var i = 0; i < renderers.Length; i++)
             {
-                if (renderers[i] != null)
+                if (renderers[i] != null && !IsRangeIndicatorRenderer(renderers[i]))
                 {
                     renderers[i].enabled = visible;
                 }
             }
+        }
+
+        private bool IsRangeIndicatorRenderer(Renderer renderer)
+        {
+            if (rangeIndicators == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < rangeIndicators.Length; i++)
+            {
+                if (rangeIndicators[i] != null && rangeIndicators[i].OwnsRenderer(renderer))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void SetEnabled<T>(T[] components, bool enabled) where T : Behaviour

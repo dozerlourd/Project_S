@@ -49,8 +49,11 @@ namespace ProjectS.Units
         Vector2Int DefaultFootprint { get; }
         string LastPlacementFailureReason { get; }
         IReadOnlyList<UnitBuildPlacementPreviewCell> GetDefaultConstructionSitePreviewCells(Vector3 worldPosition);
-        bool CanPlaceDefaultConstructionSite(Vector3 worldPosition);
-        bool TryPlaceDefaultConstructionSite(Vector3 worldPosition, out IUnitInteractableTarget constructionSite);
+        bool CanPlaceDefaultConstructionSite(UnitCommandAgent builder, Vector3 worldPosition);
+        bool TryPlaceDefaultConstructionSite(
+            UnitCommandAgent builder,
+            Vector3 worldPosition,
+            out IUnitInteractableTarget constructionSite);
     }
 
     public readonly struct UnitBuildPlacementPreviewCell

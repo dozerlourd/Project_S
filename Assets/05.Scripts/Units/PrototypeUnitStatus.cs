@@ -5,6 +5,12 @@ using UnityEngine;
 
 namespace ProjectS.Units
 {
+    public enum UnitBuffKind
+    {
+        Overdrive = 0,
+        MovementSpeedAura = 1
+    }
+
     public enum UnitTrial
     {
         Human
@@ -128,7 +134,8 @@ namespace ProjectS.Units
         [SerializeField] private bool hasAreaAttack;
         [SerializeField] private float attackArea;
 
-        private readonly Dictionary<object, float> movementSpeedModifiers = new Dictionary<object, float>();
+        private readonly Dictionary<UnitBuffKind, Dictionary<object, float>> movementSpeedModifiers =
+            new Dictionary<UnitBuffKind, Dictionary<object, float>>();
 
         public UnitTrial Trial => trial;
         public UnitTeam Team => team;
@@ -151,9 +158,15 @@ namespace ProjectS.Units
             get
             {
                 var multiplier = 1f;
-                foreach (var modifier in movementSpeedModifiers.Values)
+                foreach (var sources in movementSpeedModifiers.Values)
                 {
-                    multiplier *= Mathf.Max(0.01f, modifier);
+                    var strongestModifier = 0.01f;
+                    foreach (var modifier in sources.Values)
+                    {
+                        strongestModifier = Mathf.Max(strongestModifier, modifier);
+                    }
+
+                    multiplier *= strongestModifier;
                 }
 
                 return movementSpeed * UnitUpgradeStatModifiers.GetMovementSpeedMultiplier(team) * multiplier;
@@ -413,21 +426,33 @@ namespace ProjectS.Units
             supplyCost = Mathf.Max(0, cost);
         }
 
-        public void SetMovementSpeedModifier(object source, float multiplier)
+        public void SetMovementSpeedModifier(UnitBuffKind buffKind, object source, float multiplier)
         {
             if (source == null)
             {
                 return;
             }
 
-            movementSpeedModifiers[source] = Mathf.Max(0.01f, multiplier);
+            if (!movementSpeedModifiers.TryGetValue(buffKind, out var sources))
+            {
+                sources = new Dictionary<object, float>();
+                movementSpeedModifiers.Add(buffKind, sources);
+            }
+
+            sources[source] = Mathf.Max(0.01f, multiplier);
         }
 
-        public void RemoveMovementSpeedModifier(object source)
+        public void RemoveMovementSpeedModifier(UnitBuffKind buffKind, object source)
         {
-            if (source != null)
+            if (source == null || !movementSpeedModifiers.TryGetValue(buffKind, out var sources))
             {
-                movementSpeedModifiers.Remove(source);
+                return;
+            }
+
+            sources.Remove(source);
+            if (sources.Count == 0)
+            {
+                movementSpeedModifiers.Remove(buffKind);
             }
         }
 

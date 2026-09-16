@@ -265,21 +265,173 @@ namespace ProjectS.UI
         public bool IsPointerOverInteractiveHud(Vector2 screenPosition)
         {
             var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
-            if (new Rect(ResourcePanelX, ResourcePanelY, ResourcePanelWidth, ResourcePanelHeight).Contains(guiPosition))
+            if (workerAutoAssignmentManager != null
+                && new Rect(24f, 112f, 220f, 24f).Contains(guiPosition))
             {
                 return true;
+            }
+
+            if (IsMatchOver())
+            {
+                return IsPointerOverMatchResultButton(guiPosition);
+            }
+
+            if (commandController == null)
+            {
+                return false;
             }
 
             var bottomLayout = CalculateBottomLayout();
-            if (bottomLayout.selectionRect.Contains(guiPosition) || bottomLayout.commandRect.Contains(guiPosition))
+            if (IsPointerOverCommandButton(guiPosition, bottomLayout.commandRect))
             {
                 return true;
             }
 
-            var hasContextPanel = (commandController != null && commandController.IsBuildMenuOpen)
-                || displayedProductionQueue != null
-                || ResolveDisplayedSkillController() != null;
-            return hasContextPanel && bottomLayout.contextRect.Contains(guiPosition);
+            if (commandController.IsBuildMenuOpen)
+            {
+                return IsPointerOverBuildOption(guiPosition, bottomLayout.contextRect);
+            }
+
+            var skillController = ResolveDisplayedSkillController();
+            if (skillController != null)
+            {
+                return new Rect(bottomLayout.contextRect.x + 8f, bottomLayout.contextRect.y + 30f, 132f, 46f).Contains(guiPosition);
+            }
+
+            return IsPointerOverProductionControl(guiPosition, bottomLayout.contextRect, ResolveDisplayedProductionQueue());
+        }
+
+        private static bool IsPointerOverCommandButton(Vector2 guiPosition, Rect commandRect)
+        {
+            for (var i = 0; i < 6; i++)
+            {
+                if (CommandButtonRect(commandRect, i).Contains(guiPosition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsPointerOverBuildOption(Vector2 guiPosition, Rect panelRect)
+        {
+            var buttonGap = 6f;
+            var columns = panelRect.width >= 560f ? 5 : panelRect.width >= 420f ? 3 : 2;
+            var buttonWidth = (panelRect.width - 16f - buttonGap * (columns - 1)) / columns;
+            var buttonHeight = columns == 4 ? 46f : 28f;
+            for (var i = 0; i < BuildMenuBuildings.Length; i++)
+            {
+                if (BuildOptionRect(panelRect, i, columns, buttonWidth, buttonHeight, buttonGap).Contains(guiPosition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsPointerOverProductionControl(Vector2 guiPosition, Rect panelRect, UnitProductionQueue productionQueue)
+        {
+            if (productionQueue == null)
+            {
+                return false;
+            }
+
+            var research = displayedUpgradeResearch ?? TeamUpgradeResearch.FindForTeam(playerTeam);
+            if (showUpgradeResearch && research != null)
+            {
+                return IsPointerOverResearchControl(guiPosition, panelRect, research);
+            }
+
+            if (research != null && new Rect(panelRect.x + panelRect.width - 236f, panelRect.y + 4f, 72f, 24f).Contains(guiPosition))
+            {
+                return true;
+            }
+
+            if (new Rect(panelRect.x + panelRect.width - 158f, panelRect.y + 4f, 72f, 24f).Contains(guiPosition))
+            {
+                return true;
+            }
+
+            if (productionQueue.ActiveProduction != null
+                && new Rect(panelRect.x + panelRect.width - 80f, panelRect.y + 4f, 72f, 24f).Contains(guiPosition))
+            {
+                return true;
+            }
+
+            var definitions = productionQueue.ProducibleUnits;
+            var visibleButtonCount = Mathf.Min(
+                definitions.Count,
+                Mathf.FloorToInt((panelRect.width - 16f + CommandButtonGap) / (CommandButtonMaxSize + CommandButtonGap)));
+            for (var i = 0; i < visibleButtonCount; i++)
+            {
+                if (definitions[i] == null)
+                {
+                    continue;
+                }
+
+                var rect = new Rect(
+                    panelRect.x + 8f + i * (CommandButtonMaxSize + CommandButtonGap),
+                    panelRect.y + 42f,
+                    CommandButtonMaxSize,
+                    CommandButtonMaxSize);
+                if (rect.Contains(guiPosition))
+                {
+                    return true;
+                }
+            }
+
+            if (productionQueue.PendingCount <= 0)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < productionQueue.PendingCount && i < 3; i++)
+            {
+                if (new Rect(panelRect.x + 72f + i * 30f, panelRect.y + 88f, 26f, 22f).Contains(guiPosition))
+                {
+                    return true;
+                }
+            }
+
+            return new Rect(panelRect.x + 170f, panelRect.y + 88f, 116f, 22f).Contains(guiPosition);
+        }
+
+        private static bool IsPointerOverResearchControl(Vector2 guiPosition, Rect panelRect, TeamUpgradeResearch research)
+        {
+            if (new Rect(panelRect.x + panelRect.width - 80f, panelRect.y + 4f, 72f, 24f).Contains(guiPosition))
+            {
+                return true;
+            }
+
+            var definitions = research.Definitions;
+            for (var i = 0; i < definitions.Count && i < 2; i++)
+            {
+                if (definitions[i] == null)
+                {
+                    continue;
+                }
+
+                var buttonWidth = (panelRect.width - 22f) * 0.5f;
+                var buttonRect = new Rect(panelRect.x + 8f + i * buttonWidth, panelRect.y + 58f, buttonWidth, 38f);
+                if (buttonRect.Contains(guiPosition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsPointerOverMatchResultButton(Vector2 guiPosition)
+        {
+            var width = 360f;
+            var height = 188f;
+            var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+            return new Rect(rect.x + 20f, rect.y + 116f, 96f, 34f).Contains(guiPosition)
+                || new Rect(rect.x + 132f, rect.y + 116f, 96f, 34f).Contains(guiPosition)
+                || new Rect(rect.x + 244f, rect.y + 116f, 96f, 34f).Contains(guiPosition);
         }
 
         private void DrawResourcePanel()
@@ -487,7 +639,12 @@ namespace ProjectS.UI
                 commandController.StopSelectedUnits();
             }
 
-            if (DrawCommandButton(CommandButtonRect(commandRect, 5), 5, "Build B"))
+            var canUseBuildCommands = commandController.CanUseBuildCommands;
+            var previousGuiEnabled = GUI.enabled;
+            GUI.enabled = canUseBuildCommands;
+            var buildButtonClicked = DrawCommandButton(CommandButtonRect(commandRect, 5), 5, "Build B");
+            GUI.enabled = previousGuiEnabled;
+            if (buildButtonClicked)
             {
                 commandController.ToggleBuildMenu();
             }
@@ -644,6 +801,13 @@ namespace ProjectS.UI
         {
             if (hotkeyIndex < 0 || hotkeyIndex >= BuildMenuBuildings.Length)
             {
+                return false;
+            }
+
+            if (!commandController.CanUseBuildCommands)
+            {
+                productionFeedback = "Select exactly one friendly worker before placing.";
+                commandController.CloseBuildMenu();
                 return false;
             }
 
