@@ -348,3 +348,5 @@
 - Collider 보정 추가: VespeneGeyser Collider를 `1.0 x 1.0`으로 축소하고 런타임 자동 생성 가스에도 동일한 크기를 적용했다.
 - 추가 조정: MainBase Collider를 `2.2 x 1.8`에서 `2.0 x 1.6`으로 추가 축소하고, 프리팹·에디터 생성 경로에 반영했다. ResourceNode, ResourceTile, 런타임/에디터 자원 생성 경로와 MineralField/VespeneGeyser 프리팹의 채집 시간을 기존 값의 2배로 조정했다.
 - 자원 규칙 통일: Gas의 초기량, 1회 채집량, 채집 시간, 상호작용 거리, Collider 크기를 Minerals와 동일하게 맞추고 `ResourceType`만 다르게 유지했다.
+- 자원 이동 예외: Resource 전용 상호작용 경로는 자원 Collider 내부 셀도 후보로 허용하고, ResourceNode의 BoxCollider2D를 항상 Trigger로 보장해 채집 worker의 접근·재채집이 자원 Collider나 자원 셀 판정 때문에 취소되지 않도록 했다. 일반 이동 및 반납 경로에는 이 예외를 적용하지 않는다.
+- [ ] 실제 Unity PlayMode에서 다수 Worker를 MineralField와 VespeneGeyser에 각각 배정해 채집→운반→반납→재채집을 반복하고, 자원 내부 이동 중 경로 재요청·무한 재경로·상태 취소가 없는지 확인한다.

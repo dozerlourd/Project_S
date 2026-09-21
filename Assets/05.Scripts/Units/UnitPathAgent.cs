@@ -115,6 +115,7 @@ namespace ProjectS.Units
         private Collider2D interactionCollider;
         private float interactionRange;
         private bool hasInteractionDestination;
+        private bool allowInteractionColliderInterior;
 
         public bool HasPath => hasPendingPathRequest || HasActivePath;
         public IReadOnlyList<Vector3> CurrentPath => path;
@@ -199,6 +200,20 @@ namespace ProjectS.Units
 
         public bool MoveToInteraction(Vector3 destination, Collider2D targetCollider, float range)
         {
+            return MoveToInteractionInternal(destination, targetCollider, range, false);
+        }
+
+        public bool MoveToResourceInteraction(Vector3 destination, Collider2D resourceCollider, float range)
+        {
+            return MoveToInteractionInternal(destination, resourceCollider, range, true);
+        }
+
+        private bool MoveToInteractionInternal(
+            Vector3 destination,
+            Collider2D targetCollider,
+            float range,
+            bool allowTargetColliderInterior)
+        {
             if (targetCollider == null)
             {
                 return MoveTo(destination);
@@ -219,6 +234,7 @@ namespace ProjectS.Units
             interactionCollider = targetCollider;
             interactionRange = Mathf.Max(0.1f, range);
             hasInteractionDestination = true;
+            allowInteractionColliderInterior = allowTargetColliderInterior;
             requestedDestination = destination;
             hasRequestedDestination = true;
             if (navigator != null)
@@ -449,7 +465,7 @@ namespace ProjectS.Units
                 }
 
                 var candidateWorld = tilemapWorld.GetCellCenterWorld(candidate);
-                if (interactionCollider.OverlapPoint(candidateWorld))
+                if (!allowInteractionColliderInterior && interactionCollider.OverlapPoint(candidateWorld))
                 {
                     continue;
                 }
@@ -765,6 +781,7 @@ namespace ProjectS.Units
             interactionCollider = null;
             interactionRange = 0f;
             hasInteractionDestination = false;
+            allowInteractionColliderInterior = false;
         }
 
         private bool TryRepathToRequestedDestination()

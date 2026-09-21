@@ -86,12 +86,13 @@
 - 핵심 역할: 자원 채집과 건설.
 - 채집 상호작용 거리: WorkerGatherController의 `gatherRange`를 기본 0.2로 사용하며, 자원 노드의 InteractionRange보다 길어지지 않는다. 실제 Worker와 자원 Collider 사이의 짧은 거리에서만 채집을 시작한다.
 - 반납 상호작용 거리: WorkerGatherController의 `dropOffRange`를 기본 0.45로 사용하며, 반납 건물의 InteractionRange보다 길어지지 않는다. 건물 Collider 외곽의 인접 경로 셀에서만 반납하고 먼 거리에서 채집 완료와 반납이 연속 처리되지 않도록 한다.
-- 상호작용 Collider: MineralField는 시각 이미지 전체를 Collider로 확장하지 않고 기본 `0.9 x 0.7`, VespeneGeyser는 `1.0 x 1.0`, MainBase는 기본 `2.0 x 1.6` Collider를 사용해 채집·반납 판정이 실제 접근 위치에 맞도록 한다.
+- 상호작용 Collider: MineralField와 VespeneGeyser는 시각 이미지 전체를 Collider로 확장하지 않고 기본 `0.9 x 0.7`, MainBase는 기본 `2.0 x 1.6` Collider를 사용해 채집·반납 판정이 실제 접근 위치에 맞도록 한다.
 - 채집 규칙: Minerals와 Gas는 `ResourceType`만 다르고 초기량, 1회 채집량, 채집 시간, 상호작용 거리, Collider 크기, 고갈 규칙은 동일하게 사용한다. 기본 채집 시간은 2.4초이며 프리팹은 기존 자원별 값의 2배가 적용된 값을 유지한다.
 - 두 값은 WorkerGatherController의 인스펙터 파라미터로 조정할 수 있다.
 - 교전: 기본적으로 자동 전투 역할을 갖지 않는다.
 - 이동: 채집, 반납, 건설 상호작용과 직접 이동 명령을 우선한다.
 - 채집·반납 위치: `Gathering` 또는 `ReturningToDropOff` 상태의 Worker는 경로 점유 등록을 해제해 자원 지점과 반납 지점에서 다른 Worker와 겹칠 수 있다. 자원으로 이동 중일 때만 기존 점유 규칙을 유지한다.
+- 자원 경로 예외: Worker가 자원으로 이동하거나 재채집하는 동안에는 자원 Collider 내부 후보 셀과 자원 오브젝트의 트리거 Collider를 이동 장애물로 해석하지 않는다. 이 예외는 Resource 전용 경로 요청에만 적용하며, 반납 건물·지형·건물·다른 유닛의 이동 규칙은 유지한다.
 - 자동 자원 배정은 별도 `WorkerAutoAssignmentManager`가 활성화된 경우에만 `Idle` Worker에게 적용한다.
 - 자동 배정된 Worker라도 플레이어 또는 AI의 새 직접 명령이 들어오면 자동 배정이 즉시 양보하며, `Interact` 중인 명령은 자동 관리자가 덮어쓰지 않는다.
 

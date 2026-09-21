@@ -37,6 +37,12 @@ namespace ProjectS.Resources
         private void Awake()
         {
             maximumAmount = Mathf.Max(maximumAmount, totalAmount);
+            var boxCollider = GetComponent<BoxCollider2D>();
+            if (boxCollider != null)
+            {
+                boxCollider.isTrigger = true;
+            }
+
             FitClickColliderToVisualBounds();
         }
 
@@ -93,6 +99,12 @@ namespace ProjectS.Resources
             gatherDuration = Mathf.Max(0f, gatherDuration);
             interactionRange = Mathf.Max(0.1f, interactionRange);
             clickColliderPadding = Mathf.Max(0f, clickColliderPadding);
+            var boxCollider = GetComponent<BoxCollider2D>();
+            if (boxCollider != null)
+            {
+                boxCollider.isTrigger = true;
+            }
+
             FitClickColliderToVisualBounds();
         }
 

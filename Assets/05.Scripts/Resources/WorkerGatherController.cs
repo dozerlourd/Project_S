@@ -267,7 +267,7 @@ namespace ProjectS.Resources
             var range = GetGatherRange(targetNode);
             if (resourceCollider != null)
             {
-                pathAgent.MoveToInteraction(targetNode.InteractionPoint, resourceCollider, range);
+                pathAgent.MoveToResourceInteraction(targetNode.InteractionPoint, resourceCollider, range);
                 return;
             }
 
