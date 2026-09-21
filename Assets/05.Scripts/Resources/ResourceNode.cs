@@ -5,30 +5,38 @@ using UnityEngine;
 namespace ProjectS.Resources
 {
     [RequireComponent(typeof(BoxCollider2D))]
-    public sealed class ResourceNode : MonoBehaviour, IUnitInteractableTarget
+    public sealed class ResourceNode : MonoBehaviour, IUnitInteractableTarget, IPlayerSelectableTarget, ISelectionValidity
     {
         private static readonly List<ResourceNode> Nodes = new List<ResourceNode>();
 
         [SerializeField] private ResourceType resourceType = ResourceType.Minerals;
         [SerializeField, Min(0)] private int totalAmount = 1500;
+        [SerializeField, Min(0)] private int maximumAmount = 1500;
         [SerializeField, Min(1)] private int gatherAmountPerTrip = 5;
-        [SerializeField, Min(0f)] private float gatherDuration = 1.5f;
+        [SerializeField, Min(0f)] private float gatherDuration = 3f;
         [SerializeField, Min(0.1f)] private float interactionRange = 0.85f;
         [SerializeField] private bool depleteWhenEmpty = true;
-        [SerializeField] private bool fitClickColliderToVisualBounds = true;
+        [SerializeField] private bool fitClickColliderToVisualBounds = false;
         [SerializeField, Min(0f)] private float clickColliderPadding = 0.05f;
 
         public Vector3 InteractionPoint => transform.position;
         public float InteractionRange => interactionRange;
         public ResourceType ResourceType => resourceType;
         public int RemainingAmount => totalAmount;
+        public int MaximumAmount => Mathf.Max(maximumAmount, totalAmount);
         public int GatherAmountPerTrip => gatherAmountPerTrip;
         public float GatherDuration => gatherDuration;
         public bool IsDepleted => totalAmount <= 0;
         public static IReadOnlyList<ResourceNode> AllNodes => Nodes;
+        public UnitTeam Team => UnitTeam.Team1;
+        public string SelectionName => gameObject.name;
+        public Transform SelectionTransform => transform;
+        public GameObject SelectionGameObject => gameObject;
+        public bool IsSelectionValid => isActiveAndEnabled && !IsDepleted;
 
         private void Awake()
         {
+            maximumAmount = Mathf.Max(maximumAmount, totalAmount);
             FitClickColliderToVisualBounds();
         }
 
@@ -80,6 +88,7 @@ namespace ProjectS.Resources
         private void OnValidate()
         {
             totalAmount = Mathf.Max(0, totalAmount);
+            maximumAmount = Mathf.Max(maximumAmount, totalAmount);
             gatherAmountPerTrip = Mathf.Max(1, gatherAmountPerTrip);
             gatherDuration = Mathf.Max(0f, gatherDuration);
             interactionRange = Mathf.Max(0.1f, interactionRange);
@@ -108,6 +117,7 @@ namespace ProjectS.Resources
         {
             resourceType = type;
             totalAmount = Mathf.Max(0, amount);
+            maximumAmount = totalAmount;
             gatherAmountPerTrip = Mathf.Max(1, gatherPerTrip);
             gatherDuration = Mathf.Max(0f, duration);
             interactionRange = Mathf.Max(0.1f, range);

@@ -15,7 +15,7 @@ namespace ProjectS.Tilemaps
         [SerializeField] private ResourceTileType resourceType = ResourceTileType.Minerals;
         [SerializeField, Min(1)] private int initialAmount = 1500;
         [SerializeField, Min(1)] private int gatherAmountPerTrip = 8;
-        [SerializeField, Min(0f)] private float gatherDuration = 1.2f;
+        [SerializeField, Min(0f)] private float gatherDuration = 2.4f;
         [SerializeField, Min(0.1f)] private float interactionRange = 0.95f;
 
         public ResourceTileType ResourceType => resourceType;

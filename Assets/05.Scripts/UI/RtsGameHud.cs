@@ -492,13 +492,29 @@ namespace ProjectS.UI
             }
 
             GUI.Label(new Rect(rect.x + 10f, rect.y + 10f, rect.width - 20f, 22f), selection.SelectionName);
-            GUI.Label(new Rect(rect.x + 10f, rect.y + 32f, rect.width - 20f, 22f), $"Team: {selection.Team}");
 
             var selectionObject = selection.SelectionGameObject;
             if (selectionObject == null)
             {
                 return;
             }
+
+            var resourceNode = selectionObject.GetComponent<ResourceNode>();
+            if (resourceNode != null)
+            {
+                GUI.Label(
+                    new Rect(rect.x + 10f, rect.y + 34f, rect.width - 20f, 22f),
+                    $"Resource: {resourceNode.ResourceType}");
+                GUI.Label(
+                    new Rect(rect.x + 10f, rect.y + 58f, rect.width - 20f, 22f),
+                    $"Amount: {resourceNode.RemainingAmount}/{resourceNode.MaximumAmount}");
+                GUI.Label(
+                    new Rect(rect.x + 10f, rect.y + 82f, rect.width - 20f, 22f),
+                    resourceNode.IsDepleted ? "Status: Depleted" : "Status: Available");
+                return;
+            }
+
+            GUI.Label(new Rect(rect.x + 10f, rect.y + 32f, rect.width - 20f, 22f), $"Team: {selection.Team}");
 
             var health = selectionObject.GetComponent<UnitHealth>();
             if (health != null)

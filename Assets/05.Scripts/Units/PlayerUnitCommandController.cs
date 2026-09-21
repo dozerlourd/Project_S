@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ProjectS.Tilemaps;
 using UnityEngine;
@@ -52,6 +53,7 @@ namespace ProjectS.Units
         public UnitTeam PlayerTeam => playerTeam;
         public IReadOnlyList<UnitCommandAgent> SelectedUnits => selectedUnits;
         public IPlayerSelectableTarget PrimarySelection { get; private set; }
+        public event Action<PlayerSelectionSnapshot> SelectionChanged;
         public bool IsBuildPlacementPending => pendingBuildPlacementService != null;
         public bool IsRallyPointPending => pendingRallyQueue != null;
         public bool IsBuildMenuOpen => isBuildMenuOpen;
@@ -138,6 +140,12 @@ namespace ProjectS.Units
             }
 
             ResolveSceneReferences(true);
+            SelectionOutlineManager.EnsureRuntimeManager().BindController(this);
+        }
+
+        private void OnEnable()
+        {
+            SelectionOutlineManager.EnsureRuntimeManager().BindController(this);
         }
 
         private void OnDestroy()
@@ -146,6 +154,11 @@ namespace ProjectS.Units
             {
                 ActiveInstance = null;
             }
+        }
+
+        public PlayerSelectionSnapshot GetSelectionSnapshot()
+        {
+            return new PlayerSelectionSnapshot(selectedUnits, PrimarySelection);
         }
 
         private void Update()
@@ -374,7 +387,7 @@ namespace ProjectS.Units
 
             if (!TryGetUnitUnderCursor(out var status))
             {
-                if (TryGetSelectableUnderCursor(out var selectable) && selectable.Team == playerTeam)
+                if (TryGetSelectableUnderCursor(out var selectable))
                 {
                     SelectNonUnitTarget(selectable);
                 }
@@ -386,7 +399,18 @@ namespace ProjectS.Units
                 return;
             }
 
-            if (status == null || status.Team != playerTeam || status.MovementDomain != MovementDomain.Ground)
+            if (status == null || !status.IsAlive)
+            {
+                return;
+            }
+
+            if (status.Team != playerTeam)
+            {
+                SelectNonUnitTarget(status);
+                return;
+            }
+
+            if (status.MovementDomain != MovementDomain.Ground)
             {
                 return;
             }
@@ -409,6 +433,8 @@ namespace ProjectS.Units
         {
             ClearSelection();
             PrimarySelection = target;
+            CloseBuildMenu();
+            NotifySelectionChanged();
         }
 
         private void SelectUnitsInDragRect()
@@ -688,6 +714,12 @@ namespace ProjectS.Units
 
         public void BeginMoveCommand()
         {
+            if (selectedUnits.Count == 0)
+            {
+                WarnCommandBlockedReason();
+                return;
+            }
+
             CloseBuildMenu();
             pendingPointCommand = PendingPointCommand.Move;
             pendingBuildPlacementService = null;
@@ -697,6 +729,12 @@ namespace ProjectS.Units
 
         public void BeginAttackMoveCommand()
         {
+            if (selectedUnits.Count == 0)
+            {
+                WarnCommandBlockedReason();
+                return;
+            }
+
             CloseBuildMenu();
             pendingPointCommand = PendingPointCommand.AttackMove;
             pendingBuildPlacementService = null;
@@ -706,6 +744,12 @@ namespace ProjectS.Units
 
         public void BeginPatrolCommand()
         {
+            if (selectedUnits.Count == 0)
+            {
+                WarnCommandBlockedReason();
+                return;
+            }
+
             CloseBuildMenu();
             pendingPointCommand = PendingPointCommand.Patrol;
             pendingBuildPlacementService = null;
@@ -1316,6 +1360,7 @@ namespace ProjectS.Units
             selectedUnits.Add(agent);
             PrimarySelection = agent.Status;
             SetSelectionVisible(agent, true);
+            NotifySelectionChanged();
         }
 
         private void ClearSelection()
@@ -1332,25 +1377,46 @@ namespace ProjectS.Units
             selectedUnits.Clear();
             PrimarySelection = null;
             RefreshTargetHighlights();
+            NotifySelectionChanged();
         }
 
         private void PruneInvalidSelection()
         {
+            var changed = false;
             for (var i = selectedUnits.Count - 1; i >= 0; i--)
             {
                 if (selectedUnits[i] == null || !selectedUnits[i].gameObject.activeInHierarchy)
                 {
+                    SetSelectionVisible(selectedUnits[i], false);
                     selectedUnits.RemoveAt(i);
+                    changed = true;
                 }
+            }
+
+            var selectionValidity = PrimarySelection as ISelectionValidity;
+            if (selectionValidity != null && !selectionValidity.IsSelectionValid)
+            {
+                ClearSelection();
+                return;
             }
 
             if (PrimarySelection == null
                 || (PrimarySelection.SelectionGameObject != null && PrimarySelection.SelectionGameObject.activeInHierarchy))
             {
+                if (changed)
+                {
+                    NotifySelectionChanged();
+                }
+
                 return;
             }
 
             ClearSelection();
+        }
+
+        private void NotifySelectionChanged()
+        {
+            SelectionChanged?.Invoke(GetSelectionSnapshot());
         }
 
         private void SelectControlGroup(int index)
@@ -1384,6 +1450,11 @@ namespace ProjectS.Units
 
         private static void SetSelectionVisible(UnitCommandAgent agent, bool visible)
         {
+            if (agent == null)
+            {
+                return;
+            }
+
             var ring = agent.transform.Find("SelectionRing");
             if (ring != null)
             {
@@ -1578,6 +1649,7 @@ namespace ProjectS.Units
             {
                 if (occupiedCommandCells.Contains(cell)
                     || reservedCommandCells.Contains(cell)
+                    || UnitSettlementRegistry.IsCellBlocked(tilemapWorld, cell)
                     || !tilemapWorld.IsWalkable(cell))
                 {
                     return false;

@@ -338,6 +338,7 @@ MonoBehaviour:
   skills:
   - displayName: Overdrive
     effectType: 0
+    buffKind: 0
     cooldown: 12
     duration: 4
     movementSpeedMultiplier: 1.5

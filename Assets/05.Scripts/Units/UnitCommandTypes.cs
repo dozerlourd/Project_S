@@ -83,6 +83,11 @@ namespace ProjectS.Units
         GameObject SelectionGameObject { get; }
     }
 
+    public interface ISelectionValidity
+    {
+        bool IsSelectionValid { get; }
+    }
+
     public interface IUnitAttackTarget : IPlayerSelectableTarget
     {
         bool IsAlive { get; }

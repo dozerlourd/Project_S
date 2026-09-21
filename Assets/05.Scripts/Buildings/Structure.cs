@@ -6,7 +6,7 @@ using UnityEngine;
 namespace ProjectS.Buildings
 {
     [DisallowMultipleComponent]
-    public abstract class Structure : MonoBehaviour, IUnitAttackTarget, IAttackTargetPriorityProvider, IFogVisionProvider
+    public abstract class Structure : MonoBehaviour, IUnitAttackTarget, IAttackTargetPriorityProvider, IFogVisionProvider, IUnitSettlementBlocker
     {
         [SerializeField] private UnitTeam team = UnitTeam.Team1;
         [SerializeField] private BuildingKind kind = BuildingKind.MainBase;
@@ -34,6 +34,9 @@ namespace ProjectS.Buildings
         public Transform VisionTransform => transform;
         public bool IsVisionActive => isActiveAndEnabled && IsAlive;
         public float VisionRadius => Mathf.Max(0f, visionRadius);
+        public Transform SettlementTransform => transform;
+        public Vector2Int SettlementFootprint => Footprint;
+        public bool IsSettlementBlocking => isActiveAndEnabled;
 
         public BuildingHealth Health => health;
         protected virtual BuildingKind? RoleKind => null;
@@ -62,6 +65,7 @@ namespace ProjectS.Buildings
             EnsureRoleComponents();
             EnsureRangeIndicator();
             EnsureFogVisibilityTarget();
+            EnsureSelectionOutlineEffect();
         }
 
         protected virtual void OnEnable()
@@ -72,6 +76,8 @@ namespace ProjectS.Buildings
             ResolveReferences();
             EnsureHealth();
             EnsureFogVisibilityTarget();
+            EnsureSelectionOutlineEffect();
+            UnitSettlementRegistry.Register(this);
             RegisterBuilding();
             UnitAttackTargetRegistry.Register(this);
             FogOfWarRegistry.Register(this);
@@ -80,6 +86,7 @@ namespace ProjectS.Buildings
 
         protected virtual void OnDisable()
         {
+            UnitSettlementRegistry.Unregister(this);
             UnregisterBuilding();
             UnitAttackTargetRegistry.Unregister(this);
             FogOfWarRegistry.Unregister(this);
@@ -118,6 +125,7 @@ namespace ProjectS.Buildings
             EnsureRoleComponents();
             EnsureRangeIndicator();
             EnsureFogVisibilityTarget();
+            EnsureSelectionOutlineEffect();
 
             if (isActiveAndEnabled)
             {
@@ -254,6 +262,11 @@ namespace ProjectS.Buildings
         private void EnsureFogVisibilityTarget()
         {
             EnsureComponent<BuildingFogVisibilityTarget>();
+        }
+
+        private void EnsureSelectionOutlineEffect()
+        {
+            EnsureComponent<SelectionOutlineEffect>().Prepare();
         }
 
         private static AttackTargetPriority GetTargetPriority(BuildingKind buildingKind)

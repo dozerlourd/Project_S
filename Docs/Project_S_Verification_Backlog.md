@@ -80,6 +80,8 @@
 
 ### 목적지 분산 및 점유 타일
 
+- [ ] 건물과 ConstructionSite 풋프린트는 경로 중 통과할 수 있지만 내부 클릭, 최종 경로점, 그룹 예약 목적지로는 선택되지 않고 외곽 셀에서 정지하는지 확인한다.
+- [ ] 건물 외곽에 정지한 유닛이 건물 공격, 건설 기여, 자원 반납을 정상 완료하는지 확인한다.
 - [ ] 우클릭 이동, Move UI, `AttackMove`, `FocusAttack`, `Patrol`, `Interact` 모두 목적지에서 유닛이 겹치지 않는지 확인한다.
 - [ ] 이동 중인 아군은 점유 장애물로 취급하지 않고, 도착/공격 정지 상태의 아군만 점유 장애물로 반영되는지 확인한다.
 - [ ] 유닛의 x/y footprint 값이 1x1보다 큰 경우에도 목적지 후보와 점유 타일 계산이 올바른지 확인한다.
@@ -207,6 +209,17 @@
 - [ ] Team1 HUD의 자동 Worker 분배 버튼이 기본 OFF로 표시되고, 버튼 클릭 시 ON/OFF 상태와 현재 배정 Worker 수가 즉시 갱신되는지 Unity PlayMode에서 확인한다.
 - [ ] 자동 Worker 분배 HUD 버튼이 기존 이동·채집·건설 단축키와 충돌하지 않고, 직접 명령 우선 원칙을 유지하는지 확인한다.
 
+### 자원 노드 선택 정보
+
+- [ ] 자원 노드를 좌클릭했을 때 유닛·건물 선택과 충돌하지 않고 자원 종류와 현재/최대 자원량이 선택 패널에 표시되는지 Unity PlayMode에서 확인한다.
+- [ ] 선택한 자원이 고갈되거나 다른 대상·빈 공간을 선택하면 자원 정보가 즉시 갱신되거나 숨겨지는지 확인한다.
+- [ ] 자원 노드 좌클릭 선택 추가가 기존 우클릭 채집 상호작용과 드래그 선택 입력을 가로막지 않는지 확인한다.
+
+### Worker 채집 접근 안정성
+
+- [ ] 여러 Worker가 같은 자원 노드를 우클릭했을 때 목적지 보정 셀에서도 콜라이더 기준 상호작용 범위에 진입해 `Gathering`으로 안정적으로 전환하는지 확인한다.
+- [ ] 같은 자원 노드 채집 중 Worker가 중심점과 주변 접근 셀 사이에서 반복 경로 요청을 하지 않고, 실제 자원 감소와 팀 지갑 입금이 진행되는지 확인한다.
+
 ### 자원 Tilemap 배치
 
 - [x] `ResourceTile` 및 `ResourceTilemapNodeSynchronizer`를 추가했다. `Resource` 이름의 Tilemap에서 `ResourceTile` 셀만 읽어 런타임 `ResourceNode`로 생성·동기화하며, 별도 Resource 레이어는 `ProjectSTilemapWorld`의 이동·건설 판정 Tilemap 조회에 포함하지 않는다.
@@ -259,6 +272,8 @@
 
 ### 전투 시각 피드백
 
+- [ ] 공격 선이 안개 가시성 갱신 중에도 기본 0.08초 후 사라지고, 연속 공격·컴포넌트 비활성화·제거 이후에는 잔상이 남지 않는지 PlayMode에서 확인한다.
+- [ ] 공격 적중 파동이 기본 0.08초 후 풀로 복귀하며 다음 적중 시 기존 슬롯을 재사용하는지 확인한다.
 - [ ] 유닛과 자동 포탑 공격 적중 시 황색 파동, 피격 시 적색 파동, 사망 시 큰 소멸 파동이 각각 한 번씩 표시되는지 확인한다.
 - [ ] Striker의 Overdrive 성공 시 청록색 강화 파동이 표시되고, 쿨다운 실패 시에는 이펙트가 발생하지 않는지 확인한다.
 - [ ] 다수 유닛 교전에서도 전투 피드백 오브젝트가 최대 풀 크기 48개를 넘지 않고 가장 오래된 효과를 재사용하는지 확인한다.
@@ -312,3 +327,24 @@
 - [ ] B 건설 메뉴를 하드코딩 슬롯 대신 `BuildingPlacementService.ConstructionDefinitions` 목록으로 렌더링하고, 잠김 항목의 정확한 조건 사유와 페이지 또는 슬롯 이동을 제공한다.
 - [ ] 선택한 건설 정의의 프리뷰, 실제 배치, 비용 차감이 동일한 cost/footprint를 사용하며 성공한 배치만 비용을 한 번 차감하고 메뉴를 닫는지 PlayMode 테스트를 추가하고 실행한다.
 - [ ] 공사 중 ConstructionSite 풋프린트를 등록 기반 동적 경로 장애물로 노출하고 완료·비활성화 때 해제하며, 작업자가 접근 가능한 인접 칸으로 이동하는 처리는 Structure 및 경로 담당 변경과 조율한 뒤 구현한다.
+
+## 2026-09-22 작업 일시정지 기록
+
+- 요청: 시작 자원을 미네랄 100, 가스 0으로 변경하고, worker의 미네랄 채집 문제를 수정하는 작업을 진행하던 중 일시정지.
+- 완료된 변경: 플레이어/AI 시작 자원 및 기본 지갑을 미네랄 100, 가스 0으로 통일하고, ResourceNode 선택 정보와 선택 유효성, worker 자동 배정 UI/런타임 기반, 자원 노드의 최대량·고갈 상태 표시를 반영했다.
+- 채집 관련 현재 상태: WorkerGatherController에 자원/드롭오프 상호작용, 반복 채집·반납, 자원 Collider2D 기준 거리 판정, 경로 재시도 간격, 진단 로그를 반영했지만 실제 Unity 실행에서는 worker가 채집 상태로 안정적으로 정착하지 못하고 미네랄 주변에서 위치를 반복 보정하는 문제가 남아 있다.
+- 재개 시 우선 분석: 접근 지점 보정부터 추가하지 말고 매 프레임 `UnitCommandAgent.Mode`, `ActionState`, 최신 명령 ID/목적지, `UnitPathAgent`의 `HasPath`·pending/path 완료·현재 waypoint, worker 위치/속도, ResourceNode Collider2D 거리, WorkerGatherController 상태를 함께 기록한다. `Gather -> Move/Idle/Interact` 전환을 발생시킨 호출과 명령 재발행 주체를 역추적한다.
+- 재개 시 확인 대상: `UnitCommandAgent`의 상호작용 실패/완료 처리, `WorkerGatherController.Update`의 명령 모드 불일치 취소, `UnitPathAgent`의 점유 셀·목적지 후보 재탐색, 자원 Collider와 실제 이동 가능 셀의 불일치, 자동 배정 또는 입력 코드의 반복 명령 발행 여부.
+- 검증 현황: `dotnet build Project_S.sln`은 성공했으며 경고·오류가 없었다. `dotnet test --no-build`는 종료 코드 0이지만 Unity PlayMode 실행 로그를 제공하지 않아 런타임 검증으로 간주하지 않는다. Unity 프로세스가 여러 개 실행 중이어서 실제 PlayMode/Test Runner 검증은 보류했다.
+- 일시정지 시점: 코드 추가 수정과 프로세스 종료 없이 기록만 남겼다. 재개 시 먼저 위 프레임 추적 로그와 단일/다중 worker 반복 채집 테스트를 실행한 뒤 원인 확정 후 수정한다.
+- 재개 후 수정: `UnitPathAgent.MoveToInteraction`을 추가해 자원 Collider 내부 셀을 후보에서 제외하고, 상호작용 거리 안의 바깥 셀을 거리순으로 경로 요청하도록 변경했다. `WorkerGatherController`의 최초 채집, 재경로, 고갈 후 대체 노드 이동이 모두 이 경로를 사용하며 `GatherStateName`·`DebugStateSnapshot`으로 명령 모드, 액션 상태, 위치, 경로 pending/waypoint/목적지를 확인할 수 있다.
+- 수정 후 정적 검증: `dotnet build Project_S.sln --no-restore` 성공, 경고 0개·오류 0개. `dotnet test ProjectS.PlayModeTests.csproj --no-build` 종료 코드 0이나 콘솔에 테스트 실행 결과가 없어 Unity 런타임 검증으로는 미확정 상태다.
+- 재개 후 Unity 검증: 단일 worker와 다중 worker 테스트에서 `Gathering -> ReturningToDropOff -> MovingToResource`가 유지되는지, `UnitCommandAgent.Mode`가 `Interact`에서 `Idle`로 바뀌지 않는지, `UnitPathAgent.HasPendingPathRequest`가 반복적으로 재설정되지 않는지, 최종 waypoint가 자원 Collider 바깥의 상호작용 거리 후보인지 확인한다.
+- 추가 수정: 실제 원인은 상태 전이보다 Worker의 채집·반납 상호작용 거리가 과도했던 것으로 확인했다. `WorkerGatherController.gatherRange` 기본값을 0.2, `dropOffRange` 기본값을 0.3으로 낮추고, 각 대상의 InteractionRange와 `Min`으로 제한했다. `B_Worker` 프리팹과 기존 WorkerGatherController가 포함된 `B_Medic` 프리팹에도 인스펙터 값을 반영했다.
+- 추가 수정: `Gathering` 및 `ReturningToDropOff` 상태의 Worker는 `UnitPathAgent` 점유 등록에서 제외되어 자원 지점과 반납 지점에서 다른 Worker와 겹칠 수 있게 했다. 자원 이동 중이거나 직접 명령으로 채집 루프가 종료되면 점유 등록을 다시 활성화한다.
+- 추가 수정: 초기 Player/AI MainBase 생성 전에 시작 자원 클러스터를 등록하고, 일반 건설과 동일한 `ConstructionSite.GetPlacementFailureReason` 검증을 통과하는 위치를 탐색하도록 런타임 자동 부트스트랩과 에디터 맵 생성기를 변경했다. 첫 베이스 생성 후 두 번째 베이스도 기존 베이스 풋프린트와 자원 보호 영역을 함께 검사한다.
+- 채집/반납 오류 분석: 반납 사거리를 0.3으로 낮춘 뒤 MainBase의 실제 Collider 외곽과 경로 후보 셀 사이 거리보다 짧아져 `ReturningToDropOff`에서 반납 판정에 진입하지 못할 수 있었다. 기본값을 0.45로 조정하고 반납 경로도 Collider 기반 후보를 사용하도록 변경했다. Collider가 없는 동적 ResourceDropOff가 중심점 fallback으로 막히는 경우를 없애기 위해 Collider2D를 필수 구성으로 추가했다. `DebugStateSnapshot`에는 반납 대상, carried 양, Collider 거리, 반납 사거리, path pending/waypoint를 포함한다.
+- Collider 보정: ResourceNode가 시각 크기까지 클릭 Collider를 자동 확장하던 기본 동작을 끄고 MineralField를 `0.9 x 0.7`, MainBase를 `2.2 x 1.8`로 축소했다. 런타임 자동 생성 미네랄과 에디터에서 생성되는 MainBase에도 동일한 크기를 적용한다.
+- Collider 보정 추가: VespeneGeyser Collider를 `1.0 x 1.0`으로 축소하고 런타임 자동 생성 가스에도 동일한 크기를 적용했다.
+- 추가 조정: MainBase Collider를 `2.2 x 1.8`에서 `2.0 x 1.6`으로 추가 축소하고, 프리팹·에디터 생성 경로에 반영했다. ResourceNode, ResourceTile, 런타임/에디터 자원 생성 경로와 MineralField/VespeneGeyser 프리팹의 채집 시간을 기존 값의 2배로 조정했다.
+- 자원 규칙 통일: Gas의 초기량, 1회 채집량, 채집 시간, 상호작용 거리, Collider 크기를 Minerals와 동일하게 맞추고 `ResourceType`만 다르게 유지했다.

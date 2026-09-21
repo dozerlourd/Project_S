@@ -269,13 +269,24 @@ namespace ProjectS
 
             ConfigureProductionTemplate(mainBasePrototype, workerUnitPrefab, workerDefinitions, new Vector3(2.5f, -1.5f, 0f), new Vector3(5f, -2f, 0f));
 
+            if (!ResourceTilemapNodeSynchronizer.SceneHasResourceTiles())
+            {
+                CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
+                CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
+            }
+
+            var mainBaseFootprint = GetBuildingFootprint(mainBasePrototype);
+            if (!ConstructionSite.TryFindNearestValidPlacement(tilemapWorld, playerStart, mainBaseFootprint, 12, out playerStart)
+                || !ConstructionSite.TryFindNearestValidPlacement(tilemapWorld, aiStart, mainBaseFootprint, 12, out aiStart))
+            {
+                throw new System.InvalidOperationException("Could not find valid separated starting main base positions.");
+            }
+
             InstantiateBuilding(mainBasePrototype, "Player Main Base", UnitTeam.Team1, BuildingKind.MainBase, playerStart, playerWallet, tilemapWorld, workerDefinitions, new Vector3(2.5f, -1.5f, 0f), new Vector3(5f, -2f, 0f), root.transform);
             InstantiateBuilding(mainBasePrototype, "AI Main Base", UnitTeam.Team2, BuildingKind.MainBase, aiStart, aiWallet, tilemapWorld, workerDefinitions, new Vector3(-2.5f, 1.5f, 0f), new Vector3(-5f, 2f, 0f), root.transform);
 
             if (!ResourceTilemapNodeSynchronizer.SceneHasResourceTiles())
             {
-                CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
-                CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
                 CreateExpansionResourceClusters(playerStart, aiStart, root.transform, tilemapWorld);
             }
             CreateStartingUnits(UnitTeam.Team1, playerStart, workerUnitPrefab, root.transform, tilemapWorld);
@@ -593,6 +604,12 @@ namespace ProjectS
             }
         }
 
+        private static Vector2Int GetBuildingFootprint(GameObject buildingPrototype)
+        {
+            var status = buildingPrototype != null ? buildingPrototype.GetComponent<BuildingStatus>() : null;
+            return status != null ? status.Footprint : new Vector2Int(3, 3);
+        }
+
         private static void CreateResourceCluster(Vector3 center, Transform parent, ProjectSTilemapWorld tilemapWorld)
         {
             CreateResourceCluster("Home", center, parent, tilemapWorld);
@@ -669,16 +686,16 @@ namespace ProjectS
             ScaleResourceNodeVisual(nodeObject.transform, resourceSprite, type);
 
             var collider = nodeObject.AddComponent<BoxCollider2D>();
-            collider.size = type == ResourceType.Minerals ? new Vector2(1f, 0.8f) : new Vector2(1.2f, 1.2f);
+            collider.size = new Vector2(0.9f, 0.7f);
             collider.isTrigger = true;
 
             var node = nodeObject.AddComponent<ResourceNode>();
             node.Configure(
                 type,
-                type == ResourceType.Minerals ? 1500 : 2500,
-                type == ResourceType.Minerals ? 8 : 6,
-                type == ResourceType.Minerals ? 1.2f : 1.8f,
-                type == ResourceType.Minerals ? 0.95f : 1.05f,
+                1500,
+                8,
+                2.4f,
+                0.95f,
                 true);
         }
 

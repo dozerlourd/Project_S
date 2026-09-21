@@ -157,7 +157,7 @@ namespace ProjectS.Units
                     continue;
                 }
 
-                if (Time.time >= visual.EndTime || !ShouldDisplay(visual.FeedbackEvent))
+                if (Time.unscaledTime >= visual.EndTime || !ShouldDisplay(visual.FeedbackEvent))
                 {
                     Deactivate(visual);
                     continue;
@@ -238,8 +238,9 @@ namespace ProjectS.Units
 
         private void ConfigureVisual(PooledVisual visual, CombatFeedbackEvent feedbackEvent)
         {
+            Deactivate(visual);
             visual.FeedbackEvent = feedbackEvent;
-            visual.StartTime = Time.time;
+            visual.StartTime = Time.unscaledTime;
             visual.Active = true;
             switch (feedbackEvent.Type)
             {
@@ -264,14 +265,14 @@ namespace ProjectS.Units
         private static void SetStyle(PooledVisual visual, Color color, float duration, float startRadius, float endRadius)
         {
             visual.Color = color;
-            visual.EndTime = visual.StartTime + duration;
+            visual.EndTime = visual.StartTime + Mathf.Max(0.01f, duration);
             visual.StartRadius = startRadius;
             visual.EndRadius = endRadius;
         }
 
         private static void UpdateVisual(PooledVisual visual)
         {
-            var progress = Mathf.InverseLerp(visual.StartTime, visual.EndTime, Time.time);
+            var progress = Mathf.InverseLerp(visual.StartTime, visual.EndTime, Time.unscaledTime);
             var radius = Mathf.Lerp(visual.StartRadius, visual.EndRadius, progress);
             var center = visual.FeedbackEvent.WorldPosition;
             for (var i = 0; i < CircleSegmentCount; i++)

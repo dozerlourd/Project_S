@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace ProjectS.Buildings
 {
-    public sealed class ConstructionSite : MonoBehaviour, IUnitInteractableTarget
+    public sealed class ConstructionSite : MonoBehaviour, IUnitInteractableTarget, IUnitSettlementBlocker
     {
         private static readonly List<ConstructionSite> ActiveSites = new List<ConstructionSite>();
         private const int ResourceProtectionDiagonalRadius = 2;
@@ -23,6 +23,7 @@ namespace ProjectS.Buildings
 
         private static string lastCreateFailureReason;
         private PlayerResourceWallet wallet;
+        private ConstructionProgressBar progressBar;
         private float buildProgress;
         private bool completed;
         private bool constructionStarted;
@@ -36,6 +37,9 @@ namespace ProjectS.Buildings
         public float BuildProgress01 => Mathf.Clamp01(buildProgress / BuildTime);
         public bool Completed => completed;
         public bool HasConstructionStarted => constructionStarted;
+        public Transform SettlementTransform => transform;
+        public Vector2Int SettlementFootprint => SanitizeFootprint(footprint);
+        public bool IsSettlementBlocking => isActiveAndEnabled && !completed;
         public static string LastCreateFailureReason => lastCreateFailureReason;
 
         private void OnValidate()
@@ -48,6 +52,7 @@ namespace ProjectS.Buildings
         private void Awake()
         {
             EnsureCollider();
+            EnsureProgressBar();
         }
 
         private void OnEnable()
@@ -56,10 +61,13 @@ namespace ProjectS.Buildings
             {
                 ActiveSites.Add(this);
             }
+
+            UnitSettlementRegistry.Register(this);
         }
 
         private void OnDisable()
         {
+            UnitSettlementRegistry.Unregister(this);
             ActiveSites.Remove(this);
         }
 
@@ -82,6 +90,8 @@ namespace ProjectS.Buildings
             constructionStarted = true;
             wallet = null;
             EnsureCollider();
+            EnsureProgressBar();
+            progressBar.RefreshVisibility();
         }
 
         public bool CanInteract(UnitCommandAgent agent)
@@ -121,6 +131,7 @@ namespace ProjectS.Buildings
                 return;
             }
 
+            progressBar?.Hide();
             gameObject.SetActive(false);
             Destroy(gameObject);
         }
@@ -145,6 +156,50 @@ namespace ProjectS.Buildings
             }
 
             return string.Empty;
+        }
+
+        public static bool TryFindNearestValidPlacement(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3 desiredWorldPosition,
+            Vector2Int footprint,
+            int searchRadius,
+            out Vector3 placementCenter)
+        {
+            var desiredCell = tilemapWorld != null
+                ? tilemapWorld.WorldToCell(desiredWorldPosition)
+                : new Vector3Int(Mathf.RoundToInt(desiredWorldPosition.x), Mathf.RoundToInt(desiredWorldPosition.y), 0);
+            var maximumRadius = Mathf.Max(0, searchRadius);
+
+            for (var radius = 0; radius <= maximumRadius; radius++)
+            {
+                for (var y = -radius; y <= radius; y++)
+                {
+                    for (var x = -radius; x <= radius; x++)
+                    {
+                        if (radius > 0 && Mathf.Max(Mathf.Abs(x), Mathf.Abs(y)) != radius)
+                        {
+                            continue;
+                        }
+
+                        var candidateCell = desiredCell + new Vector3Int(x, y, 0);
+                        var candidateWorld = tilemapWorld != null
+                            ? tilemapWorld.GetCellCenterWorld(candidateCell)
+                            : desiredWorldPosition + new Vector3(x, y, 0f);
+                        candidateWorld.z = desiredWorldPosition.z;
+                        if (!string.IsNullOrEmpty(GetPlacementFailureReason(tilemapWorld, candidateWorld, footprint)))
+                        {
+                            continue;
+                        }
+
+                        placementCenter = GetPlacementCenterWorld(tilemapWorld, candidateWorld, footprint);
+                        placementCenter.z = desiredWorldPosition.z;
+                        return true;
+                    }
+                }
+            }
+
+            placementCenter = desiredWorldPosition;
+            return false;
         }
 
         public static IReadOnlyList<UnitBuildPlacementPreviewCell> GetPlacementPreviewCells(
@@ -371,6 +426,8 @@ namespace ProjectS.Buildings
             {
                 collider.enabled = visible;
             }
+
+            progressBar?.RefreshVisibility();
         }
 
         private void CompleteConstruction()
@@ -382,6 +439,7 @@ namespace ProjectS.Buildings
 
             completed = true;
             buildProgress = BuildTime;
+            progressBar?.Hide();
             if (completedBuildingPrefab != null)
             {
                 var completedObject = Instantiate(completedBuildingPrefab, transform.position, transform.rotation);
@@ -433,6 +491,19 @@ namespace ProjectS.Buildings
             var sanitizedFootprint = SanitizeFootprint(footprint);
             boxCollider.size = new Vector2(sanitizedFootprint.x, sanitizedFootprint.y);
             boxCollider.isTrigger = true;
+        }
+
+        private void EnsureProgressBar()
+        {
+            if (progressBar == null)
+            {
+                progressBar = GetComponent<ConstructionProgressBar>();
+            }
+
+            if (progressBar == null)
+            {
+                progressBar = gameObject.AddComponent<ConstructionProgressBar>();
+            }
         }
 
         private static void FailCreate(string reason)

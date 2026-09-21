@@ -96,6 +96,70 @@ namespace ProjectS.Tests.PlayMode
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator AttackFlash_ExpiresDespiteFogRefreshAndCleansUpWhenDisabled()
+        {
+            var worldRoot = CreateWorld(4, out var groundTile);
+            var fog = FogOfWarManager.ActiveInstance != null
+                ? FogOfWarManager.ActiveInstance
+                : new GameObject("Attack Flash Fog").AddComponent<FogOfWarManager>();
+            fog.Configure(worldRoot.GetComponent<ProjectSTilemapWorld>(), UnitTeam.Team1);
+            var attacker = CreateUnit("Attack Flash Attacker", Vector3.zero, UnitTeam.Team1, 10f);
+            var effect = attacker.GetComponent<TemporaryAttackEffect>();
+            var line = attacker.transform.Find("TemporaryAttackEffect").GetComponent<LineRenderer>();
+
+            effect.PlayAttackFlash(Vector3.right);
+            Assert.That(line.enabled, Is.True);
+            yield return new WaitForSecondsRealtime(0.12f);
+            Assert.That(line.enabled, Is.False);
+
+            effect.PlayAttackFlash(Vector3.right * 2f);
+            Assert.That(line.enabled, Is.True);
+            yield return new WaitForSecondsRealtime(0.12f);
+            Assert.That(line.enabled, Is.False);
+
+            effect.PlayAttackFlash(Vector3.right);
+            effect.enabled = false;
+            Assert.That(line.enabled, Is.False);
+            effect.enabled = true;
+            Assert.That(line.enabled, Is.False);
+
+            Object.Destroy(effect);
+            yield return null;
+            Assert.That(attacker.transform.Find("TemporaryAttackEffect"), Is.Null);
+
+            Object.Destroy(attacker);
+            Object.Destroy(worldRoot);
+            Object.Destroy(groundTile);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator AttackHitFeedback_ExpiresAndReusesItsPoolSlot()
+        {
+            var service = CombatFeedbackService.ActiveInstance != null
+                ? CombatFeedbackService.ActiveInstance
+                : new GameObject("Attack Hit Feedback Service").AddComponent<CombatFeedbackService>();
+            yield return new WaitForSecondsRealtime(0.85f);
+
+            var createdBefore = service.CreatedVisualCount;
+            CombatFeedbackEvents.Publish(CombatFeedbackType.AttackHit, Vector3.zero, UnitTeam.Team1);
+            Assert.That(service.ActiveVisualCount, Is.EqualTo(1));
+            yield return new WaitForSecondsRealtime(0.12f);
+            Assert.That(service.ActiveVisualCount, Is.Zero);
+
+            var lines = service.GetComponentsInChildren<LineRenderer>(true);
+            Assert.That(Array.TrueForAll(lines, line => !line.enabled), Is.True);
+
+            CombatFeedbackEvents.Publish(CombatFeedbackType.AttackHit, Vector3.right, UnitTeam.Team1);
+            Assert.That(service.CreatedVisualCount, Is.EqualTo(createdBefore));
+            Assert.That(service.ActiveVisualCount, Is.EqualTo(1));
+            service.enabled = false;
+            Assert.That(service.ActiveVisualCount, Is.Zero);
+            Assert.That(Array.TrueForAll(lines, line => !line.enabled), Is.True);
+            service.enabled = true;
+        }
+
         private static GameObject CreateWorld(int width, out Tile groundTile)
         {
             var root = new GameObject("Feedback Test Grid");

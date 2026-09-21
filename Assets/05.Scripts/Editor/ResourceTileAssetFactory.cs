@@ -82,10 +82,10 @@ namespace ProjectS.Editor
                     : ResourceTileType.Minerals;
                 tile.Configure(
                     resourceType,
-                    resourceType == ResourceTileType.Gas ? 2500 : 1500,
-                    resourceType == ResourceTileType.Gas ? 6 : 8,
-                    resourceType == ResourceTileType.Gas ? 1.8f : 1.2f,
-                    resourceType == ResourceTileType.Gas ? 1.05f : 0.95f);
+                    1500,
+                    8,
+                    2.4f,
+                    0.95f);
 
                 var name = ObjectNames.NicifyVariableName(sprite.name).Replace(" ", "_");
                 AssetDatabase.CreateAsset(tile, AssetDatabase.GenerateUniqueAssetPath($"{ResourceTileFolder}/{name}.asset"));
@@ -221,10 +221,10 @@ namespace ProjectS.Editor
             tile.colliderType = UnityEngine.Tilemaps.Tile.ColliderType.None;
             tile.Configure(
                 resourceType,
-                resourceType == ResourceTileType.Gas ? 2500 : 1500,
-                resourceType == ResourceTileType.Gas ? 6 : 8,
-                resourceType == ResourceTileType.Gas ? 1.8f : 1.2f,
-                resourceType == ResourceTileType.Gas ? 1.05f : 0.95f);
+                1500,
+                8,
+                2.4f,
+                0.95f);
             EditorUtility.SetDirty(tile);
         }
 

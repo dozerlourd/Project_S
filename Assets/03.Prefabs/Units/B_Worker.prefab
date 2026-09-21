@@ -337,8 +337,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   carryCapacity: 5
-  fallbackGatherRange: 0.85
-  fallbackDropOffRange: 1.25
+  gatherRange: 0.2
+  dropOffRange: 0.45
+  resourcePathRetryInterval: 0.25
   logGathering: 1
 --- !u!114 &100014
 MonoBehaviour:

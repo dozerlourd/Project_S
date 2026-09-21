@@ -41,7 +41,7 @@ namespace ProjectS.Buildings
                 return;
             }
 
-            if (!IsInRange(targetInteractionPoint, targetSite.InteractionRange))
+            if (!IsInRange(targetSite, targetInteractionPoint, targetSite.InteractionRange))
             {
                 if (!pathAgent.HasPath)
                 {
@@ -92,8 +92,19 @@ namespace ProjectS.Buildings
             targetInteractionPoint = default;
         }
 
-        private bool IsInRange(Vector3 point, float range)
+        private bool IsInRange(ConstructionSite site, Vector3 point, float range)
         {
+            var unitCollider = GetComponent<Collider2D>();
+            var siteCollider = site != null ? site.GetComponent<Collider2D>() : null;
+            if (unitCollider != null && siteCollider != null)
+            {
+                var distance = unitCollider.Distance(siteCollider);
+                if (distance.isValid)
+                {
+                    return distance.distance <= Mathf.Max(0.1f, range);
+                }
+            }
+
             return Vector3.Distance(transform.position, point) <= Mathf.Max(0.1f, range);
         }
     }

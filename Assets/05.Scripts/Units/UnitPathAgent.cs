@@ -4,6 +4,80 @@ using UnityEngine;
 
 namespace ProjectS.Units
 {
+    public interface IUnitSettlementBlocker
+    {
+        Transform SettlementTransform { get; }
+        Vector2Int SettlementFootprint { get; }
+        bool IsSettlementBlocking { get; }
+    }
+
+    public static class UnitSettlementRegistry
+    {
+        private static readonly List<IUnitSettlementBlocker> Blockers = new List<IUnitSettlementBlocker>();
+
+        public static void Register(IUnitSettlementBlocker blocker)
+        {
+            if (blocker != null && !Blockers.Contains(blocker))
+            {
+                Blockers.Add(blocker);
+            }
+        }
+
+        public static void Unregister(IUnitSettlementBlocker blocker)
+        {
+            if (blocker != null)
+            {
+                Blockers.Remove(blocker);
+            }
+        }
+
+        public static bool IsCellBlocked(ProjectSTilemapWorld tilemapWorld, Vector3Int cell)
+        {
+            if (tilemapWorld == null)
+            {
+                return false;
+            }
+
+            for (var i = Blockers.Count - 1; i >= 0; i--)
+            {
+                var blocker = Blockers[i];
+                var unityObject = blocker as Object;
+                if (blocker == null || unityObject == null)
+                {
+                    Blockers.RemoveAt(i);
+                    continue;
+                }
+
+                var blockerTransform = blocker.SettlementTransform;
+                if (!blocker.IsSettlementBlocking || blockerTransform == null)
+                {
+                    continue;
+                }
+
+                var centerCell = tilemapWorld.WorldToCell(blockerTransform.position);
+                var footprint = blocker.SettlementFootprint;
+                footprint = new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
+                var startX = centerCell.x - footprint.x / 2;
+                var startY = centerCell.y - footprint.y / 2;
+                if (cell.x >= startX
+                    && cell.x < startX + footprint.x
+                    && cell.y >= startY
+                    && cell.y < startY + footprint.y)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry()
+        {
+            Blockers.Clear();
+        }
+    }
+
     [RequireComponent(typeof(PrototypeUnitStatus))]
     public sealed class UnitPathAgent : MonoBehaviour
     {
@@ -23,6 +97,7 @@ namespace ProjectS.Units
         private readonly List<Vector3> path = new List<Vector3>();
         private readonly List<Vector3> candidatePath = new List<Vector3>();
         private readonly List<Vector3> scheduledDestinations = new List<Vector3>();
+        private readonly List<Vector3Int> interactionCandidateCells = new List<Vector3Int>();
         private PrototypeUnitStatus status;
         private ProjectSTilemapWorld occupiedWorld;
         private Vector3Int occupiedCell;
@@ -34,11 +109,20 @@ namespace ProjectS.Units
         private bool hasRequestedDestination;
         private bool hasPendingPathRequest;
         private bool forceOccupiedCell;
+        private bool participatesInOccupancy = true;
         private int nextPathRequestId;
         private int activePathRequestId;
+        private Collider2D interactionCollider;
+        private float interactionRange;
+        private bool hasInteractionDestination;
 
         public bool HasPath => hasPendingPathRequest || HasActivePath;
         public IReadOnlyList<Vector3> CurrentPath => path;
+        public bool HasPendingPathRequest => hasPendingPathRequest;
+        public Vector3 RequestedDestination => requestedDestination;
+        public Vector3 CurrentWaypoint => HasActivePath ? path[waypointIndex] : transform.position;
+        public Vector3 LastMoveDirection => lastMoveDirection;
+        public bool ParticipatesInOccupancy => participatesInOccupancy;
 
         private bool HasActivePath => waypointIndex < path.Count;
 
@@ -98,16 +182,52 @@ namespace ProjectS.Units
             }
 
             ResolveNavigator();
+            ClearInteractionDestination();
             requestedDestination = destination;
             hasRequestedDestination = true;
             if (navigator != null)
             {
-                SchedulePathRequest(destination);
-                return true;
+                return SchedulePathRequest(destination);
             }
 
             path.Clear();
             path.Add(destination);
+            waypointIndex = 0;
+            NormalizePathStart();
+            return true;
+        }
+
+        public bool MoveToInteraction(Vector3 destination, Collider2D targetCollider, float range)
+        {
+            if (targetCollider == null)
+            {
+                return MoveTo(destination);
+            }
+
+            if (status == null)
+            {
+                status = GetComponent<PrototypeUnitStatus>();
+            }
+
+            if (status.MovementDomain != MovementDomain.Ground || status.PlacementType != PlacementType.Movable)
+            {
+                ClearPath();
+                return false;
+            }
+
+            ResolveNavigator();
+            interactionCollider = targetCollider;
+            interactionRange = Mathf.Max(0.1f, range);
+            hasInteractionDestination = true;
+            requestedDestination = destination;
+            hasRequestedDestination = true;
+            if (navigator != null)
+            {
+                return SchedulePathRequest(destination);
+            }
+
+            path.Clear();
+            path.Add(targetCollider.ClosestPoint(transform.position));
             waypointIndex = 0;
             NormalizePathStart();
             return true;
@@ -124,6 +244,18 @@ namespace ProjectS.Units
             if (!success || result == null || result.Count == 0)
             {
                 ClearPath();
+                return;
+            }
+
+            var tilemapWorld = navigator != null ? navigator.TilemapWorld : null;
+            if (tilemapWorld != null
+                && !IsCellAvailable(tilemapWorld, tilemapWorld.WorldToCell(result[result.Count - 1])))
+            {
+                if (!SchedulePathRequest(requestedDestination))
+                {
+                    ClearPath();
+                }
+
                 return;
             }
 
@@ -144,6 +276,17 @@ namespace ProjectS.Units
             UpdateOccupiedCell();
         }
 
+        public void SetOccupancyParticipation(bool participates)
+        {
+            if (participatesInOccupancy == participates)
+            {
+                return;
+            }
+
+            participatesInOccupancy = participates;
+            UpdateOccupiedCell();
+        }
+
         public void ClearPath()
         {
             path.Clear();
@@ -160,6 +303,19 @@ namespace ProjectS.Units
             var flatDelta = new Vector3(target.x - current.x, target.y - current.y, 0f);
             if (flatDelta.magnitude <= stoppingDistance)
             {
+                if (waypointIndex + 1 >= path.Count
+                    && navigator != null
+                    && navigator.TilemapWorld != null
+                    && !IsCellAvailable(navigator.TilemapWorld, navigator.TilemapWorld.WorldToCell(target)))
+                {
+                    if (!TryRepathToRequestedDestination())
+                    {
+                        ClearPath();
+                    }
+
+                    return;
+                }
+
                 if (navigator != null && !navigator.IsSegmentWalkable(current, target))
                 {
                     if (!TryRepathToRequestedDestination())
@@ -213,7 +369,7 @@ namespace ProjectS.Units
             return true;
         }
 
-        private void SchedulePathRequest(Vector3 destination)
+        private bool SchedulePathRequest(Vector3 destination)
         {
             UpdateOccupiedCell();
             path.Clear();
@@ -223,6 +379,13 @@ namespace ProjectS.Units
             hasPendingPathRequest = true;
             BuildScheduledDestinations(destination);
 
+            if (scheduledDestinations.Count == 0)
+            {
+                hasPendingPathRequest = false;
+                hasRequestedDestination = false;
+                return false;
+            }
+
             UnitPathRequestScheduler.Instance.Enqueue(
                 this,
                 activePathRequestId,
@@ -230,6 +393,7 @@ namespace ProjectS.Units
                 transform.position,
                 scheduledDestinations,
                 GetCurrentTeamOccupiedCells());
+            return true;
         }
 
         private void BuildScheduledDestinations(Vector3 destination)
@@ -244,6 +408,12 @@ namespace ProjectS.Units
             var tilemapWorld = navigator.TilemapWorld;
             var destinationCell = tilemapWorld.WorldToCell(destination);
             var checkedCandidates = 0;
+
+            if (hasInteractionDestination && interactionCollider != null)
+            {
+                BuildInteractionDestinations(tilemapWorld, destinationCell);
+                return;
+            }
 
             foreach (var candidate in EnumerateDestinationCandidates(destinationCell))
             {
@@ -263,8 +433,64 @@ namespace ProjectS.Units
 
             if (scheduledDestinations.Count == 0)
             {
-                scheduledDestinations.Add(destination);
+                hasPendingPathRequest = false;
+                hasRequestedDestination = false;
             }
+        }
+
+        private void BuildInteractionDestinations(ProjectSTilemapWorld tilemapWorld, Vector3Int destinationCell)
+        {
+            interactionCandidateCells.Clear();
+            foreach (var candidate in EnumerateDestinationCandidates(destinationCell))
+            {
+                if (!IsCellAvailable(tilemapWorld, candidate))
+                {
+                    continue;
+                }
+
+                var candidateWorld = tilemapWorld.GetCellCenterWorld(candidate);
+                if (interactionCollider.OverlapPoint(candidateWorld))
+                {
+                    continue;
+                }
+
+                var closestPoint = interactionCollider.ClosestPoint(candidateWorld);
+                var distanceToCollider = Vector2.Distance(candidateWorld, closestPoint);
+                var unitPadding = GetInteractionPadding();
+                if (distanceToCollider > interactionRange + unitPadding)
+                {
+                    continue;
+                }
+
+                interactionCandidateCells.Add(candidate);
+            }
+
+            interactionCandidateCells.Sort((left, right) =>
+            {
+                var leftDistance = GetInteractionDistance(tilemapWorld, left);
+                var rightDistance = GetInteractionDistance(tilemapWorld, right);
+                return leftDistance.CompareTo(rightDistance);
+            });
+
+            var count = Mathf.Min(maxDestinationPathCandidates, interactionCandidateCells.Count);
+            for (var i = 0; i < count; i++)
+            {
+                scheduledDestinations.Add(tilemapWorld.GetCellCenterWorld(interactionCandidateCells[i]));
+            }
+        }
+
+        private float GetInteractionDistance(ProjectSTilemapWorld tilemapWorld, Vector3Int cell)
+        {
+            var candidateWorld = tilemapWorld.GetCellCenterWorld(cell);
+            return Vector2.Distance(candidateWorld, interactionCollider.ClosestPoint(candidateWorld));
+        }
+
+        private float GetInteractionPadding()
+        {
+            var footprint = status != null ? status.OccupiedCells : Vector2Int.one;
+            var width = Mathf.Max(1, footprint.x) * 0.5f;
+            var height = Mathf.Max(1, footprint.y) * 0.5f;
+            return Mathf.Sqrt(width * width + height * height) + 0.08f;
         }
 
         private bool TryBuildShortestPathToAvailableDestination(Vector3 destination)
@@ -351,7 +577,9 @@ namespace ProjectS.Units
         {
             foreach (var footprintCell in EnumerateFootprintCells(cell))
             {
-                if (!tilemapWorld.IsWalkable(footprintCell) || IsCellOccupied(tilemapWorld, footprintCell))
+                if (!tilemapWorld.IsWalkable(footprintCell)
+                    || IsCellOccupied(tilemapWorld, footprintCell)
+                    || UnitSettlementRegistry.IsCellBlocked(tilemapWorld, footprintCell))
                 {
                     return false;
                 }
@@ -377,6 +605,7 @@ namespace ProjectS.Units
             if (navigator == null
                 || navigator.TilemapWorld == null
                 || !CanBlockGroundMovement()
+                || !participatesInOccupancy
                 || (HasPath && !forceOccupiedCell))
             {
                 UnregisterOccupiedCell();
@@ -531,6 +760,13 @@ namespace ProjectS.Units
             }
         }
 
+        private void ClearInteractionDestination()
+        {
+            interactionCollider = null;
+            interactionRange = 0f;
+            hasInteractionDestination = false;
+        }
+
         private bool TryRepathToRequestedDestination()
         {
             if (!hasRequestedDestination || navigator == null)
@@ -541,8 +777,7 @@ namespace ProjectS.Units
             var destination = requestedDestination;
             if (navigator != null)
             {
-                SchedulePathRequest(destination);
-                return true;
+                return SchedulePathRequest(destination);
             }
 
             if (!TryBuildPath(destination))

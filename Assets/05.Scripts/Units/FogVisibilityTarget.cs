@@ -14,19 +14,24 @@ namespace ProjectS.Visibility
             var fog = FogOfWarManager.ActiveInstance;
             if (fog == null || !TryGetTeam(out var team))
             {
+                GetComponent<ProjectS.Units.TemporaryAttackEffect>()?.SetVisibilityAllowed(true);
                 return;
             }
 
             var visible = team == fog.PlayerTeam || fog.IsWorldPositionVisible(transform.position);
+            var attackEffect = GetComponent<ProjectS.Units.TemporaryAttackEffect>();
             ResolveRenderers();
             for (var i = 0; i < renderers.Length; i++)
             {
-                if (renderers[i] != null)
+                if (renderers[i] != null
+                    && !IsSelectionOutlineRenderer(renderers[i])
+                    && (attackEffect == null || !attackEffect.OwnsRenderer(renderers[i])))
                 {
                     renderers[i].enabled = visible;
                 }
             }
 
+            attackEffect?.SetVisibilityAllowed(visible);
             SetUiVisibility(visible);
         }
 
@@ -52,6 +57,12 @@ namespace ProjectS.Visibility
                 teamIndicators = GetComponentsInChildren<ProjectS.Units.UnitTeamIndicator>(true);
                 teamIndicatorMarkers = GetComponentsInChildren<ProjectS.Units.UnitTeamIndicatorMarker>(true);
             }
+        }
+
+        private bool IsSelectionOutlineRenderer(Renderer renderer)
+        {
+            var outline = renderer != null ? renderer.GetComponentInParent<ProjectS.Units.SelectionOutlineEffect>() : null;
+            return outline != null && outline.OwnsRenderer(renderer);
         }
 
         private void SetUiVisibility(bool visible)

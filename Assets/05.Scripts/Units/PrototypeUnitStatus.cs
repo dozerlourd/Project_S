@@ -211,10 +211,12 @@ namespace ProjectS.Units
             EnsureCommandAgent();
             EnsureCombatComponents();
             EnsureFogVisibilityTarget();
+            EnsureSelectionOutlineEffect();
         }
 
         private void OnEnable()
         {
+            EnsureSelectionOutlineEffect();
             UnitAttackTargetRegistry.Register(this);
             FogOfWarRegistry.Register(this);
         }
@@ -237,6 +239,17 @@ namespace ProjectS.Units
             {
                 gameObject.AddComponent<FogVisibilityTarget>();
             }
+        }
+
+        private void EnsureSelectionOutlineEffect()
+        {
+            var outline = GetComponent<SelectionOutlineEffect>();
+            if (outline == null)
+            {
+                outline = gameObject.AddComponent<SelectionOutlineEffect>();
+            }
+
+            outline.Prepare();
         }
 
         public void Initialize(

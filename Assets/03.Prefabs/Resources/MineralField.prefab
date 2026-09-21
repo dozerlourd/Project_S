@@ -137,7 +137,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 1.1, y: 1.1}
+  m_Size: {x: 0.9, y: 0.7}
   m_EdgeRadius: 0
 --- !u!114 &5100000000000000005
 MonoBehaviour:
@@ -153,6 +153,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   resourceType: 0
   totalAmount: 1500
+  maximumAmount: 1500
   gatherAmountPerTrip: 8
-  gatherDuration: 3.5
+  gatherDuration: 7
+  interactionRange: 0.85
   depleteWhenEmpty: 1
+  fitClickColliderToVisualBounds: 0
+  clickColliderPadding: 0.05

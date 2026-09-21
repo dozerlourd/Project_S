@@ -8,14 +8,17 @@ namespace ProjectS.Units
     {
         [SerializeField] private Color effectColor = new Color(1f, 0.85f, 0.25f, 0.9f);
         [SerializeField] private float lineWidth = 0.08f;
-        [SerializeField] private float effectDuration = 0.08f;
+        [SerializeField, Min(0.01f)] private float effectDuration = 0.08f;
         [SerializeField] private float muzzleOffset = 0.25f;
         [SerializeField] private string sortingLayerName = "Default";
         [SerializeField] private int sortingOrder = 30;
 
         private LineRenderer attackLine;
+        private GameObject effectObject;
         private Material effectMaterial;
-        private float hideAtTime;
+        private float hideAtRealtime;
+        private bool flashActive;
+        private bool visibilityAllowed = true;
 
         private void Awake()
         {
@@ -25,15 +28,20 @@ namespace ProjectS.Units
 
         private void Update()
         {
-            if (attackLine.enabled && Time.time >= hideAtTime)
+            if (flashActive && Time.unscaledTime >= hideAtRealtime)
             {
-                attackLine.enabled = false;
+                StopFlash();
             }
+        }
+
+        private void OnDisable()
+        {
+            StopFlash();
         }
 
         private LineRenderer CreateAttackLine()
         {
-            var effectObject = new GameObject("TemporaryAttackEffect");
+            effectObject = new GameObject("TemporaryAttackEffect");
             effectObject.transform.SetParent(transform, false);
 
             var line = effectObject.AddComponent<LineRenderer>();
@@ -52,15 +60,39 @@ namespace ProjectS.Units
 
         private void OnDestroy()
         {
+            StopFlash();
+            if (effectObject != null)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(effectObject);
+                }
+                else
+                {
+                    DestroyImmediate(effectObject);
+                }
+            }
+
             if (effectMaterial != null)
             {
                 Destroy(effectMaterial);
             }
         }
 
+        public bool OwnsRenderer(Renderer renderer)
+        {
+            return renderer != null && renderer == attackLine;
+        }
+
+        public void SetVisibilityAllowed(bool allowed)
+        {
+            visibilityAllowed = allowed;
+            RefreshLineVisibility();
+        }
+
         public void PlayAttackFlash(Vector3 targetPosition)
         {
-            if (attackLine == null)
+            if (!isActiveAndEnabled || attackLine == null)
             {
                 return;
             }
@@ -75,8 +107,24 @@ namespace ProjectS.Units
 
             attackLine.SetPosition(0, start);
             attackLine.SetPosition(1, targetPosition);
-            attackLine.enabled = true;
-            hideAtTime = Time.time + effectDuration;
+            flashActive = true;
+            hideAtRealtime = Time.unscaledTime + Mathf.Max(0.01f, effectDuration);
+            RefreshLineVisibility();
+        }
+
+        private void StopFlash()
+        {
+            flashActive = false;
+            hideAtRealtime = 0f;
+            RefreshLineVisibility();
+        }
+
+        private void RefreshLineVisibility()
+        {
+            if (attackLine != null)
+            {
+                attackLine.enabled = flashActive && visibilityAllowed;
+            }
         }
     }
 }

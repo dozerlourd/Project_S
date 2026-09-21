@@ -26,6 +26,7 @@ namespace ProjectS.Tests.PlayMode
         private static readonly Type BuildingStatusType = GetGameplayType("ProjectS.Buildings.BuildingStatus");
         private static readonly Type BuildingKindType = GetGameplayType("ProjectS.Buildings.BuildingKind");
         private static readonly Type ConstructionSiteType = GetGameplayType("ProjectS.Buildings.ConstructionSite");
+        private static readonly Type ConstructionProgressBarType = GetGameplayType("ProjectS.Buildings.ConstructionProgressBar");
         private static readonly Type BuildingPlacementServiceType = GetGameplayType("ProjectS.Buildings.BuildingPlacementService");
         private static readonly Type ResourceDropOffType = GetGameplayType("ProjectS.Buildings.ResourceDropOff");
         private static readonly Type WorkerAutoAssignmentManagerType = GetGameplayType("ProjectS.Resources.WorkerAutoAssignmentManager");
@@ -392,6 +393,158 @@ namespace ProjectS.Tests.PlayMode
             Object.Destroy(unit);
             Object.Destroy(blocker);
             Object.Destroy(worldObject);
+        }
+
+        [UnityTest]
+        public IEnumerator BuildingFootprint_AllowsTransitButRejectsFinalSettlement()
+        {
+            var worldObject = CreateNavigationTestWorld(
+                "BuildingSettlementWorld",
+                RectCells(0, -2, 9, 5),
+                new HashSet<Vector3Int>(),
+                out var tilemapWorld,
+                out _);
+            var buildingCell = new Vector3Int(4, 0, 0);
+            var building = new GameObject("SettlementBlockingBuilding");
+            building.transform.position = tilemapWorld.GetCellCenterWorld(buildingCell);
+            var buildingStatus = building.AddComponent(BuildingStatusType);
+            Invoke(
+                buildingStatus,
+                "Initialize",
+                UnitTeam.Team1,
+                Enum.Parse(BuildingKindType, "Other"),
+                new Vector2Int(3, 3),
+                true);
+            var unit = CreateMovableUnit(
+                "BuildingTransitUnit",
+                tilemapWorld.GetCellCenterWorld(new Vector3Int(0, 0, 0)));
+            var agent = unit.GetComponent<UnitPathAgent>();
+            var traversedBuildingCell = false;
+
+            Assert.That(agent.MoveTo(tilemapWorld.GetCellCenterWorld(new Vector3Int(8, 0, 0))), Is.True);
+            for (var i = 0; i < 360; i++)
+            {
+                yield return null;
+                traversedBuildingCell |= UnitSettlementRegistry.IsCellBlocked(
+                    tilemapWorld,
+                    tilemapWorld.WorldToCell(unit.transform.position));
+                if (i > 2 && !agent.HasPath)
+                {
+                    break;
+                }
+            }
+
+            Assert.That(traversedBuildingCell, Is.True, "The building footprint was incorrectly treated as a path obstacle.");
+            Assert.That(tilemapWorld.WorldToCell(unit.transform.position), Is.EqualTo(new Vector3Int(8, 0, 0)));
+
+            Assert.That(agent.MoveTo(tilemapWorld.GetCellCenterWorld(buildingCell)), Is.True);
+            for (var i = 0; i < 240; i++)
+            {
+                yield return null;
+                if (i > 2 && !agent.HasPath)
+                {
+                    break;
+                }
+            }
+
+            var finalCell = tilemapWorld.WorldToCell(unit.transform.position);
+            Assert.That(UnitSettlementRegistry.IsCellBlocked(tilemapWorld, finalCell), Is.False);
+            Assert.That(agent.HasPath, Is.False);
+
+            Object.Destroy(unit);
+            Object.Destroy(building);
+            Object.Destroy(worldObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator GroupDestinationReservation_SkipsBuildingFootprint()
+        {
+            var worldObject = CreateNavigationTestWorld(
+                "BuildingReservationWorld",
+                RectCells(0, -3, 9, 7),
+                new HashSet<Vector3Int>(),
+                out var tilemapWorld,
+                out _);
+            var buildingCell = new Vector3Int(4, 0, 0);
+            var building = new GameObject("ReservationBlockingBuilding");
+            building.transform.position = tilemapWorld.GetCellCenterWorld(buildingCell);
+            var buildingStatus = building.AddComponent(BuildingStatusType);
+            Invoke(
+                buildingStatus,
+                "Initialize",
+                UnitTeam.Team1,
+                Enum.Parse(BuildingKindType, "Other"),
+                new Vector2Int(3, 3),
+                true);
+            var controllerObject = new GameObject("Settlement Reservation Controller");
+            var controller = controllerObject.AddComponent<PlayerUnitCommandController>();
+            var clickedPoint = tilemapWorld.GetCellCenterWorld(buildingCell);
+
+            var first = (Vector3)Invoke(controller, "GetUniqueTileDestination", clickedPoint, 0, 2, Vector2Int.one);
+            var second = (Vector3)Invoke(controller, "GetUniqueTileDestination", clickedPoint, 1, 2, Vector2Int.one);
+            var firstCell = tilemapWorld.WorldToCell(first);
+            var secondCell = tilemapWorld.WorldToCell(second);
+
+            Assert.That(UnitSettlementRegistry.IsCellBlocked(tilemapWorld, firstCell), Is.False);
+            Assert.That(UnitSettlementRegistry.IsCellBlocked(tilemapWorld, secondCell), Is.False);
+            Assert.That(secondCell, Is.Not.EqualTo(firstCell));
+
+            Object.Destroy(controllerObject);
+            Object.Destroy(building);
+            Object.Destroy(worldObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ConstructionSiteFootprint_RejectsSettlementUntilSiteIsDisabled()
+        {
+            var worldObject = CreateNavigationTestWorld(
+                "ConstructionSettlementWorld",
+                RectCells(0, -2, 7, 5),
+                new HashSet<Vector3Int>(),
+                out var tilemapWorld,
+                out _);
+            var siteCell = new Vector3Int(3, 0, 0);
+            var siteObject = new GameObject("SettlementBlockingConstructionSite");
+            siteObject.transform.position = tilemapWorld.GetCellCenterWorld(siteCell);
+            var site = siteObject.AddComponent(ConstructionSiteType);
+            Invoke(
+                site,
+                "Initialize",
+                UnitTeam.Team1,
+                Enum.Parse(BuildingKindType, "Other"),
+                new Vector2Int(2, 2),
+                CreateResourceAmount(0, 0),
+                5f,
+                null);
+            var unit = CreateMovableUnit(
+                "ConstructionSettlementUnit",
+                tilemapWorld.GetCellCenterWorld(new Vector3Int(0, 0, 0)));
+            var agent = unit.GetComponent<UnitPathAgent>();
+
+            Assert.That(UnitSettlementRegistry.IsCellBlocked(tilemapWorld, siteCell), Is.True);
+            Assert.That(agent.MoveTo(tilemapWorld.GetCellCenterWorld(siteCell)), Is.True);
+            for (var i = 0; i < 240; i++)
+            {
+                yield return null;
+                if (i > 2 && !agent.HasPath)
+                {
+                    break;
+                }
+            }
+
+            Assert.That(
+                UnitSettlementRegistry.IsCellBlocked(tilemapWorld, tilemapWorld.WorldToCell(unit.transform.position)),
+                Is.False);
+
+            siteObject.SetActive(false);
+            Assert.That(UnitSettlementRegistry.IsCellBlocked(tilemapWorld, siteCell), Is.False);
+
+            Object.Destroy(unit);
+            Object.Destroy(siteObject);
+            Object.Destroy(worldObject);
+            yield return null;
         }
 
         [UnityTest]
@@ -762,6 +915,34 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator PlayerCommandController_ResourceSelectionShowsAmountAndClearsWhenDepleted()
+        {
+            var controllerObject = new GameObject("ResourceSelectionController");
+            var controller = controllerObject.AddComponent<PlayerUnitCommandController>();
+            var resourceObject = CreateResourceNode(
+                "SelectableMinerals",
+                Enum.Parse(ResourceTypeType, "Minerals"),
+                5,
+                5,
+                0f,
+                Vector3.zero);
+            var resourceNode = resourceObject.GetComponent(ResourceNodeType);
+
+            Invoke(controller, "SelectNonUnitTarget", resourceNode);
+            Assert.That(GetProperty(controller, "PrimarySelection"), Is.EqualTo(resourceNode));
+            Assert.That(GetInt(resourceNode, "RemainingAmount"), Is.EqualTo(5));
+            Assert.That(GetInt(resourceNode, "MaximumAmount"), Is.EqualTo(5));
+
+            Invoke(resourceNode, "TryGather");
+            yield return null;
+
+            Assert.That(GetProperty(controller, "PrimarySelection"), Is.Null);
+
+            Object.Destroy(resourceObject);
+            Object.Destroy(controllerObject);
+        }
+
+        [UnityTest]
         public IEnumerator RtsGameHud_RebindsWhenTeamWalletIsReplaced()
         {
             LogAssert.Expect(LogType.Warning, "Replacing existing resource wallet for Team1. Only one active wallet should own a team's resources.");
@@ -964,6 +1145,53 @@ namespace ProjectS.Tests.PlayMode
 
             Object.Destroy(site.gameObject);
             Object.Destroy(builder);
+            Object.Destroy(walletObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ConstructionProgressBar_OnlyShowsAfterConstructionStartsAndHidesOnCompletion()
+        {
+            var walletObject = new GameObject("ConstructionProgressWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(0, 0));
+            var siteObject = new GameObject("ConstructionProgressSite");
+            var site = siteObject.AddComponent(ConstructionSiteType);
+            Invoke(
+                site,
+                "Initialize",
+                UnitTeam.Team1,
+                Enum.Parse(BuildingKindType, "Production"),
+                Vector2Int.one,
+                CreateResourceAmount(0, 0),
+                1f,
+                null);
+            Invoke(site, "SetDeferredPayment", wallet);
+
+            var progressBar = siteObject.GetComponent(ConstructionProgressBarType);
+            var background = siteObject.transform.Find("ConstructionProgressBar/Background").GetComponent<SpriteRenderer>();
+            var fill = siteObject.transform.Find("ConstructionProgressBar/Fill").GetComponent<SpriteRenderer>();
+            Assert.That(progressBar, Is.Not.Null);
+            Assert.That(background.enabled, Is.False);
+            Assert.That(fill.enabled, Is.False);
+
+            var builder = CreateWorkerUnit("ProgressBarBuilder", Vector3.left);
+            Assert.That((bool)Invoke(site, "TryContribute", builder.GetComponent<UnitCommandAgent>(), 0.25f), Is.True);
+            yield return null;
+
+            Assert.That(GetBool(site, "HasConstructionStarted"), Is.True);
+            Assert.That(GetFloat(site, "BuildProgress01"), Is.EqualTo(0.25f).Within(0.001f));
+            Assert.That(background.enabled, Is.True);
+            Assert.That(fill.enabled, Is.True);
+            Assert.That(siteObject.transform.Find("ConstructionProgressBar").GetComponent<Collider2D>(), Is.Null);
+
+            Assert.That((bool)Invoke(site, "TryContribute", builder.GetComponent<UnitCommandAgent>(), 1f), Is.True);
+            Assert.That(GetBool(site, "Completed"), Is.True);
+            Assert.That(background.enabled, Is.False);
+            Assert.That(fill.enabled, Is.False);
+
+            Object.Destroy(builder);
+            Object.Destroy(siteObject);
             Object.Destroy(walletObject);
             yield return null;
         }
@@ -1706,6 +1934,65 @@ namespace ProjectS.Tests.PlayMode
             Object.Destroy(dropOffObject);
             Object.Destroy(team2WalletObject);
             Object.Destroy(team1WalletObject);
+        }
+
+        [UnityTest]
+        public IEnumerator WorkerGatherController_MultipleWorkersUseColliderRangeWithoutApproachOscillation()
+        {
+            var worldObject = CreateNavigationTestWorld(
+                "MultiWorkerGatherWorld",
+                RectCells(-6, -6, 13, 13),
+                new HashSet<Vector3Int>(),
+                out _,
+                out _);
+            var walletObject = new GameObject("MultiWorkerGatherWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(0, 0));
+            var dropOffObject = CreateDropOff("MultiWorkerGatherDropOff", UnitTeam.Team1, new Vector3(0f, 4f, 0f));
+            var resourceObject = CreateResourceNode(
+                "MultiWorkerMinerals",
+                Enum.Parse(ResourceTypeType, "Minerals"),
+                40,
+                5,
+                0f,
+                Vector3.zero);
+            var resourceCollider = resourceObject.GetComponent<BoxCollider2D>();
+            resourceCollider.size = new Vector2(2.5f, 2.5f);
+            var firstWorker = CreateWorkerUnit("MultiWorkerGatherA", new Vector3(-4f, 0f, 0f));
+            var secondWorker = CreateWorkerUnit("MultiWorkerGatherB", new Vector3(4f, 0f, 0f));
+            var resourceNode = resourceObject.GetComponent(ResourceNodeType);
+            var interactableResource = (IUnitInteractableTarget)resourceNode;
+
+            firstWorker.GetComponent<UnitCommandAgent>().Issue(new UnitCommand(
+                UnitCommandMode.Interact,
+                interactableResource.InteractionPoint,
+                null,
+                interactableResource,
+                false));
+            secondWorker.GetComponent<UnitCommandAgent>().Issue(new UnitCommand(
+                UnitCommandMode.Interact,
+                interactableResource.InteractionPoint,
+                null,
+                interactableResource,
+                false));
+
+            for (var i = 0; i < 240 && GetInt(wallet, "Minerals") < 10; i++)
+            {
+                yield return null;
+            }
+
+            Assert.That(GetInt(wallet, "Minerals"), Is.GreaterThanOrEqualTo(10));
+            Assert.That(GetInt(resourceNode, "RemainingAmount"), Is.LessThan(40));
+            Assert.That(firstWorker.GetComponent<UnitCommandAgent>().Mode, Is.EqualTo(UnitCommandMode.Interact));
+            Assert.That(secondWorker.GetComponent<UnitCommandAgent>().Mode, Is.EqualTo(UnitCommandMode.Interact));
+
+            Object.Destroy(secondWorker);
+            Object.Destroy(firstWorker);
+            Object.Destroy(resourceObject);
+            Object.Destroy(dropOffObject);
+            Object.Destroy(walletObject);
+            Object.Destroy(worldObject);
+            yield return null;
         }
 
         [UnityTest]

@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 6300000000000000004}
   - component: {fileID: 6300000000000000005}
   - component: {fileID: 6300000000000000006}
+  - component: {fileID: 6300000000000000007}
   m_Layer: 0
   m_Name: PrototypeConstructionSite
   m_TagString: Untagged
@@ -181,3 +182,22 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 2.2, y: 2}
   m_EdgeRadius: 0
+--- !u!114 &6300000000000000007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6300000000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c54ae1c3d1424a0cb2ac6e5ee20739d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  barSprite: {fileID: 0}
+  backgroundColor: {r: 0.06, g: 0.06, b: 0.06, a: 0.9}
+  fillColor: {r: 1, g: 0.72, b: 0.18, a: 0.98}
+  widthRatio: 0.72
+  height: 0.12
+  localOffset: {x: 0, y: 0.2, z: 0}
+  sortingOrder: 2

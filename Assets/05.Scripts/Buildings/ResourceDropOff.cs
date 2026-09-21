@@ -6,6 +6,7 @@ using UnityEngine;
 namespace ProjectS.Buildings
 {
     [RequireComponent(typeof(BuildingStatus))]
+    [RequireComponent(typeof(Collider2D))]
     public sealed class ResourceDropOff : MonoBehaviour, IUnitInteractableTarget
     {
         private static readonly List<ResourceDropOff> AllDropOffs = new List<ResourceDropOff>();

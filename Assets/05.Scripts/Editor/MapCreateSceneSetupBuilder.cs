@@ -93,6 +93,17 @@ namespace ProjectS.Editor
                 CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterPrefab, new ResourceAmount(125, 0), 8f, allowedProductionBuildings: new[] { BuildingKind.SpliterProduction })
             };
 
+            CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
+            CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
+
+            var mainBaseStatus = mainBasePrefab.GetComponent<BuildingStatus>();
+            var mainBaseFootprint = mainBaseStatus != null ? mainBaseStatus.Footprint : new Vector2Int(3, 3);
+            if (!ConstructionSite.TryFindNearestValidPlacement(tilemapWorld, playerStart, mainBaseFootprint, 12, out playerStart)
+                || !ConstructionSite.TryFindNearestValidPlacement(tilemapWorld, aiStart, mainBaseFootprint, 12, out aiStart))
+            {
+                throw new System.InvalidOperationException("Could not find valid separated starting main base positions.");
+            }
+
             InstantiateBuilding(
                 mainBasePrefab,
                 "Player Main Base",
@@ -119,8 +130,6 @@ namespace ProjectS.Editor
                 new Vector3(-5f, 2f, 0f),
                 root.transform);
 
-            CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
-            CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team1, playerStart, workerPrefab, root.transform, tilemapWorld);
             CreateStartingUnits(UnitTeam.Team2, aiStart, workerPrefab, root.transform, tilemapWorld);
             CreatePlayerRuntimeSystems(
@@ -206,7 +215,9 @@ namespace ProjectS.Editor
                 visual.Configure(body, new Color(0.08f, 0.13f, 0.18f, 1f), size);
 
                 var collider = root.AddComponent<BoxCollider2D>();
-                collider.size = size;
+                collider.size = kind == BuildingKind.MainBase
+                    ? new Vector2(2f, 1.6f)
+                    : size;
                 collider.isTrigger = true;
 
                 var status = StructureFactory.AddTo(root, kind);
@@ -292,7 +303,9 @@ namespace ProjectS.Editor
                 renderer.sortingOrder = sortingOrder;
 
                 var collider = root.GetComponent<BoxCollider2D>() ?? root.AddComponent<BoxCollider2D>();
-                collider.size = size;
+                collider.size = prefabPath == MainBasePrefabPath
+                    ? new Vector2(2f, 1.6f)
+                    : size;
                 collider.isTrigger = true;
                 PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
             }
@@ -471,11 +484,11 @@ namespace ProjectS.Editor
             for (var i = 0; i < offsets.Length; i++)
             {
                 var node = InstantiateResource(mineralPrefab, $"Mineral Field {i + 1}", center + offsets[i], parent, tilemapWorld);
-                node.Configure(ResourceType.Minerals, 1500, 8, 1.2f, 0.95f, true);
+            node.Configure(ResourceType.Minerals, 1500, 8, 2.4f, 0.95f, true);
             }
 
             var gas = InstantiateResource(gasPrefab, "Vespene Geyser", center + new Vector3(3f, 0f, 0f), parent, tilemapWorld);
-            gas.Configure(ResourceType.Gas, 2500, 6, 1.8f, 1.05f, true);
+            gas.Configure(ResourceType.Gas, 1500, 8, 2.4f, 0.95f, true);
         }
 
         private static ResourceNode InstantiateResource(

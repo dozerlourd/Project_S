@@ -50,7 +50,9 @@ namespace ProjectS.Buildings
         {
             for (var i = 0; i < renderers.Length; i++)
             {
-                if (renderers[i] != null && !IsRangeIndicatorRenderer(renderers[i]))
+                if (renderers[i] != null
+                    && !IsRangeIndicatorRenderer(renderers[i])
+                    && !IsSelectionOutlineRenderer(renderers[i]))
                 {
                     renderers[i].enabled = visible;
                 }
@@ -73,6 +75,12 @@ namespace ProjectS.Buildings
             }
 
             return false;
+        }
+
+        private bool IsSelectionOutlineRenderer(Renderer renderer)
+        {
+            var outline = renderer != null ? renderer.GetComponentInParent<ProjectS.Units.SelectionOutlineEffect>() : null;
+            return outline != null && outline.OwnsRenderer(renderer);
         }
 
         private static void SetEnabled<T>(T[] components, bool enabled) where T : Behaviour
