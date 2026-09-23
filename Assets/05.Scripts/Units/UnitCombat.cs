@@ -76,9 +76,10 @@ namespace ProjectS.Units
             }
 
             var center = primaryTarget.SelectionTransform.position;
-            var maxTargets = Mathf.Max(1, status.MaxAttackTargets);
-            var radiusSquared = status.AttackArea * status.AttackArea;
-            UnitAttackTargetRegistry.QueryNearbyEnemies(status.Team, center, status.AttackArea, nearbyTargets);
+            var maxTargets = Mathf.Max(1, status.MaxAreaTargets);
+            var areaDamageRadius = status.AreaDamageRadius;
+            var radiusSquared = areaDamageRadius * areaDamageRadius;
+            UnitAttackTargetRegistry.QueryNearbyEnemies(status.Team, center, areaDamageRadius, nearbyTargets);
             for (var i = 0; i < nearbyTargets.Count; i++)
             {
                 var candidate = nearbyTargets[i];
@@ -101,9 +102,7 @@ namespace ProjectS.Units
 
         private bool HasAreaAttack()
         {
-            return (status.AttackTargetType == AttackTargetType.AreaAttack || status.HasAreaAttack)
-                && status.AttackArea > 0f
-                && status.MaxAttackTargets > 1;
+            return status.HasAreaAttack;
         }
 
         private bool IsValidEnemyTarget(IUnitAttackTarget target)

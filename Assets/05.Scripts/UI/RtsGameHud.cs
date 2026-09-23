@@ -1044,7 +1044,7 @@ namespace ProjectS.UI
 
                 var x = panelRect.x + 8f + i * (buttonSize + buttonGap);
                 var y = panelRect.y + 42f;
-                var isLocked = !definition.CanBeProducedBy(productionQueue.Team, out _);
+                var isLocked = !definition.CanMeetAdditionalProductionConditions(productionQueue.Team, "produce", out _);
                 var buttonLabel = isLocked
                     ? WithHotkeyLabel($"LOCKED\n{definition.DisplayName}", i)
                     : WithHotkeyLabel($"{definition.DisplayName}\n{FormatCost(definition.Cost)}", i);

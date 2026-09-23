@@ -179,18 +179,7 @@ namespace ProjectS.Buildings
                 return false;
             }
 
-            var requirements = definition.Requirements;
-            for (var i = 0; i < requirements.Count; i++)
-            {
-                var requirement = requirements[i];
-                if (requirement != null && !requirement.IsMet(status.Team))
-                {
-                    failureReason = requirement.GetFailureReason(definition);
-                    return false;
-                }
-            }
-
-            if (status != null && !definition.CanBeProducedBy(status.Team, out failureReason))
+            if (!definition.CanMeetAdditionalProductionConditions(Team, "enqueue", out failureReason))
             {
                 return false;
             }
@@ -343,13 +332,30 @@ namespace ProjectS.Buildings
 
         private void TryStartNextProduction()
         {
-            if (activeProduction != null || queue.Count <= 0)
+            if (activeProduction != null)
             {
                 return;
             }
 
-            activeProduction = queue.Dequeue();
-            activeProgress = 0f;
+            while (queue.Count > 0)
+            {
+                var nextProduction = queue.Dequeue();
+                if (nextProduction == null)
+                {
+                    continue;
+                }
+
+                if (!nextProduction.CanMeetAdditionalProductionConditions(Team, "start", out var failureReason))
+                {
+                    CancelAndRefund(nextProduction);
+                    FailEnqueue(failureReason);
+                    continue;
+                }
+
+                activeProduction = nextProduction;
+                activeProgress = 0f;
+                return;
+            }
         }
 
         private void CompleteActiveProduction()

@@ -203,7 +203,6 @@ MonoBehaviour:
   detectionRange: 5
   attackSpeed: 0.9
   movementSpeed: 3
-  maxAttackTargets: 3
   occupiedCells: {x: 1, y: 1}
   supplyCost: 3
   advancedSupplyCost: 0
@@ -219,8 +218,8 @@ MonoBehaviour:
   hasManaRegeneration: 0
   manaRegenerationAmount: 0
   canGatherResources: 0
-  hasAreaAttack: 1
-  attackArea: 2
+  areaDamageRadius: 2
+  maxAreaTargets: 3
 --- !u!114 &100006
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -2493,10 +2493,15 @@ namespace ProjectS.Tests.PlayMode
         [UnityTest]
         public IEnumerator UnitProductionQueue_UsesConfiguredBuildingRequirementWithoutRegisteringGlobalUnlocks()
         {
+            var supplyObject = new GameObject("RequirementSupplyManager");
+            var supplyManager = supplyObject.AddComponent(SupplyManagerType);
+            Invoke(supplyManager, "Initialize", UnitTeam.Team1);
             var walletObject = new GameObject("RequirementWallet");
             var wallet = walletObject.AddComponent(PlayerResourceWalletType);
             Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 0));
             var productionBuilding = CreateProductionBuilding("RequirementProductionBuilding", UnitTeam.Team1, Vector3.zero);
+            var suppliedAmount = Activator.CreateInstance(GetGameplayType("ProjectS.Units.SupplyAmount"), 10, 10);
+            Invoke(productionBuilding.GetComponent(BuildingStatusType), "ConfigureSupplyProvided", suppliedAmount);
             var unitPrefab = CreateUnitPrefab("RequirementWorkerPrefab", PrototypeUnitType.Worker);
             var requirement = Activator.CreateInstance(UnitProductionRequirementType);
             Invoke(requirement, "ConfigureCompletedBuilding", Enum.Parse(BuildingKindType, "SupplyDepot"), 1);
@@ -2514,6 +2519,7 @@ namespace ProjectS.Tests.PlayMode
                 1,
                 1,
                 requirements);
+            Invoke(definition, "ConfigureSupplyRequirement", 1, 1);
             var definitions = Array.CreateInstance(UnitProductionDefinitionType, 1);
             definitions.SetValue(definition, 0);
             var queue = productionBuilding.AddComponent(UnitProductionQueueType);
@@ -2524,6 +2530,8 @@ namespace ProjectS.Tests.PlayMode
                 "Cannot enqueue Requirement Worker: requires 1 completed SupplyDepot building(s).");
             Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Worker), Is.False);
             Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(100));
+            Assert.That(GetInt(supplyManager, "ReservedSupply"), Is.Zero);
+            Assert.That(GetInt(supplyManager, "ReservedAdvancedSupply"), Is.Zero);
 
             var prerequisiteBuilding = new GameObject("RequirementSupplyDepot");
             var prerequisiteStatus = prerequisiteBuilding.AddComponent(BuildingStatusType);
@@ -2531,9 +2539,56 @@ namespace ProjectS.Tests.PlayMode
 
             Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Worker), Is.True);
             Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(75));
+            Assert.That(GetInt(supplyManager, "ReservedSupply"), Is.EqualTo(1));
+            Assert.That(GetInt(supplyManager, "ReservedAdvancedSupply"), Is.EqualTo(1));
 
             Object.Destroy(unitPrefab);
             Object.Destroy(prerequisiteBuilding);
+            Object.Destroy(productionBuilding);
+            Object.Destroy(walletObject);
+            Object.Destroy(supplyObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator UnitProductionQueue_RechecksAdditionalConditionsBeforeStartingPendingProduction()
+        {
+            var walletObject = new GameObject("StartConditionWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 0));
+            var productionBuilding = CreateProductionBuilding("StartConditionProduction", UnitTeam.Team1, Vector3.zero);
+            var unitPrefab = CreateUnitPrefab("StartConditionWorkerPrefab", PrototypeUnitType.Worker);
+
+            var activeDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(activeDefinition, "Configure", "Active Worker", PrototypeUnitType.Worker, unitPrefab, CreateResourceAmount(10, 0), 10f);
+            var requiredDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(requiredDefinition, "Configure", "Conditional Worker", PrototypeUnitType.Worker, unitPrefab, CreateResourceAmount(25, 0), 10f);
+            var requirement = Activator.CreateInstance(UnitProductionRequirementType);
+            Invoke(requirement, "ConfigureCompletedBuilding", Enum.Parse(BuildingKindType, "SupplyDepot"), 1);
+            var requirements = Array.CreateInstance(UnitProductionRequirementType, 1);
+            requirements.SetValue(requirement, 0);
+            Invoke(requiredDefinition, "ConfigureProductionRequirements", requirements);
+
+            var definitions = Array.CreateInstance(UnitProductionDefinitionType, 2);
+            definitions.SetValue(activeDefinition, 0);
+            definitions.SetValue(requiredDefinition, 1);
+            var queue = productionBuilding.AddComponent(UnitProductionQueueType);
+            Invoke(queue, "Configure", wallet, null, definitions, 2, Vector3.right, Vector3.right * 2f);
+
+            Assert.That((bool)Invoke(queue, "TryEnqueue", activeDefinition), Is.True);
+            var prerequisiteBuilding = new GameObject("StartConditionSupplyDepot");
+            var prerequisiteStatus = prerequisiteBuilding.AddComponent(BuildingStatusType);
+            Invoke(prerequisiteStatus, "Initialize", UnitTeam.Team1, Enum.Parse(BuildingKindType, "SupplyDepot"), Vector2Int.one, true);
+            Assert.That((bool)Invoke(queue, "TryEnqueue", requiredDefinition), Is.True);
+            Object.DestroyImmediate(prerequisiteBuilding);
+
+            LogAssert.Expect(LogType.Warning,
+                "Cannot start Conditional Worker: requires 1 completed SupplyDepot building(s).");
+            Assert.That((bool)Invoke(queue, "TryCancelActiveProduction"), Is.True);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(100));
+            Assert.That(GetInt(queue, "QueuedCount"), Is.Zero);
+
+            Object.Destroy(unitPrefab);
             Object.Destroy(productionBuilding);
             Object.Destroy(walletObject);
             yield return null;

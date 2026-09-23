@@ -19,7 +19,10 @@ namespace ProjectS.Buildings
         [SerializeField, Min(0)] private int advancedSupplyCost;
         [SerializeField, Min(0.1f)] private float productionTime = 6f;
         [SerializeField, Min(1)] private int unitsPerProduction = 1;
+        [Header("Additional Production Conditions")]
+        [Tooltip("All listed conditions must be met before resources or supply are reserved.")]
         [SerializeField] private UnitProductionRequirement[] requirements = new UnitProductionRequirement[0];
+        [Tooltip("Optional team unlock conditions. These are evaluated with the building conditions above.")]
         [SerializeField] private UnlockRequirement[] unlockRequirements = new UnlockRequirement[0];
         [SerializeField] private BuildingKind[] allowedProductionBuildings = new BuildingKind[0];
 
@@ -80,9 +83,30 @@ namespace ProjectS.Buildings
             allowedProductionBuildings = buildingKinds ?? new BuildingKind[0];
         }
 
+        public void ConfigureProductionRequirements(UnitProductionRequirement[] productionRequirements)
+        {
+            requirements = productionRequirements ?? new UnitProductionRequirement[0];
+        }
+
         public void ConfigureUnlockRequirements(UnlockRequirement[] productionUnlockRequirements)
         {
             unlockRequirements = productionUnlockRequirements ?? new UnlockRequirement[0];
+        }
+
+        public bool CanMeetAdditionalProductionConditions(UnitTeam team, string action, out string failureReason)
+        {
+            var requirementsToCheck = requirements ?? Array.Empty<UnitProductionRequirement>();
+            for (var i = 0; i < requirementsToCheck.Length; i++)
+            {
+                var requirement = requirementsToCheck[i];
+                if (requirement != null && !requirement.IsMet(team))
+                {
+                    failureReason = requirement.GetFailureReason(action, DisplayName);
+                    return false;
+                }
+            }
+
+            return UnlockRequirement.AreMet(unlockRequirements, team, action, DisplayName, out failureReason);
         }
 
         public bool CanBeProducedBy(UnitTeam team, out string failureReason)

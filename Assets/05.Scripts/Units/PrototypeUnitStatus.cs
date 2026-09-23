@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ProjectS.Visibility;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ProjectS.Units
 {
@@ -165,7 +166,6 @@ namespace ProjectS.Units
         [SerializeField] private float detectionRange = 5f;
         [SerializeField] private float attackSpeed = 1f;
         [SerializeField] private float movementSpeed = 3f;
-        [SerializeField] private int maxAttackTargets = 1;
         [SerializeField] private Vector2Int occupiedCells = Vector2Int.one;
         // Keep this serialized name for existing unit prefabs: it is the standard supply cost.
         [SerializeField, Min(0)] private int supplyCost = 1;
@@ -184,8 +184,13 @@ namespace ProjectS.Units
         [SerializeField] private bool hasManaRegeneration;
         [SerializeField] private float manaRegenerationAmount;
         [SerializeField] private bool canGatherResources;
-        [SerializeField] private bool hasAreaAttack;
-        [SerializeField] private float attackArea;
+        [Header("Area Attack")]
+        [Tooltip("World-space damage radius centered on the primary target. Zero keeps the attack single-target.")]
+        [FormerlySerializedAs("attackArea")]
+        [SerializeField, Min(0f)] private float areaDamageRadius;
+        [Tooltip("Maximum targets including the primary target. Zero keeps the attack single-target.")]
+        [FormerlySerializedAs("maxAttackTargets")]
+        [SerializeField, Min(0)] private int maxAreaTargets;
 
         private readonly Dictionary<UnitBuffKind, Dictionary<object, float>> movementSpeedModifiers =
             new Dictionary<UnitBuffKind, Dictionary<object, float>>();
@@ -225,7 +230,8 @@ namespace ProjectS.Units
                 return movementSpeed * UnitUpgradeStatModifiers.GetMovementSpeedMultiplier(team) * multiplier;
             }
         }
-        public int MaxAttackTargets => maxAttackTargets;
+        // Compatibility alias for callers that still expect every attack to have at least one target.
+        public int MaxAttackTargets => HasAreaAttack ? Mathf.Max(1, MaxAreaTargets) : 1;
         public Vector2Int OccupiedCells => new Vector2Int(Mathf.Max(1, occupiedCells.x), Mathf.Max(1, occupiedCells.y));
         public int SupplyCost => Mathf.Max(0, supplyCost);
         public int AdvancedSupplyCost => Mathf.Max(0, advancedSupplyCost);
@@ -242,8 +248,11 @@ namespace ProjectS.Units
         public bool HasManaRegeneration => hasManaRegeneration;
         public float ManaRegenerationAmount => manaRegenerationAmount;
         public bool CanGatherResources => canGatherResources;
-        public bool HasAreaAttack => hasAreaAttack;
-        public float AttackArea => attackArea;
+        public bool HasAreaAttack => AreaDamageRadius > 0f && MaxAreaTargets > 0;
+        public int MaxAreaTargets => Mathf.Max(0, maxAreaTargets);
+        // Kept for API compatibility. New code should use AreaDamageRadius.
+        public float AttackArea => AreaDamageRadius;
+        public float AreaDamageRadius => Mathf.Max(0f, areaDamageRadius);
         public string SelectionName => unitType.ToString();
         public Transform SelectionTransform => transform;
         public GameObject SelectionGameObject => gameObject;
@@ -349,11 +358,10 @@ namespace ProjectS.Units
             this.detectionRange = Mathf.Max(attackRange, detectionRange);
             this.attackSpeed = attackSpeed;
             this.movementSpeed = movementSpeed;
-            this.maxAttackTargets = maxAttackTargets;
             this.occupiedCells = new Vector2Int(Mathf.Max(1, occupiedCells.x), Mathf.Max(1, occupiedCells.y));
             this.canGatherResources = canGatherResources;
-            this.hasAreaAttack = hasAreaAttack;
-            this.attackArea = attackArea;
+            areaDamageRadius = hasAreaAttack ? Mathf.Max(0f, attackArea) : 0f;
+            maxAreaTargets = areaDamageRadius > 0f ? Mathf.Max(1, maxAttackTargets) : 0;
 
             var commandAgent = GetComponent<UnitCommandAgent>();
             if (commandAgent != null)
@@ -388,6 +396,13 @@ namespace ProjectS.Units
                 UnitAttackTargetRegistry.Register(this);
                 FogOfWarRegistry.Register(this);
             }
+        }
+
+        public void ConfigureAreaDamage(float radius, int targetLimit)
+        {
+            areaDamageRadius = Mathf.Max(0f, radius);
+            maxAreaTargets = Mathf.Max(0, targetLimit);
+            attackTargetType = HasAreaAttack ? AttackTargetType.AreaAttack : AttackTargetType.SingleTarget;
         }
 
         public void ConfigurePrototypeDefaults(PrototypeUnitType type, UnitTeam initialTeam = UnitTeam.Team1)
