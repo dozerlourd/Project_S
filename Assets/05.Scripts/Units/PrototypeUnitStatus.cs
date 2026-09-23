@@ -5,6 +5,57 @@ using UnityEngine;
 
 namespace ProjectS.Units
 {
+    public enum SupplyKind
+    {
+        Standard = 0,
+        Advanced = 1
+    }
+
+    [Serializable]
+    public struct SupplyAmount
+    {
+        [SerializeField, Min(0)] private int standard;
+        [SerializeField, Min(0)] private int advanced;
+
+        public int Standard => Mathf.Max(0, standard);
+        public int Advanced => Mathf.Max(0, advanced);
+
+        public SupplyAmount(int standardAmount, int advancedAmount = 0)
+        {
+            standard = Mathf.Max(0, standardAmount);
+            advanced = Mathf.Max(0, advancedAmount);
+        }
+
+        public int Get(SupplyKind kind)
+        {
+            return kind == SupplyKind.Advanced ? Advanced : Standard;
+        }
+
+        public static SupplyAmount For(SupplyKind kind, int amount)
+        {
+            return kind == SupplyKind.Advanced
+                ? new SupplyAmount(0, amount)
+                : new SupplyAmount(amount, 0);
+        }
+
+        public static SupplyAmount operator +(SupplyAmount left, SupplyAmount right)
+        {
+            return new SupplyAmount(left.Standard + right.Standard, left.Advanced + right.Advanced);
+        }
+
+        public static SupplyAmount operator -(SupplyAmount left, SupplyAmount right)
+        {
+            return new SupplyAmount(
+                Mathf.Max(0, left.Standard - right.Standard),
+                Mathf.Max(0, left.Advanced - right.Advanced));
+        }
+
+        public static SupplyAmount operator *(SupplyAmount amount, int multiplier)
+        {
+            return new SupplyAmount(amount.Standard * Mathf.Max(0, multiplier), amount.Advanced * Mathf.Max(0, multiplier));
+        }
+    }
+
     public enum UnitBuffKind
     {
         Overdrive = 0,
@@ -116,7 +167,9 @@ namespace ProjectS.Units
         [SerializeField] private float movementSpeed = 3f;
         [SerializeField] private int maxAttackTargets = 1;
         [SerializeField] private Vector2Int occupiedCells = Vector2Int.one;
+        // Keep this serialized name for existing unit prefabs: it is the standard supply cost.
         [SerializeField, Min(0)] private int supplyCost = 1;
+        [SerializeField, Min(0)] private int advancedSupplyCost;
         [SerializeField, Min(0f)] private float visionRadius = 7f;
 
         [Header("Special Status")]
@@ -175,6 +228,9 @@ namespace ProjectS.Units
         public int MaxAttackTargets => maxAttackTargets;
         public Vector2Int OccupiedCells => new Vector2Int(Mathf.Max(1, occupiedCells.x), Mathf.Max(1, occupiedCells.y));
         public int SupplyCost => Mathf.Max(0, supplyCost);
+        public int AdvancedSupplyCost => Mathf.Max(0, advancedSupplyCost);
+        public SupplyKind SupplyCategory => AdvancedSupplyCost > 0 && SupplyCost == 0 ? SupplyKind.Advanced : SupplyKind.Standard;
+        public SupplyAmount SupplyUsage => new SupplyAmount(SupplyCost, AdvancedSupplyCost);
         public bool HasHealthRegeneration => hasHealthRegeneration;
         public float HealthRegenerationAmount => healthRegenerationAmount;
         public bool HasShield => hasShield;
@@ -437,6 +493,13 @@ namespace ProjectS.Units
         public void ConfigureSupplyCost(int cost)
         {
             supplyCost = Mathf.Max(0, cost);
+            advancedSupplyCost = 0;
+        }
+
+        public void ConfigureSupply(SupplyAmount amount)
+        {
+            supplyCost = amount.Standard;
+            advancedSupplyCost = amount.Advanced;
         }
 
         public void SetMovementSpeedModifier(UnitBuffKind buffKind, object source, float multiplier)

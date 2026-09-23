@@ -213,9 +213,12 @@ namespace ProjectS.Buildings
                 return false;
             }
 
-            if (supplyManager != null && !supplyManager.CanReserve(GetRequiredSupply(definition)))
+            var requiredSupply = GetRequiredSupply(definition);
+            if (supplyManager != null && !supplyManager.CanReserve(requiredSupply))
             {
-                failureReason = $"Cannot enqueue {definition.DisplayName}: insufficient supply ({supplyManager.CurrentSupply + supplyManager.ReservedSupply}/{supplyManager.MaxSupply}).";
+                failureReason = $"Cannot enqueue {definition.DisplayName}: insufficient supply: "
+                    + $"need {requiredSupply.Standard} standard/{requiredSupply.Advanced} advanced, "
+                    + $"available {supplyManager.AvailableStandardSupply} standard/{supplyManager.AvailableAdvancedSupply} advanced.";
                 return false;
             }
 
@@ -356,6 +359,7 @@ namespace ProjectS.Buildings
             activeProgress = 0f;
             if (definition == null || definition.UnitPrefab == null)
             {
+                ReleaseSupplyReservation(definition);
                 TryStartNextProduction();
                 return;
             }
@@ -368,13 +372,15 @@ namespace ProjectS.Buildings
                 if (unitStatus != null && status != null)
                 {
                     unitStatus.SetTeam(status.Team);
-                    unitStatus.ConfigureSupplyCost(definition.SupplyCost);
+                    unitStatus.ConfigureSupply(definition.SupplyRequirement);
                 }
 
-                if (supplyManager != null && !supplyManager.CommitReservation(definition.SupplyCost, unitStatus))
+                if (supplyManager != null && !supplyManager.CommitReservation(definition.SupplyRequirement, unitStatus))
                 {
-                    Debug.LogWarning($"Could not complete supply reservation for {definition.DisplayName}.", this);
-                    ReleaseSupplyReservation(definition);
+                    Debug.LogWarning($"Could not complete supply reservation for {definition.DisplayName}; the spawned unit was discarded.", this);
+                    supplyManager.ReleaseReservation(definition.SupplyRequirement);
+                    Destroy(unitObject);
+                    continue;
                 }
 
                 unitObject.SetActive(true);
@@ -482,7 +488,7 @@ namespace ProjectS.Buildings
         private bool TryReserveSupply(UnitProductionDefinition definition, out string failureReason)
         {
             var requiredSupply = GetRequiredSupply(definition);
-            if (requiredSupply <= 0)
+            if (requiredSupply.Standard <= 0 && requiredSupply.Advanced <= 0)
             {
                 failureReason = string.Empty;
                 return true;
@@ -508,15 +514,15 @@ namespace ProjectS.Buildings
         private void ReleaseSupplyReservation(UnitProductionDefinition definition)
         {
             var requiredSupply = GetRequiredSupply(definition);
-            if (requiredSupply > 0)
+            if (requiredSupply.Standard > 0 || requiredSupply.Advanced > 0)
             {
                 supplyManager?.ReleaseReservation(requiredSupply);
             }
         }
 
-        private static int GetRequiredSupply(UnitProductionDefinition definition)
+        private static SupplyAmount GetRequiredSupply(UnitProductionDefinition definition)
         {
-            return definition == null ? 0 : definition.SupplyCost * definition.UnitsPerProduction;
+            return definition == null ? new SupplyAmount() : definition.SupplyRequirement * definition.UnitsPerProduction;
         }
 
         private void CancelAndRefund(UnitProductionDefinition definition)

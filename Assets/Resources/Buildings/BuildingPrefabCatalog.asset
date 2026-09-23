@@ -15,6 +15,8 @@ MonoBehaviour:
   mainBasePrefab: {fileID: 6100000000000000001, guid: 17d2652cf567447e9b01ac9c9f6fca70, type: 3}
   productionPrefab: {fileID: 6200000000000000001, guid: a1a8879442e04bf59d09c598cbd94447, type: 3}
   spliterProductionPrefab: {fileID: 7300000000000000001, guid: 55e5f46d57bb4d16b7cf51bd5f462bcd, type: 3}
+  supplyDepotPrefab: {fileID: 8350000000000000001, guid: 9dc4ba8fa4064a198d1c02ef82f3dc2b, type: 3}
+  advancedSupplyDepotPrefab: {fileID: 8400000000000000001, guid: 3e0ff756b68c4875a16d29d74d979f08, type: 3}
   autoTurretPrefab: {fileID: 7400000000000000001, guid: 70caa648d6d649e5acf6189d7bf8a0ee, type: 3}
   speedAuraPrefab: {fileID: 7500000000000000001, guid: 9a0306e4c20946c3b564e4171cbd1a11, type: 3}
   vehicleFactoryPrefab: {fileID: 8100000000000000001, guid: d61f452661d546b68902e31e2f5dc123, type: 3}

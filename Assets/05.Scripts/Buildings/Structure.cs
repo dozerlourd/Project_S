@@ -13,6 +13,7 @@ namespace ProjectS.Buildings
         [SerializeField] private Vector2Int footprint = new Vector2Int(2, 2);
         [SerializeField] private bool completed = true;
         [SerializeField, Min(0)] private int supplyProvided;
+        [SerializeField, Min(0)] private int advancedSupplyProvided;
         [SerializeField, Min(0f)] private float visionRadius = 9f;
 
         [SerializeField, HideInInspector] private bool roleDefaultsApplied;
@@ -25,6 +26,8 @@ namespace ProjectS.Buildings
         public Vector2Int Footprint => new Vector2Int(Mathf.Max(1, footprint.x), Mathf.Max(1, footprint.y));
         public bool Completed => completed;
         public int SupplyProvided => Mathf.Max(0, supplyProvided);
+        public int AdvancedSupplyProvided => Mathf.Max(0, advancedSupplyProvided);
+        public SupplyAmount SupplyProvidedAmount => new SupplyAmount(SupplyProvided, AdvancedSupplyProvided);
         public string SelectionName => Kind.ToString();
         public Transform SelectionTransform => transform;
         public GameObject SelectionGameObject => gameObject;
@@ -113,9 +116,13 @@ namespace ProjectS.Buildings
 
             team = ownerTeam;
             kind = RoleKind ?? buildingKind;
-            if (Kind == BuildingKind.SupplyDepot && supplyProvided == 0)
+            if ((Kind == BuildingKind.SupplyDepot || Kind == BuildingKind.AdvancedSupplyDepot)
+                && supplyProvided == 0
+                && advancedSupplyProvided == 0)
             {
-                supplyProvided = 10;
+                var defaultSupply = StructureFactory.GetDefaultSupplyAmount(Kind);
+                supplyProvided = defaultSupply.Standard;
+                advancedSupplyProvided = defaultSupply.Advanced;
             }
             footprint = new Vector2Int(Mathf.Max(1, occupiedFootprint.x), Mathf.Max(1, occupiedFootprint.y));
             completed = isCompleted;
@@ -164,6 +171,13 @@ namespace ProjectS.Buildings
             SyncSupplyProvider();
         }
 
+        public void ConfigureSupplyProvided(SupplyAmount amount)
+        {
+            supplyProvided = amount.Standard;
+            advancedSupplyProvided = amount.Advanced;
+            SyncSupplyProvider();
+        }
+
         public void TakeDamage(float amount)
         {
             if (!completed)
@@ -203,7 +217,9 @@ namespace ProjectS.Buildings
             roleDefaultsApplied = true;
             kind = RoleKind.Value;
             footprint = StructureFactory.GetDefaultFootprint(kind);
-            supplyProvided = StructureFactory.GetDefaultSupply(kind);
+            var defaultSupply = StructureFactory.GetDefaultSupplyAmount(kind);
+            supplyProvided = defaultSupply.Standard;
+            advancedSupplyProvided = defaultSupply.Advanced;
             visionRadius = StructureFactory.GetDefaultVisionRadius(kind);
             EnsureHealth();
             health.ConfigureMaxHealth(StructureFactory.GetDefaultMaxHealth(kind));
@@ -295,7 +311,7 @@ namespace ProjectS.Buildings
 
             if (isActiveAndEnabled && IsAlive)
             {
-                supplyManager.RegisterBuilding(this, SupplyProvided);
+                supplyManager.RegisterBuilding(this, SupplyProvidedAmount);
             }
             else
             {

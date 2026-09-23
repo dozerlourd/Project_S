@@ -25,6 +25,8 @@ namespace ProjectS.Editor
         private const string MainBasePrefabPath = CoreBuildingPrefabFolder + "/PrototypeMainBase.prefab";
         private const string ProductionPrefabPath = CoreBuildingPrefabFolder + "/PrototypeProductionBuilding.prefab";
         private const string SpliterProductionPrefabPath = CoreBuildingPrefabFolder + "/PrototypeSpliterProductionBuilding.prefab";
+        private const string SupplyDepotPrefabPath = CoreBuildingPrefabFolder + "/PrototypeSupplyDepotBuilding.prefab";
+        private const string AdvancedSupplyDepotPrefabPath = CoreBuildingPrefabFolder + "/PrototypeAdvancedSupplyDepotBuilding.prefab";
         private const string AutoTurretPrefabPath = CoreBuildingPrefabFolder + "/PrototypeAutoTurretBuilding.prefab";
         private const string SpeedAuraPrefabPath = CoreBuildingPrefabFolder + "/PrototypeSpeedAuraBuilding.prefab";
         private const string ConstructionSitePrefabPath = ConstructionPrefabFolder + "/PrototypeConstructionSite.prefab";
@@ -59,6 +61,8 @@ namespace ProjectS.Editor
             GetStartPositions(tilemapWorld, out var playerStart, out var aiStart);
             var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(100, 0), root.transform);
             var aiWallet = CreateWallet("AI Wallet", UnitTeam.Team2, new ResourceAmount(100, 0), root.transform);
+            CreateSupplyManager("Player Supply", UnitTeam.Team1, root.transform);
+            CreateSupplyManager("AI Supply", UnitTeam.Team2, root.transform);
             CreateTeamUnlockState("Player Unlocks", UnitTeam.Team1, root.transform);
             CreateTeamUnlockState("AI Unlocks", UnitTeam.Team2, root.transform);
 
@@ -72,6 +76,8 @@ namespace ProjectS.Editor
             var mainBasePrefab = LoadRequired<GameObject>(MainBasePrefabPath);
             var productionPrefab = LoadRequired<GameObject>(ProductionPrefabPath);
             var spliterProductionPrefab = LoadRequired<GameObject>(SpliterProductionPrefabPath);
+            var supplyDepotPrefab = LoadRequired<GameObject>(SupplyDepotPrefabPath);
+            var advancedSupplyDepotPrefab = LoadRequired<GameObject>(AdvancedSupplyDepotPrefabPath);
             var autoTurretPrefab = LoadRequired<GameObject>(AutoTurretPrefabPath);
             var speedAuraPrefab = LoadRequired<GameObject>(SpeedAuraPrefabPath);
             var constructionSitePrefab = LoadRequired<GameObject>(ConstructionSitePrefabPath);
@@ -138,12 +144,26 @@ namespace ProjectS.Editor
                 constructionSitePrefab,
                 productionPrefab,
                 spliterProductionPrefab,
+                supplyDepotPrefab,
+                advancedSupplyDepotPrefab,
                 autoTurretPrefab,
                 speedAuraPrefab,
                 combatDefinitions,
                 spliterDefinitions,
                 root.transform);
-            CreateAiController(playerStart, root.transform);
+            CreateAiController(
+                playerStart,
+                aiWallet,
+                tilemapWorld,
+                constructionSitePrefab,
+                productionPrefab,
+                spliterProductionPrefab,
+                autoTurretPrefab,
+                speedAuraPrefab,
+                supplyDepotPrefab,
+                advancedSupplyDepotPrefab,
+                mainBasePrefab,
+                root.transform);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -161,6 +181,8 @@ namespace ProjectS.Editor
             CreateBuildingPrefab(MainBasePrefabPath, "PrototypeMainBase", BuildingKind.MainBase, new Vector2(2.6f, 2.2f));
             CreateBuildingPrefab(ProductionPrefabPath, "PrototypeProductionBuilding", BuildingKind.Production, new Vector2(2.4f, 2f));
             CreateBuildingPrefab(SpliterProductionPrefabPath, "PrototypeSpliterProductionBuilding", BuildingKind.SpliterProduction, new Vector2(2.5f, 2.5f));
+            CreateBuildingPrefab(SupplyDepotPrefabPath, "PrototypeSupplyDepotBuilding", BuildingKind.SupplyDepot, new Vector2(2f, 1f));
+            CreateBuildingPrefab(AdvancedSupplyDepotPrefabPath, "PrototypeAdvancedSupplyDepotBuilding", BuildingKind.AdvancedSupplyDepot, new Vector2(2f, 1f));
             CreateBuildingPrefab(AutoTurretPrefabPath, "PrototypeAutoTurretBuilding", BuildingKind.AutoTurret, new Vector2(2.3f, 2.3f));
             CreateBuildingPrefab(SpeedAuraPrefabPath, "PrototypeSpeedAuraBuilding", BuildingKind.SpeedAura, new Vector2(2.6f, 2.6f));
             CreateBuildingPrefab(VehicleFactoryPrefabPath, "PrototypeVehicleFactoryBuilding", BuildingKind.VehicleFactory, new Vector2(3f, 3f));
@@ -253,6 +275,8 @@ namespace ProjectS.Editor
                 case BuildingKind.SpliterProduction: return UniqueBuildingTextureFolder + "/SpliterProduction_Unique.png";
                 case BuildingKind.AutoTurret: return UniqueBuildingTextureFolder + "/AutoTurret_Unique.png";
                 case BuildingKind.SpeedAura: return UniqueBuildingTextureFolder + "/SpeedAura_Unique.png";
+                case BuildingKind.SupplyDepot: return "Assets/01.Textures/Buildings/SupplyDepotBuilding.png";
+                case BuildingKind.AdvancedSupplyDepot: return "Assets/01.Textures/Buildings/AdvancedSupplyDepotBuilding.png";
                 case BuildingKind.VehicleFactory: return UniqueBuildingTextureFolder + "/VehicleFactory_Unique.png";
                 case BuildingKind.MaintenanceBay: return UniqueBuildingTextureFolder + "/MaintenanceBay_Unique.png";
                 case BuildingKind.SignalRelay: return UniqueBuildingTextureFolder + "/SignalRelay_Unique.png";
@@ -358,6 +382,8 @@ namespace ProjectS.Editor
             GameObject constructionSitePrefab,
             GameObject productionPrefab,
             GameObject spliterProductionPrefab,
+            GameObject supplyDepotPrefab,
+            GameObject advancedSupplyDepotPrefab,
             GameObject autoTurretPrefab,
             GameObject speedAuraPrefab,
             UnitProductionDefinition[] combatDefinitions,
@@ -383,7 +409,12 @@ namespace ProjectS.Editor
                 new Vector2Int(2, 2));
             ConfigureProductionPrefab(productionPrefab, wallet, tilemapWorld, combatDefinitions, new Vector3(2.5f, -0.5f, 0f), new Vector3(5f, -1f, 0f));
             ConfigureProductionPrefab(spliterProductionPrefab, wallet, tilemapWorld, spliterDefinitions, new Vector3(2.5f, -0.5f, 0f), new Vector3(5f, -1f, 0f));
-            placementService.ConfigureBuildOptions(spliterProductionPrefab, autoTurretPrefab, speedAuraPrefab);
+            placementService.ConfigureBuildOptions(
+                spliterProductionPrefab,
+                autoTurretPrefab,
+                speedAuraPrefab,
+                supplyDepotPrefab: supplyDepotPrefab,
+                advancedSupplyDepotPrefab: advancedSupplyDepotPrefab);
 
             var hud = runtime.AddComponent<RtsGameHud>();
             hud.Configure(UnitTeam.Team1, placementService);
@@ -407,13 +438,35 @@ namespace ProjectS.Editor
             }
         }
 
-        private static void CreateAiController(Vector3 fallbackAttackPoint, Transform parent)
+        private static void CreateAiController(
+            Vector3 fallbackAttackPoint,
+            PlayerResourceWallet wallet,
+            ProjectSTilemapWorld tilemapWorld,
+            GameObject constructionSitePrefab,
+            GameObject productionPrefab,
+            GameObject spliterProductionPrefab,
+            GameObject autoTurretPrefab,
+            GameObject speedAuraPrefab,
+            GameObject supplyDepotPrefab,
+            GameObject advancedSupplyDepotPrefab,
+            GameObject mainBasePrefab,
+            Transform parent)
         {
             var aiObject = new GameObject("Simple Skirmish AI");
             aiObject.transform.SetParent(parent, false);
             var ai = aiObject.AddComponent<SimpleSkirmishAI>();
             ai.Configure(UnitTeam.Team2, UnitTeam.Team1, 3, 7, fallbackAttackPoint);
             ai.ConfigureTempo(1.5f, 18f);
+
+            var templates = aiObject.AddComponent<AiBuildingTemplateRegistry>();
+            templates.Configure(UnitTeam.Team2, wallet, tilemapWorld, constructionSitePrefab);
+            templates.RegisterTemplate(BuildingKind.Production, productionPrefab, new ResourceAmount(150, 0), 8f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.SpliterProduction, spliterProductionPrefab, new ResourceAmount(175, 0), 9f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.AutoTurret, autoTurretPrefab, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.SpeedAura, speedAuraPrefab, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.SupplyDepot, supplyDepotPrefab, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1));
+            templates.RegisterTemplate(BuildingKind.AdvancedSupplyDepot, advancedSupplyDepotPrefab, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1));
+            templates.RegisterTemplate(BuildingKind.MainBase, mainBasePrefab, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3));
         }
 
         private static PlayerResourceWallet CreateWallet(
@@ -427,6 +480,15 @@ namespace ProjectS.Editor
             var wallet = walletObject.AddComponent<PlayerResourceWallet>();
             wallet.Initialize(team, resources);
             return wallet;
+        }
+
+        private static SupplyManager CreateSupplyManager(string name, UnitTeam team, Transform parent)
+        {
+            var supplyObject = new GameObject(name);
+            supplyObject.transform.SetParent(parent, false);
+            var supplyManager = supplyObject.AddComponent<SupplyManager>();
+            supplyManager.Initialize(team);
+            return supplyManager;
         }
 
         private static void CreateTeamUnlockState(string name, UnitTeam team, Transform parent)

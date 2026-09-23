@@ -386,6 +386,7 @@ MonoBehaviour:
   footprint: {x: 2, y: 2}
   completed: 1
   supplyProvided: 0
+  advancedSupplyProvided: 0
   visionRadius: 9
   roleDefaultsApplied: 1
 --- !u!114 &7500000000000000005

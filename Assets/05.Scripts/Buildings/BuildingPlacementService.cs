@@ -210,6 +210,7 @@ namespace ProjectS.Buildings
             GameObject autoTurretPrefab,
             GameObject speedAuraPrefab,
             GameObject supplyDepotPrefab = null,
+            GameObject advancedSupplyDepotPrefab = null,
             GameObject resourceDropOffPrefab = null,
             GameObject mainBasePrefab = null)
         {
@@ -236,7 +237,12 @@ namespace ProjectS.Buildings
 
             if (supplyDepotPrefab != null)
             {
-                definitions.Add(BuildingConstructionDefinition.Create("Supply Depot", BuildingKind.SupplyDepot, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 2), supplyDepotPrefab));
+                definitions.Add(BuildingConstructionDefinition.Create("Supply Depot", BuildingKind.SupplyDepot, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1), supplyDepotPrefab));
+            }
+
+            if (advancedSupplyDepotPrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Advanced Supply Depot", BuildingKind.AdvancedSupplyDepot, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1), advancedSupplyDepotPrefab));
             }
 
             if (resourceDropOffPrefab != null)

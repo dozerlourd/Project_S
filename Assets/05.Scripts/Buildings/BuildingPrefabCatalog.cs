@@ -10,6 +10,8 @@ namespace ProjectS.Buildings
         [SerializeField] private GameObject mainBasePrefab;
         [SerializeField] private GameObject productionPrefab;
         [SerializeField] private GameObject spliterProductionPrefab;
+        [SerializeField] private GameObject supplyDepotPrefab;
+        [SerializeField] private GameObject advancedSupplyDepotPrefab;
         [SerializeField] private GameObject autoTurretPrefab;
         [SerializeField] private GameObject speedAuraPrefab;
         [SerializeField] private GameObject vehicleFactoryPrefab;
@@ -31,6 +33,8 @@ namespace ProjectS.Buildings
                 case BuildingKind.MainBase: return mainBasePrefab;
                 case BuildingKind.Production: return productionPrefab;
                 case BuildingKind.SpliterProduction: return spliterProductionPrefab;
+                case BuildingKind.SupplyDepot: return supplyDepotPrefab;
+                case BuildingKind.AdvancedSupplyDepot: return advancedSupplyDepotPrefab;
                 case BuildingKind.AutoTurret: return autoTurretPrefab;
                 case BuildingKind.SpeedAura: return speedAuraPrefab;
                 case BuildingKind.VehicleFactory: return vehicleFactoryPrefab;
@@ -45,6 +49,8 @@ namespace ProjectS.Buildings
             if (mainBasePrefab == null
                 || productionPrefab == null
                 || spliterProductionPrefab == null
+                || supplyDepotPrefab == null
+                || advancedSupplyDepotPrefab == null
                 || autoTurretPrefab == null
                 || speedAuraPrefab == null
                 || vehicleFactoryPrefab == null

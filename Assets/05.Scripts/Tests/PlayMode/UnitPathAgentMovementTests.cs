@@ -2614,6 +2614,68 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator UnitProductionQueue_SeparatelyBlocksAndResumesStandardAndAdvancedSupply()
+        {
+            var supplyObject = new GameObject("SeparatedSupplyManager");
+            var supplyManager = supplyObject.AddComponent(SupplyManagerType);
+            Invoke(supplyManager, "Initialize", UnitTeam.Team1);
+            var walletObject = new GameObject("SeparatedSupplyWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 0));
+            var productionBuilding = CreateProductionBuilding("SeparatedSupplyProduction", UnitTeam.Team1, Vector3.zero);
+            var normalPrefab = CreateUnitPrefab("StandardSupplyUnitPrefab", PrototypeUnitType.Worker);
+            var advancedPrefab = CreateUnitPrefab("AdvancedSupplyUnitPrefab", PrototypeUnitType.Soldier);
+            var normalDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(normalDefinition, "Configure", "Standard Supply Unit", PrototypeUnitType.Worker, normalPrefab, CreateResourceAmount(10, 0), 10f, 1, 1, null);
+            Invoke(normalDefinition, "ConfigureSupplyRequirement", 10, 0);
+            var advancedDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(advancedDefinition, "Configure", "Advanced Supply Unit", PrototypeUnitType.Soldier, advancedPrefab, CreateResourceAmount(10, 0), 10f, 1, 1, null);
+            Invoke(advancedDefinition, "ConfigureSupplyRequirement", 0, 10);
+            var definitions = Array.CreateInstance(UnitProductionDefinitionType, 2);
+            definitions.SetValue(normalDefinition, 0);
+            definitions.SetValue(advancedDefinition, 1);
+            var queue = productionBuilding.AddComponent(UnitProductionQueueType);
+            Invoke(queue, "Configure", wallet, null, definitions, 4, Vector3.right, Vector3.right * 2f);
+
+            LogAssert.Expect(LogType.Warning,
+                "Cannot enqueue Standard Supply Unit: insufficient supply: need 10 standard/0 advanced, available 0 standard/0 advanced.");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Worker), Is.False);
+            LogAssert.Expect(LogType.Warning,
+                "Cannot enqueue Advanced Supply Unit: insufficient supply: need 0 standard/10 advanced, available 0 standard/0 advanced.");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Soldier), Is.False);
+
+            var normalDepot = new GameObject("Standard Supply Depot");
+            var normalDepotStatus = normalDepot.AddComponent(BuildingStatusType);
+            Invoke(normalDepotStatus, "Initialize", UnitTeam.Team1, Enum.Parse(BuildingKindType, "SupplyDepot"), Vector2Int.one, true);
+            Assert.That(GetInt(supplyManager, "AvailableSupply"), Is.EqualTo(10));
+            Assert.That(GetInt(supplyManager, "AvailableAdvancedSupply"), Is.Zero);
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Worker), Is.True);
+
+            LogAssert.Expect(LogType.Warning,
+                "Cannot enqueue Standard Supply Unit: insufficient supply: need 10 standard/0 advanced, available 0 standard/0 advanced.");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Worker), Is.False);
+
+            var advancedDepot = new GameObject("Advanced Supply Depot");
+            var advancedDepotStatus = advancedDepot.AddComponent(BuildingStatusType);
+            Invoke(advancedDepotStatus, "Initialize", UnitTeam.Team1, Enum.Parse(BuildingKindType, "AdvancedSupplyDepot"), Vector2Int.one, true);
+            Assert.That(GetInt(supplyManager, "AvailableAdvancedSupply"), Is.EqualTo(10));
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Soldier), Is.True);
+
+            LogAssert.Expect(LogType.Warning,
+                "Cannot enqueue Advanced Supply Unit: insufficient supply: need 0 standard/10 advanced, available 0 standard/0 advanced.");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Soldier), Is.False);
+
+            Object.Destroy(advancedDepot);
+            Object.Destroy(normalDepot);
+            Object.Destroy(advancedPrefab);
+            Object.Destroy(normalPrefab);
+            Object.Destroy(productionBuilding);
+            Object.Destroy(walletObject);
+            Object.Destroy(supplyObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator UnitProductionQueue_DisableRefundsActiveAndPendingProductionAndReleasesSupply()
         {
             var supplyObject = new GameObject("DisableProductionSupply");
@@ -2623,13 +2685,16 @@ namespace ProjectS.Tests.PlayMode
             var wallet = walletObject.AddComponent(PlayerResourceWalletType);
             Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 10));
             var productionBuilding = CreateProductionBuilding("DisableProductionBuilding", UnitTeam.Team1, Vector3.zero);
-            Invoke(productionBuilding.GetComponent(BuildingStatusType), "ConfigureSupplyProvided", 10);
+            var suppliedAmount = Activator.CreateInstance(GetGameplayType("ProjectS.Units.SupplyAmount"), 10, 10);
+            Invoke(productionBuilding.GetComponent(BuildingStatusType), "ConfigureSupplyProvided", suppliedAmount);
             var workerPrefab = CreateUnitPrefab("DisableProductionWorkerPrefab", PrototypeUnitType.Worker);
             var soldierPrefab = CreateUnitPrefab("DisableProductionSoldierPrefab", PrototypeUnitType.Soldier);
             var workerDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
             Invoke(workerDefinition, "Configure", "Disable Worker", PrototypeUnitType.Worker, workerPrefab, CreateResourceAmount(10, 0), 10f, 1, 1, null);
+            Invoke(workerDefinition, "ConfigureSupplyRequirement", 1, 2);
             var soldierDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
             Invoke(soldierDefinition, "Configure", "Disable Soldier", PrototypeUnitType.Soldier, soldierPrefab, CreateResourceAmount(20, 5), 10f, 2, 1, null);
+            Invoke(soldierDefinition, "ConfigureSupplyRequirement", 2, 3);
             var definitions = Array.CreateInstance(UnitProductionDefinitionType, 2);
             definitions.SetValue(workerDefinition, 0);
             definitions.SetValue(soldierDefinition, 1);
@@ -2641,12 +2706,14 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(70));
             Assert.That(GetInt(wallet, "Gas"), Is.EqualTo(5));
             Assert.That(GetInt(supplyManager, "ReservedSupply"), Is.EqualTo(3));
+            Assert.That(GetInt(supplyManager, "ReservedAdvancedSupply"), Is.EqualTo(5));
 
             productionBuilding.SetActive(false);
 
             Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(100));
             Assert.That(GetInt(wallet, "Gas"), Is.EqualTo(10));
             Assert.That(GetInt(supplyManager, "ReservedSupply"), Is.EqualTo(0));
+            Assert.That(GetInt(supplyManager, "ReservedAdvancedSupply"), Is.EqualTo(0));
             Assert.That(GetInt(queue, "QueuedCount"), Is.EqualTo(0));
 
             Object.Destroy(workerPrefab);

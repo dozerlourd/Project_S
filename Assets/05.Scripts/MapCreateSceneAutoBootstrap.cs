@@ -24,7 +24,7 @@ namespace ProjectS
         private const string GasSpriteName = "ResourceNodes_Gas";
         private const int ResourceSortingOrder = 12;
         private const int UnitSortingOrder = 20;
-        private const int MainBaseSupplyProvided = 20;
+        private const int MainBaseSupplyProvided = 10;
 
         private static Sprite squareSprite;
         private static Sprite mineralsResourceSprite;
@@ -130,10 +130,22 @@ namespace ProjectS
                 return;
             }
 
+            var productionTemplate = CreateBuildingTemplate(
+                templates,
+                "Production Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.Production));
             var spliterProductionTemplate = CreateBuildingTemplate(
                 templates,
                 "Spliter Production Building Template",
                 buildingPrefabs.GetPrefab(BuildingKind.SpliterProduction));
+            var supplyDepotTemplate = CreateBuildingTemplate(
+                templates,
+                "Supply Depot Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.SupplyDepot));
+            var advancedSupplyDepotTemplate = CreateBuildingTemplate(
+                templates,
+                "Advanced Supply Depot Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.AdvancedSupplyDepot));
             var autoTurretTemplate = CreateBuildingTemplate(
                 templates,
                 "Auto Turret Building Template",
@@ -156,12 +168,27 @@ namespace ProjectS
                     new Vector3(5f, -1f, 0f)),
                 autoTurretTemplate,
                 speedAuraTemplate,
+                supplyDepotPrefab: supplyDepotTemplate,
+                advancedSupplyDepotPrefab: advancedSupplyDepotTemplate,
                 mainBasePrefab: ConfigureProductionTemplate(
                     mainBaseTemplate,
                     GetRequiredUnitPrefab(PrototypeUnitType.Worker),
                     new[] { CreateProductionDefinition("Worker", PrototypeUnitType.Worker, GetRequiredUnitPrefab(PrototypeUnitType.Worker), new ResourceAmount(50, 0), 5f, 1, allowedProductionBuildings: new[] { BuildingKind.MainBase }) },
                     new Vector3(2.5f, -1.5f, 0f),
                     new Vector3(5f, -2f, 0f)));
+
+            ConfigureAiBuildingTemplates(
+                FindFirstObjectByType<SimpleSkirmishAI>(),
+                PlayerResourceWallet.FindForTeam(UnitTeam.Team2),
+                ProjectSTilemapWorld.ActiveInstance,
+                buildingPrefabs.ConstructionSitePrefab,
+                productionTemplate,
+                spliterProductionTemplate,
+                autoTurretTemplate,
+                speedAuraTemplate,
+                supplyDepotTemplate,
+                advancedSupplyDepotTemplate,
+                mainBaseTemplate);
         }
 
         private static GameObject CreateBuildingTemplate(Transform parent, string name, GameObject prefab)
@@ -240,6 +267,14 @@ namespace ProjectS
                 prototypeRoot.transform,
                 "Spliter Production Building Prototype",
                 buildingPrefabs.GetPrefab(BuildingKind.SpliterProduction));
+            var supplyDepotPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
+                "Supply Depot Building Prototype",
+                buildingPrefabs.GetPrefab(BuildingKind.SupplyDepot));
+            var advancedSupplyDepotPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
+                "Advanced Supply Depot Building Prototype",
+                buildingPrefabs.GetPrefab(BuildingKind.AdvancedSupplyDepot));
             var autoTurretPrototype = CreateBuildingTemplate(
                 prototypeRoot.transform,
                 "Auto Turret Building Prototype",
@@ -299,6 +334,8 @@ namespace ProjectS
                 spliterProductionPrototype,
                 autoTurretPrototype,
                 speedAuraPrototype,
+                supplyDepotPrototype,
+                advancedSupplyDepotPrototype,
                 mainBasePrototype,
                 combatDefinitions,
                 spliterDefinitions,
@@ -312,6 +349,8 @@ namespace ProjectS
                 spliterProductionPrototype,
                 autoTurretPrototype,
                 speedAuraPrototype,
+                supplyDepotPrototype,
+                advancedSupplyDepotPrototype,
                 mainBasePrototype,
                 root.transform);
         }
@@ -362,6 +401,8 @@ namespace ProjectS
             GameObject spliterProductionPrototype,
             GameObject autoTurretPrototype,
             GameObject speedAuraPrototype,
+            GameObject supplyDepotPrototype,
+            GameObject advancedSupplyDepotPrototype,
             GameObject mainBasePrototype,
             UnitProductionDefinition[] combatDefinitions,
             UnitProductionDefinition[] spliterDefinitions,
@@ -414,6 +455,8 @@ namespace ProjectS
                 spliterProductionPrototype,
                 autoTurretPrototype,
                 speedAuraPrototype,
+                supplyDepotPrefab: supplyDepotPrototype,
+                advancedSupplyDepotPrefab: advancedSupplyDepotPrototype,
                 mainBasePrefab: mainBasePrototype);
 
             var hud = FindFirstObjectByType<RtsGameHud>();
@@ -435,6 +478,8 @@ namespace ProjectS
             GameObject spliterProductionPrototype,
             GameObject autoTurretPrototype,
             GameObject speedAuraPrototype,
+            GameObject supplyDepotPrototype,
+            GameObject advancedSupplyDepotPrototype,
             GameObject mainBasePrototype,
             Transform parent)
         {
@@ -443,12 +488,51 @@ namespace ProjectS
             ai.Configure(UnitTeam.Team2, UnitTeam.Team1, 3, 7, fallbackAttackPoint);
             ai.ConfigureTempo(1.5f, 18f);
 
-            var templates = aiObject.AddComponent<AiBuildingTemplateRegistry>();
+            ConfigureAiBuildingTemplates(
+                ai,
+                wallet,
+                tilemapWorld,
+                constructionPrototype,
+                productionPrototype,
+                spliterProductionPrototype,
+                autoTurretPrototype,
+                speedAuraPrototype,
+                supplyDepotPrototype,
+                advancedSupplyDepotPrototype,
+                mainBasePrototype);
+        }
+
+        private static void ConfigureAiBuildingTemplates(
+            SimpleSkirmishAI ai,
+            PlayerResourceWallet wallet,
+            ProjectSTilemapWorld tilemapWorld,
+            GameObject constructionPrototype,
+            GameObject productionPrototype,
+            GameObject spliterProductionPrototype,
+            GameObject autoTurretPrototype,
+            GameObject speedAuraPrototype,
+            GameObject supplyDepotPrototype,
+            GameObject advancedSupplyDepotPrototype,
+            GameObject mainBasePrototype)
+        {
+            if (ai == null || wallet == null || constructionPrototype == null)
+            {
+                return;
+            }
+
+            var templates = ai.GetComponent<AiBuildingTemplateRegistry>();
+            if (templates == null)
+            {
+                templates = ai.gameObject.AddComponent<AiBuildingTemplateRegistry>();
+            }
+
             templates.Configure(UnitTeam.Team2, wallet, tilemapWorld, constructionPrototype);
             templates.RegisterTemplate(BuildingKind.Production, productionPrototype, new ResourceAmount(150, 0), 8f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.SpliterProduction, spliterProductionPrototype, new ResourceAmount(175, 0), 9f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.AutoTurret, autoTurretPrototype, new ResourceAmount(125, 0), 7f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.SpeedAura, speedAuraPrototype, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2));
+            templates.RegisterTemplate(BuildingKind.SupplyDepot, supplyDepotPrototype, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1));
+            templates.RegisterTemplate(BuildingKind.AdvancedSupplyDepot, advancedSupplyDepotPrototype, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1));
             templates.RegisterTemplate(BuildingKind.MainBase, mainBasePrototype, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3));
         }
 
@@ -551,7 +635,7 @@ namespace ProjectS
             {
                 if (buildings[i].Kind == BuildingKind.MainBase)
                 {
-                    buildings[i].ConfigureSupplyProvided(MainBaseSupplyProvided);
+                    buildings[i].ConfigureSupplyProvided(new SupplyAmount(MainBaseSupplyProvided, 0));
                 }
             }
 

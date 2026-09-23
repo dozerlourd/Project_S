@@ -1,4 +1,5 @@
 using System;
+using ProjectS.Units;
 using UnityEngine;
 
 namespace ProjectS.Buildings
@@ -27,6 +28,7 @@ namespace ProjectS.Buildings
                 case BuildingKind.SpliterProduction: return typeof(SpliterProductionStructure);
                 case BuildingKind.ResourceDropOff: return typeof(ResourceDropOffStructure);
                 case BuildingKind.SupplyDepot: return typeof(SupplyDepotStructure);
+                case BuildingKind.AdvancedSupplyDepot: return typeof(AdvancedSupplyDepotStructure);
                 case BuildingKind.AutoTurret: return typeof(AutoTurretStructure);
                 case BuildingKind.SpeedAura: return typeof(SpeedAuraStructure);
                 case BuildingKind.ResearchLab: return typeof(ResearchLabStructure);
@@ -50,6 +52,9 @@ namespace ProjectS.Buildings
                 case BuildingKind.TacticalCommandCenter:
                 case BuildingKind.MaintenanceBay:
                     return new Vector2Int(3, 2);
+                case BuildingKind.SupplyDepot:
+                case BuildingKind.AdvancedSupplyDepot:
+                    return new Vector2Int(2, 1);
                 default:
                     return new Vector2Int(2, 2);
             }
@@ -72,12 +77,18 @@ namespace ProjectS.Buildings
 
         public static int GetDefaultSupply(BuildingKind kind)
         {
+            return GetDefaultSupplyAmount(kind).Standard;
+        }
+
+        public static SupplyAmount GetDefaultSupplyAmount(BuildingKind kind)
+        {
             switch (kind)
             {
-                case BuildingKind.MainBase: return 20;
-                case BuildingKind.SupplyDepot: return 10;
-                case BuildingKind.ForwardSupplyPost: return 5;
-                default: return 0;
+                case BuildingKind.MainBase: return new SupplyAmount(10);
+                case BuildingKind.SupplyDepot: return new SupplyAmount(10);
+                case BuildingKind.AdvancedSupplyDepot: return new SupplyAmount(0, 10);
+                case BuildingKind.ForwardSupplyPost: return new SupplyAmount(5);
+                default: return new SupplyAmount();
             }
         }
 

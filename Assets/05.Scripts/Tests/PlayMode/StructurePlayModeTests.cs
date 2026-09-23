@@ -21,7 +21,7 @@ namespace ProjectS.Tests.PlayMode
             "MainBase", "Production", "ResourceDropOff", "SupplyDepot",
             "SpliterProduction", "AutoTurret", "SpeedAura", "Other",
             "ResearchLab", "DefenseControlCenter", "VehicleFactory", "SignalRelay",
-            "TacticalCommandCenter", "MaintenanceBay", "ForwardSupplyPost"
+            "TacticalCommandCenter", "MaintenanceBay", "ForwardSupplyPost", "AdvancedSupplyDepot"
         };
 
         [Test]
@@ -52,7 +52,7 @@ namespace ProjectS.Tests.PlayMode
 
             try
             {
-                foreach (var kind in new[] { "MainBase", "Production", "SpliterProduction", "AutoTurret", "SpeedAura" })
+                foreach (var kind in new[] { "MainBase", "Production", "SpliterProduction", "AutoTurret", "SpeedAura", "SupplyDepot", "AdvancedSupplyDepot" })
                 {
                     var prefab = (GameObject)Invoke(catalog, "GetPrefab", ParseKind(kind));
                     Assert.That(prefab, Is.Not.Null, kind + " catalog prefab");
@@ -77,7 +77,6 @@ namespace ProjectS.Tests.PlayMode
                 Assert.That(constructionSprite, Is.Not.Null);
                 Assert.That(sprites.Add(constructionSprite), Is.True,
                     "ConstructionSite must use a Sprite distinct from completed buildings");
-                Assert.That(catalog.GetType().GetMethod("GetPrefab")?.Invoke(catalog, new[] { ParseKind("SupplyDepot") }), Is.Null);
                 Assert.That(catalog.GetType().GetMethod("GetPrefab")?.Invoke(catalog, new[] { ParseKind("ResourceDropOff") }), Is.Null);
             }
             finally
@@ -147,7 +146,7 @@ namespace ProjectS.Tests.PlayMode
                     Is.EqualTo(DefaultFootprint(kind)));
                 Assert.That(Property(structure, "VisionRadius"), Is.EqualTo(kind == "SignalRelay" ? 12f : 9f));
                 Assert.That(Property(structure, "SupplyProvided"),
-                    Is.EqualTo(kind == "SupplyDepot" ? 10 : kind == "ForwardSupplyPost" ? 5 : 0));
+                    Is.EqualTo(kind == "MainBase" || kind == "SupplyDepot" ? 10 : kind == "ForwardSupplyPost" ? 5 : 0));
 
                 var health = root.GetComponent(BuildingType("BuildingHealth"));
                 Assert.That(health, Is.Not.Null);
@@ -434,6 +433,142 @@ namespace ProjectS.Tests.PlayMode
             }
         }
 
+        [Test]
+        public void AdvancedSupplyDepot_ProvidesOnlyAdvancedSupply_WhenCompletedAndActive()
+        {
+            var ownedObjects = new List<GameObject>();
+            try
+            {
+                var supply = GetOrCreateTeamService(ownedObjects, "SupplyManager", FirstTeam);
+                var standardBaseline = (int)Property(supply, "MaxSupply");
+                var advancedBaseline = (int)Property(supply, "MaxAdvancedSupply");
+                var root = CreateOwnedObject(ownedObjects, "Advanced supply lifecycle");
+                root.SetActive(false);
+                var structure = AddStructure(root, "AdvancedSupplyDepot");
+                Initialize(structure, FirstTeam, "AdvancedSupplyDepot", new Vector2Int(2, 1), false);
+
+                root.SetActive(true);
+                Assert.That(Property(structure, "SupplyProvided"), Is.Zero);
+                Assert.That(Property(structure, "AdvancedSupplyProvided"), Is.EqualTo(10));
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(standardBaseline));
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.EqualTo(advancedBaseline));
+
+                Invoke(structure, "MarkCompleted");
+                var advancedAfterCompletion = Mathf.Min(
+                    (int)Property(supply, "AdvancedSupplyLimit"),
+                    advancedBaseline + 10);
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(standardBaseline));
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.EqualTo(advancedAfterCompletion));
+
+                var advancedAmount = Activator.CreateInstance(GetGameplayType("ProjectS.Units.SupplyAmount"), 0, 10);
+                Assert.That((bool)Invoke(supply, "TryReserve", advancedAmount), Is.True);
+                Assert.That(Property(supply, "ReservedAdvancedSupply"), Is.EqualTo(10));
+                Invoke(supply, "ReleaseReservation", advancedAmount);
+                Assert.That(Property(supply, "ReservedAdvancedSupply"), Is.Zero);
+
+                root.SetActive(false);
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(standardBaseline));
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.EqualTo(advancedBaseline));
+                root.SetActive(true);
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.EqualTo(advancedAfterCompletion));
+
+                ((IUnitAttackTarget)structure).TakeDamage(10000f);
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.EqualTo(advancedBaseline));
+            }
+            finally
+            {
+                for (var i = ownedObjects.Count - 1; i >= 0; i--)
+                {
+                    if (ownedObjects[i] != null)
+                    {
+                        Object.DestroyImmediate(ownedObjects[i]);
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void SupplyDepot_ProvidesOnlyStandardSupply_AfterCompletionAndReleasesItExactlyOnce()
+        {
+            var ownedObjects = new List<GameObject>();
+            try
+            {
+                var supply = GetOrCreateTeamService(ownedObjects, "SupplyManager", FirstTeam);
+                var standardBaseline = (int)Property(supply, "MaxSupply");
+                var advancedBaseline = (int)Property(supply, "MaxAdvancedSupply");
+                var root = CreateOwnedObject(ownedObjects, "Standard supply lifecycle");
+                root.SetActive(false);
+                var structure = AddStructure(root, "SupplyDepot");
+                Initialize(structure, FirstTeam, "SupplyDepot", new Vector2Int(2, 1), false);
+
+                root.SetActive(true);
+                Assert.That(Property(structure, "SupplyProvided"), Is.EqualTo(10));
+                Assert.That(Property(structure, "AdvancedSupplyProvided"), Is.Zero);
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(standardBaseline));
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.EqualTo(advancedBaseline));
+
+                Invoke(structure, "MarkCompleted");
+                Invoke(structure, "MarkCompleted");
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(standardBaseline + 10));
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.EqualTo(advancedBaseline));
+
+                root.SetActive(false);
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(standardBaseline));
+                root.SetActive(true);
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(standardBaseline + 10));
+
+                ((IUnitAttackTarget)structure).TakeDamage(10000f);
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(standardBaseline));
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.EqualTo(advancedBaseline));
+            }
+            finally
+            {
+                for (var i = ownedObjects.Count - 1; i >= 0; i--)
+                {
+                    if (ownedObjects[i] != null)
+                    {
+                        Object.DestroyImmediate(ownedObjects[i]);
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void MainBase_ProvidesTenStandardSupplyAndKeepsItAfterManagerReinitialization()
+        {
+            var ownedObjects = new List<GameObject>();
+            try
+            {
+                var supply = GetOrCreateTeamService(ownedObjects, "StartingSupplyManager", FirstTeam);
+                var root = CreateOwnedObject(ownedObjects, "Starting main base");
+                root.SetActive(false);
+                var structure = AddStructure(root, "MainBase");
+                Initialize(structure, FirstTeam, "MainBase", new Vector2Int(3, 3), true);
+
+                root.SetActive(true);
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(10));
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.Zero);
+
+                Invoke(supply, "Initialize", FirstTeam);
+                Assert.That(Property(supply, "MaxSupply"), Is.EqualTo(10));
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.Zero);
+
+                root.SetActive(false);
+                Assert.That(Property(supply, "MaxSupply"), Is.Zero);
+                Assert.That(Property(supply, "MaxAdvancedSupply"), Is.Zero);
+            }
+            finally
+            {
+                for (var i = ownedObjects.Count - 1; i >= 0; i--)
+                {
+                    if (ownedObjects[i] != null)
+                    {
+                        Object.DestroyImmediate(ownedObjects[i]);
+                    }
+                }
+            }
+        }
+
         private static Vector2Int DefaultFootprint(string kind)
         {
             switch (kind)
@@ -444,6 +579,9 @@ namespace ProjectS.Tests.PlayMode
                 case "TacticalCommandCenter":
                 case "MaintenanceBay":
                     return new Vector2Int(3, 2);
+                case "SupplyDepot":
+                case "AdvancedSupplyDepot":
+                    return new Vector2Int(2, 1);
                 default:
                     return new Vector2Int(2, 2);
             }
@@ -581,6 +719,19 @@ namespace ProjectS.Tests.PlayMode
         private static Type GetGameplayType(string name)
         {
             var type = Type.GetType(name + ", Assembly-CSharp");
+            if (type == null)
+            {
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                for (var i = 0; i < assemblies.Length; i++)
+                {
+                    type = assemblies[i].GetType(name);
+                    if (type != null)
+                    {
+                        break;
+                    }
+                }
+            }
+
             Assert.That(type, Is.Not.Null, "Could not resolve gameplay type " + name);
             return type;
         }

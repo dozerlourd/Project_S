@@ -35,7 +35,8 @@ namespace ProjectS.UI
             Key.T,
             Key.Y,
             Key.U,
-            Key.I
+            Key.I,
+            Key.O
         };
         private static readonly BuildingKind[] BuildMenuBuildings =
         {
@@ -44,6 +45,7 @@ namespace ProjectS.UI
             BuildingKind.AutoTurret,
             BuildingKind.SpeedAura,
             BuildingKind.SupplyDepot,
+            BuildingKind.AdvancedSupplyDepot,
             BuildingKind.ResourceDropOff,
             BuildingKind.MainBase
         };
@@ -60,7 +62,7 @@ namespace ProjectS.UI
         private const float ResourcePanelX = 12f;
         private const float ResourcePanelY = 12f;
         private const float ResourcePanelWidth = 260f;
-        private const float ResourcePanelHeight = 168f;
+        private const float ResourcePanelHeight = 214f;
         private const float MatchTimerWidth = 132f;
         private const float MatchTimerHeight = 38f;
         private const float MatchTimerTopMargin = 14f;
@@ -266,7 +268,7 @@ namespace ProjectS.UI
         {
             var guiPosition = new Vector2(screenPosition.x, Screen.height - screenPosition.y);
             if (workerAutoAssignmentManager != null
-                && new Rect(24f, 112f, 220f, 24f).Contains(guiPosition))
+                && new Rect(24f, 138f, 220f, 24f).Contains(guiPosition))
             {
                 return true;
             }
@@ -439,19 +441,29 @@ namespace ProjectS.UI
             GUI.Box(new Rect(ResourcePanelX, ResourcePanelY, ResourcePanelWidth, ResourcePanelHeight), string.Empty);
             var minerals = wallet != null ? wallet.Minerals : 0;
             var gas = wallet != null ? wallet.Gas : 0;
-            var currentSupply = supplyManager != null ? supplyManager.CurrentSupply : 0;
-            var maxSupply = supplyManager != null ? supplyManager.MaxSupply : 0;
-            var reservedSupply = supplyManager != null ? supplyManager.ReservedSupply : 0;
             GUI.Label(new Rect(24f, 22f, 120f, 22f), $"Minerals: {minerals}");
             GUI.Label(new Rect(144f, 22f, 100f, 22f), $"Gas: {gas}");
-            GUI.Label(new Rect(24f, 46f, 220f, 22f), $"Supply: {currentSupply}/{maxSupply}  Reserved: {reservedSupply}");
-            GUI.Label(new Rect(24f, 70f, 220f, 20f), $"Team: {playerTeam}");
+            DrawPopulationLabel(
+                new Rect(24f, 46f, 236f, 22f),
+                "General Population",
+                supplyManager != null ? supplyManager.CurrentSupply : 0,
+                supplyManager != null ? supplyManager.MaxSupply : 0,
+                supplyManager != null ? supplyManager.ReservedSupply : 0,
+                new Color(0.5f, 0.86f, 1f));
+            DrawPopulationLabel(
+                new Rect(24f, 70f, 236f, 22f),
+                "Advanced Population",
+                supplyManager != null ? supplyManager.CurrentAdvancedSupply : 0,
+                supplyManager != null ? supplyManager.MaxAdvancedSupply : 0,
+                supplyManager != null ? supplyManager.ReservedAdvancedSupply : 0,
+                new Color(1f, 0.76f, 0.34f));
+            GUI.Label(new Rect(24f, 96f, 220f, 20f), $"Team: {playerTeam}");
             var autoLabel = workerAutoAssignmentManager == null
                 ? "Auto Workers: Unavailable"
                 : $"Auto Workers: {(workerAutoAssignmentManager.AutomaticAssignmentEnabled ? "ON" : "OFF")}  ({workerAutoAssignmentManager.AssignedWorkerCount})";
-            GUI.Label(new Rect(24f, 91f, 220f, 20f), autoLabel);
+            GUI.Label(new Rect(24f, 117f, 220f, 20f), autoLabel);
             if (workerAutoAssignmentManager != null
-                && GUI.Button(new Rect(24f, 112f, 220f, 24f), workerAutoAssignmentManager.AutomaticAssignmentEnabled
+                && GUI.Button(new Rect(24f, 138f, 220f, 24f), workerAutoAssignmentManager.AutomaticAssignmentEnabled
                     ? "Disable automatic assignment"
                     : "Enable automatic assignment"))
             {
@@ -462,7 +474,23 @@ namespace ProjectS.UI
             var researchLabel = research != null && research.ActiveDefinition != null
                 ? $"Research: {research.ActiveDefinition.DisplayName} {research.ActiveProgress01 * 100f:0}%"
                 : "Research: Idle";
-            GUI.Label(new Rect(24f, 142f, 236f, 18f), researchLabel);
+            GUI.Label(new Rect(24f, 170f, 236f, 18f), researchLabel);
+        }
+
+        private static void DrawPopulationLabel(
+            Rect rect,
+            string label,
+            int current,
+            int maximum,
+            int reserved,
+            Color color)
+        {
+            var previousColor = GUI.contentColor;
+            GUI.contentColor = color;
+            GUI.Label(
+                rect,
+                $"{label}: {Mathf.Max(0, current)}/{Mathf.Max(0, maximum)} ({Mathf.Max(0, reserved)})");
+            GUI.contentColor = previousColor;
         }
 
         private void DrawSelectionPanel(Rect rect)
@@ -785,9 +813,10 @@ namespace ProjectS.UI
             DrawBuildOption(BuildOptionRect(panelRect, 1, columns, buttonWidth, buttonHeight, buttonGap), 1, columns == 4 ? "Spliter\n175M" : "Spliter 175M");
             DrawBuildOption(BuildOptionRect(panelRect, 2, columns, buttonWidth, buttonHeight, buttonGap), 2, columns == 4 ? "Turret\n125M" : "Turret 125M");
             DrawBuildOption(BuildOptionRect(panelRect, 3, columns, buttonWidth, buttonHeight, buttonGap), 3, columns == 4 ? "Speed\n125M/25G" : "Speed 125M/25G");
-            DrawBuildOption(BuildOptionRect(panelRect, 4, columns, buttonWidth, buttonHeight, buttonGap), 4, columns == 5 ? "Supply\n100M" : "Supply 100M");
-            DrawBuildOption(BuildOptionRect(panelRect, 5, columns, buttonWidth, buttonHeight, buttonGap), 5, columns >= 5 ? "Drop-off\n100M" : "Drop-off 100M");
-            DrawBuildOption(BuildOptionRect(panelRect, 6, columns, buttonWidth, buttonHeight, buttonGap), 6, columns >= 5 ? "Main Base\n350M/75G" : "Main Base 350M/75G");
+            DrawBuildOption(BuildOptionRect(panelRect, 4, columns, buttonWidth, buttonHeight, buttonGap), 4, columns == 5 ? "Supply +10\n100M" : "Supply +10 100M");
+            DrawBuildOption(BuildOptionRect(panelRect, 5, columns, buttonWidth, buttonHeight, buttonGap), 5, columns == 5 ? "Adv. +10\n100M" : "Adv. +10 100M");
+            DrawBuildOption(BuildOptionRect(panelRect, 6, columns, buttonWidth, buttonHeight, buttonGap), 6, columns >= 5 ? "Drop-off\n100M" : "Drop-off 100M");
+            DrawBuildOption(BuildOptionRect(panelRect, 7, columns, buttonWidth, buttonHeight, buttonGap), 7, columns >= 5 ? "Main Base\n350M/75G" : "Main Base 350M/75G");
             var rowCount = Mathf.CeilToInt(BuildMenuBuildings.Length / (float)columns);
             GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 30f + rowCount * (buttonHeight + 4f), panelRect.width - 16f, 20f), "Choose a tile to place. Esc cancels.");
         }

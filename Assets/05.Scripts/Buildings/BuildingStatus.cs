@@ -17,7 +17,8 @@ namespace ProjectS.Buildings
         SignalRelay = 11,
         TacticalCommandCenter = 12,
         MaintenanceBay = 13,
-        ForwardSupplyPost = 14
+        ForwardSupplyPost = 14,
+        AdvancedSupplyDepot = 15
     }
 
     // Preserve this script's GUID and type for scene references and existing GetComponent calls.

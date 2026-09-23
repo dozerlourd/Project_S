@@ -12,18 +12,32 @@ namespace ProjectS.Resources
             new Dictionary<UnitTeam, SupplyManager>();
 
         [SerializeField] private UnitTeam team = UnitTeam.Team1;
+        [Header("Team supply limits")]
+        [SerializeField, Min(0)] private int standardSupplyLimit = 200;
+        [SerializeField, Min(0)] private int advancedSupplyLimit = 100;
 
-        private readonly Dictionary<int, int> unitSupplyByInstanceId = new Dictionary<int, int>();
-        private readonly Dictionary<int, int> buildingSupplyByInstanceId = new Dictionary<int, int>();
-        private int reservedSupply;
+        private readonly Dictionary<int, SupplyAmount> unitSupplyByInstanceId = new Dictionary<int, SupplyAmount>();
+        private readonly Dictionary<int, SupplyAmount> buildingSupplyByInstanceId = new Dictionary<int, SupplyAmount>();
+        private SupplyAmount reservedSupply;
         private bool registered;
         private UnitTeam registeredTeam;
 
         public UnitTeam Team => team;
-        public int CurrentSupply { get; private set; }
-        public int ReservedSupply => reservedSupply;
-        public int MaxSupply { get; private set; }
-        public int AvailableSupply => Mathf.Max(0, MaxSupply - CurrentSupply - ReservedSupply);
+        // Legacy standard-supply accessors remain for authored gameplay and external callers.
+        public int CurrentSupply => CurrentStandardSupply;
+        public int ReservedSupply => ReservedStandardSupply;
+        public int MaxSupply => MaxStandardSupply;
+        public int AvailableSupply => AvailableStandardSupply;
+        public int CurrentStandardSupply { get; private set; }
+        public int ReservedStandardSupply => reservedSupply.Standard;
+        public int MaxStandardSupply => Mathf.Min(StandardSupplyLimit, GetBuildingSupply(SupplyKind.Standard));
+        public int AvailableStandardSupply => Mathf.Max(0, MaxStandardSupply - CurrentStandardSupply - ReservedStandardSupply);
+        public int CurrentAdvancedSupply { get; private set; }
+        public int ReservedAdvancedSupply => reservedSupply.Advanced;
+        public int MaxAdvancedSupply => Mathf.Min(AdvancedSupplyLimit, GetBuildingSupply(SupplyKind.Advanced));
+        public int AvailableAdvancedSupply => Mathf.Max(0, MaxAdvancedSupply - CurrentAdvancedSupply - ReservedAdvancedSupply);
+        public int StandardSupplyLimit => Mathf.Max(0, standardSupplyLimit);
+        public int AdvancedSupplyLimit => Mathf.Max(0, advancedSupplyLimit);
         public string LastFailureReason { get; private set; }
 
         public event Action SupplyChanged;
@@ -60,16 +74,34 @@ namespace ProjectS.Resources
             }
         }
 
+        public void ConfigureSupplyLimits(int standardLimit, int advancedLimit)
+        {
+            standardSupplyLimit = Mathf.Max(0, standardLimit);
+            advancedSupplyLimit = Mathf.Max(0, advancedLimit);
+            NotifySupplyChanged();
+        }
+
         public bool CanReserve(int amount)
         {
-            return amount >= 0 && CurrentSupply + ReservedSupply + amount <= MaxSupply;
+            return CanReserve(SupplyAmount.For(SupplyKind.Standard, amount));
+        }
+
+        public bool CanReserve(SupplyAmount amount)
+        {
+            return CurrentStandardSupply + ReservedStandardSupply + amount.Standard <= MaxStandardSupply
+                && CurrentAdvancedSupply + ReservedAdvancedSupply + amount.Advanced <= MaxAdvancedSupply;
         }
 
         public bool TryReserve(int amount)
         {
+            return TryReserve(SupplyAmount.For(SupplyKind.Standard, amount));
+        }
+
+        public bool TryReserve(SupplyAmount amount)
+        {
             if (!CanReserve(amount))
             {
-                LastFailureReason = $"Insufficient supply: need {Mathf.Max(0, amount)}, available {AvailableSupply}.";
+                LastFailureReason = $"Insufficient supply: need {amount.Standard} standard/{amount.Advanced} advanced, available {AvailableStandardSupply} standard/{AvailableAdvancedSupply} advanced.";
                 return false;
             }
 
@@ -81,18 +113,23 @@ namespace ProjectS.Resources
 
         public void ReleaseReservation(int amount)
         {
-            if (amount <= 0)
-            {
-                return;
-            }
+            ReleaseReservation(SupplyAmount.For(SupplyKind.Standard, amount));
+        }
 
-            reservedSupply = Mathf.Max(0, reservedSupply - amount);
+        public void ReleaseReservation(SupplyAmount amount)
+        {
+            reservedSupply -= amount;
             NotifySupplyChanged();
         }
 
         public bool CommitReservation(int amount, PrototypeUnitStatus unit)
         {
-            if (unit == null || amount < 0 || reservedSupply < amount)
+            return CommitReservation(SupplyAmount.For(SupplyKind.Standard, amount), unit);
+        }
+
+        public bool CommitReservation(SupplyAmount amount, PrototypeUnitStatus unit)
+        {
+            if (unit == null || reservedSupply.Standard < amount.Standard || reservedSupply.Advanced < amount.Advanced)
             {
                 LastFailureReason = "Cannot complete supply reservation: reservation is missing.";
                 return false;
@@ -107,16 +144,19 @@ namespace ProjectS.Resources
 
         public void RegisterUnit(PrototypeUnitStatus unit, int supplyCost)
         {
+            RegisterUnit(unit, SupplyAmount.For(SupplyKind.Standard, supplyCost));
+        }
+
+        public void RegisterUnit(PrototypeUnitStatus unit, SupplyAmount supplyCost)
+        {
             if (unit == null || unit.Team != team)
             {
                 return;
             }
 
             var instanceId = unit.GetInstanceID();
-            unitSupplyByInstanceId.TryGetValue(instanceId, out var previousCost);
-            var sanitizedCost = Mathf.Max(0, supplyCost);
-            unitSupplyByInstanceId[instanceId] = sanitizedCost;
-            CurrentSupply += sanitizedCost - previousCost;
+            unitSupplyByInstanceId[instanceId] = supplyCost;
+            RefreshUnitSupplyTotals();
             NotifySupplyChanged();
         }
 
@@ -128,22 +168,28 @@ namespace ProjectS.Resources
             }
 
             unitSupplyByInstanceId.Remove(unit.GetInstanceID());
-            CurrentSupply = Mathf.Max(0, CurrentSupply - supplyCost);
+            RefreshUnitSupplyTotals();
             NotifySupplyChanged();
         }
 
         public void RegisterBuilding(Structure building, int suppliedAmount)
         {
-            if (building == null || building.Team != team || !building.Completed)
+            RegisterBuilding(building, SupplyAmount.For(SupplyKind.Standard, suppliedAmount));
+        }
+
+        public void RegisterBuilding(Structure building, SupplyAmount suppliedAmount)
+        {
+            if (building == null
+                || building.Team != team
+                || !building.Completed
+                || !building.isActiveAndEnabled
+                || !building.IsAlive)
             {
                 return;
             }
 
             var instanceId = building.GetInstanceID();
-            buildingSupplyByInstanceId.TryGetValue(instanceId, out var previousAmount);
-            var sanitizedAmount = Mathf.Max(0, suppliedAmount);
-            buildingSupplyByInstanceId[instanceId] = sanitizedAmount;
-            MaxSupply += sanitizedAmount - previousAmount;
+            buildingSupplyByInstanceId[instanceId] = suppliedAmount;
             NotifySupplyChanged();
         }
 
@@ -155,7 +201,6 @@ namespace ProjectS.Resources
             }
 
             buildingSupplyByInstanceId.Remove(building.GetInstanceID());
-            MaxSupply = Mathf.Max(0, MaxSupply - suppliedAmount);
             NotifySupplyChanged();
         }
 
@@ -190,17 +235,23 @@ namespace ProjectS.Resources
         {
             RefreshActiveUnitSupply();
 
+            // A manager can be disabled while a provider is destroyed or deactivated.
+            // Rebuild from the active scene so that a stale provider never survives a
+            // manager re-enable and contributes supply after it is gone.
+            buildingSupplyByInstanceId.Clear();
+
             var buildings = FindObjectsByType<BuildingStatus>(FindObjectsSortMode.None);
             for (var i = 0; i < buildings.Length; i++)
             {
-                RegisterBuilding(buildings[i], buildings[i].SupplyProvided);
+                RegisterBuilding(buildings[i], buildings[i].SupplyProvidedAmount);
             }
+
+            NotifySupplyChanged();
         }
 
         private void RefreshActiveUnitSupply()
         {
             var activeUnits = UnitRegistry.GetAgents(team);
-            var refreshedSupply = 0;
             unitSupplyByInstanceId.Clear();
 
             for (var i = 0; i < activeUnits.Count; i++)
@@ -211,16 +262,41 @@ namespace ProjectS.Resources
                     continue;
                 }
 
-                var supplyCost = status.SupplyCost;
-                unitSupplyByInstanceId[status.GetInstanceID()] = supplyCost;
-                refreshedSupply += supplyCost;
+                unitSupplyByInstanceId[status.GetInstanceID()] = status.SupplyUsage;
             }
 
-            if (CurrentSupply != refreshedSupply)
+            var oldStandard = CurrentStandardSupply;
+            var oldAdvanced = CurrentAdvancedSupply;
+            RefreshUnitSupplyTotals();
+            if (oldStandard != CurrentStandardSupply || oldAdvanced != CurrentAdvancedSupply)
             {
-                CurrentSupply = refreshedSupply;
                 NotifySupplyChanged();
             }
+        }
+
+        private void RefreshUnitSupplyTotals()
+        {
+            var standard = 0;
+            var advanced = 0;
+            foreach (var amount in unitSupplyByInstanceId.Values)
+            {
+                standard += amount.Standard;
+                advanced += amount.Advanced;
+            }
+
+            CurrentStandardSupply = Mathf.Max(0, standard);
+            CurrentAdvancedSupply = Mathf.Max(0, advanced);
+        }
+
+        private int GetBuildingSupply(SupplyKind kind)
+        {
+            var total = 0;
+            foreach (var amount in buildingSupplyByInstanceId.Values)
+            {
+                total += amount.Get(kind);
+            }
+
+            return Mathf.Max(0, total);
         }
 
         private void NotifySupplyChanged()
