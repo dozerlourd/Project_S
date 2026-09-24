@@ -19,10 +19,13 @@
 ### 특수 생산 건물 3종
 
 - [ ] `VehicleFactory_Unique.png`, `MaintenanceBay_Unique.png`, `SignalRelay_Unique.png`를 `Assets/01.Textures/Buildings/Unique`에 추가한 뒤 각 FutureTech 프리팹의 고유 Sprite 슬롯이 연결되는지 확인한다.
-- [ ] Siege, Medic, Scout 유닛 타입과 프리팹이 준비되면 생산 정의의 허용 건물을 각각 VehicleFactory, MaintenanceBay, SignalRelay로 제한하고 다른 생산 건물에서 거부되는지 확인한다.
+- [ ] Siege, Medic, Scout가 각각 VehicleFactory, MaintenanceBay, SignalRelay에서만 생산 목록에 표시되고 다른 생산 건물의 큐 요청은 자원·인구 예약 전에 거부되는지 확인한다.
+- [ ] `Project_S_Unit_Catalog.xlsx` 기준으로 Medic 2, Siege 4, Scout 1의 일반 인구와 고급 인구 0이 예약·완료·취소 때 정확히 반영되는지 확인한다.
+- [ ] 스프레드시트에 비용과 생산 시간이 확정되기 전까지 세 정의가 `UnitProductionDefinition`의 기존 기본 비용 50 미네랄과 생산 시간 6초를 유지하는지 확인한다.
 - [ ] VehicleFactory 3x3/1250 HP, MaintenanceBay 3x2/850 HP, SignalRelay 2x2/550 HP 및 시야 12가 실제 프리팹 인스턴스에 적용되는지 확인한다.
-- [ ] 세 건물이 각각 `UnitProductionQueue`를 하나만 가지며 유닛 프리팹이 없는 현재 상태에서는 생산 항목을 노출하지 않는지 확인한다.
-- [ ] `SpecializedProductionCatalog_PrefabsExposeDedicatedEmptyQueues` PlayMode 테스트를 Unity Test Runner에서 실행한다. 2026-09-15 배치 실행은 반환 코드 1로 즉시 종료되어 결과 XML이 생성되지 않았다.
+- [ ] 세 건물이 각각 `UnitProductionQueue`를 하나만 가지며 전용 유닛 정의 하나만 노출하는지 확인한다.
+- [ ] 미완성 MaintenanceBay에서 Medic 큐 요청 시 `building is not completed` 실패 사유가 표시되고 미네랄과 일반/고급 인구 예약이 변하지 않는지 확인한다.
+- [ ] `SpecializedProductionDefinition_UsesCatalogBuildingAndStandardSupply`, `SpecializedProductionQueue_IncompleteBuildingRejectsBeforeResourceAndSupplyReservation` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 
 ### 핵심 건물 역할 및 고유 텍스처
 
@@ -115,6 +118,8 @@
 ### 보급 및 생산 제한
 
 - [ ] 본진이 제공하는 보급량과 현재 유닛 사용량이 HUD에 `현재 / 최대`로 정확히 표시되는지 확인한다.
+- [ ] 새 매치에서 Team1/Team2 공급 관리자가 모두 등록된 뒤 Team1 HUD가 일반 인구 `0/10 (0)`으로 시작하는지 확인한다.
+- [ ] Team1 Supply Depot과 Advanced Supply Depot을 각각 완성했을 때 일반/고급 최대 인구가 해당 종류로만 10씩 증가하는지 확인한다.
 - [ ] 최대 보급량에 도달했을 때 생산 큐가 자원을 소비하지 않고 보급 부족 사유를 표시하는지 확인한다.
 - [ ] 대기 및 진행 중 생산을 취소하면 예약 보급량과 자원이 모두 즉시 반환되는지 확인한다.
 - [ ] 생산 완료와 유닛 사망 또는 비활성화 뒤 현재 사용 보급량이 실제 활성 유닛 수와 일치하는지 확인한다.
@@ -263,6 +268,11 @@
 - [ ] Striker와 Swarm이 표준 유닛보다 깊게 접근하고 더 짧은 재경로 간격으로 목표를 추적하면서 기존 점유 분산을 유지하는지 확인한다.
 - [ ] Spliter가 주 대상 포함, 반경 2, 최대 3대상 광역 공격 규칙을 유지하는지 확인한다.
 - [ ] `UnitTacticalBehaviorPlayModeTests`와 기존 명령·광역 공격 PlayMode 테스트를 Unity Test Runner에서 함께 실행한다.
+
+### 유닛 선택 아웃라인
+
+- [ ] 열린 Unity 에디터의 Test Runner에서 `SelectionOutline_StaysHiddenUntilSelectedAndUsesThinAlphaWidths`를 실행해 선택 전에는 아웃라인 렌더러가 없고, 선택 시 본체 알파 외곽의 6/12픽셀 초록 아웃라인만 보이는지 확인한다.
+- [ ] `B_Striker`를 씬에 배치해 새 기계 돌격 유닛 스프라이트가 정상 표시되고, 선택 해제 시 구형 사각형·십자·링 보조 표시가 남지 않으며 선택 시 외곽선만 표시되는지 확인한다.
 
 ### 능동 스킬 최소 루프
 

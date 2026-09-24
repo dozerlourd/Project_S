@@ -122,6 +122,34 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator PlayerCommandController_TreatsMinimapPointAsRuntimeHud()
+        {
+            var originalWidth = Screen.width;
+            var originalHeight = Screen.height;
+            var originalFullScreen = Screen.fullScreen;
+            Screen.SetResolution(1280, 720, false);
+            yield return null;
+
+            var minimapObject = new GameObject("Input Blocking Minimap");
+            minimapObject.AddComponent(GetGameplayType("ProjectS.UI.RtsMinimap"));
+            yield return null;
+
+            var guiPointInsideMinimap = new Vector2(1280f - 224f - 12f + 112f, 720f - 12f - 42f - 8f - 144f + 72f);
+            var screenPointInsideMinimap = new Vector2(guiPointInsideMinimap.x, Screen.height - guiPointInsideMinimap.y);
+            var controllerType = GetGameplayType("ProjectS.Units.PlayerUnitCommandController");
+            var method = controllerType.GetMethod("IsPointerOverRuntimeHud", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null, "Could not find IsPointerOverRuntimeHud.");
+
+            var isBlocked = (bool)method.Invoke(null, new object[] { screenPointInsideMinimap });
+
+            Assert.That(isBlocked, Is.True);
+
+            Object.Destroy(minimapObject);
+            Screen.SetResolution(originalWidth, originalHeight, originalFullScreen);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator NamedObstacleTilemapChanges_RefreshNavigationAndMinimapTerrain()
         {
             var gridObject = new GameObject("Obstacle Cache Grid");

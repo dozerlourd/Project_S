@@ -2550,6 +2550,117 @@ namespace ProjectS.Tests.PlayMode
             yield return null;
         }
 
+        [TestCase("Medic", "MaintenanceBay", 2)]
+        [TestCase("Siege", "VehicleFactory", 4)]
+        [TestCase("Scout", "SignalRelay", 1)]
+        public void SpecializedProductionDefinition_UsesCatalogBuildingAndStandardSupply(
+            string unitTypeName,
+            string buildingKindName,
+            int expectedStandardSupply)
+        {
+            var prefab = CreateUnitPrefab("Specialized" + unitTypeName + "Prefab", Enum.Parse<PrototypeUnitType>(unitTypeName));
+            try
+            {
+                var bootstrapType = GetGameplayType("ProjectS.MapCreateSceneAutoBootstrap");
+                var factory = bootstrapType.GetMethod(
+                    "CreateSpecializedProductionDefinition",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(factory, Is.Not.Null);
+
+                var buildingKind = Enum.Parse(BuildingKindType, buildingKindName);
+                var definition = factory.Invoke(null, new[]
+                {
+                    (object)unitTypeName,
+                    Enum.Parse<PrototypeUnitType>(unitTypeName),
+                    prefab,
+                    expectedStandardSupply,
+                    buildingKind
+                });
+
+                Assert.That(GetProperty(definition, "UnitType"), Is.EqualTo(Enum.Parse<PrototypeUnitType>(unitTypeName)));
+                Assert.That(GetInt(definition, "SupplyCost"), Is.EqualTo(expectedStandardSupply));
+                Assert.That(GetInt(definition, "AdvancedSupplyCost"), Is.Zero);
+                Assert.That(GetFloat(definition, "ProductionTime"), Is.EqualTo(6f));
+                var cost = GetProperty(definition, "Cost");
+                Assert.That(GetInt(cost, "Minerals"), Is.EqualTo(50));
+                Assert.That(GetInt(cost, "Gas"), Is.Zero);
+
+                var allowedBuildings = new List<object>();
+                foreach (var allowed in (IEnumerable)GetProperty(definition, "AllowedProductionBuildings"))
+                {
+                    allowedBuildings.Add(allowed);
+                }
+
+                Assert.That(allowedBuildings, Has.Count.EqualTo(1));
+                Assert.That(allowedBuildings[0], Is.EqualTo(buildingKind));
+
+                var requirements = new List<object>();
+                foreach (var requirement in (IEnumerable)GetProperty(definition, "Requirements"))
+                {
+                    requirements.Add(requirement);
+                }
+
+                Assert.That(requirements, Has.Count.EqualTo(1));
+                Assert.That(GetProperty(requirements[0], "RequiredBuildingKind"), Is.EqualTo(buildingKind));
+                Assert.That(GetInt(requirements[0], "RequiredCount"), Is.EqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SpecializedProductionQueue_IncompleteBuildingRejectsBeforeResourceAndSupplyReservation()
+        {
+            var supplyObject = new GameObject("SpecializedProductionSupply");
+            var supplyManager = supplyObject.AddComponent(SupplyManagerType);
+            Invoke(supplyManager, "Initialize", UnitTeam.Team1);
+            var walletObject = new GameObject("SpecializedProductionWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 0));
+            var medicPrefab = CreateUnitPrefab("SpecializedMedicPrefab", PrototypeUnitType.Medic);
+            var building = new GameObject("IncompleteMaintenanceBay");
+            var status = building.AddComponent(BuildingStatusType);
+            Invoke(status, "Initialize", UnitTeam.Team1, Enum.Parse(BuildingKindType, "MaintenanceBay"), new Vector2Int(3, 2), false);
+            Invoke(status, "ConfigureSupplyProvided", 10);
+
+            var factory = GetGameplayType("ProjectS.MapCreateSceneAutoBootstrap").GetMethod(
+                "CreateSpecializedProductionDefinition",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(factory, Is.Not.Null);
+            var definition = factory.Invoke(null, new[]
+            {
+                (object)"Medic",
+                PrototypeUnitType.Medic,
+                medicPrefab,
+                2,
+                Enum.Parse(BuildingKindType, "MaintenanceBay")
+            });
+            var definitions = Array.CreateInstance(UnitProductionDefinitionType, 1);
+            definitions.SetValue(definition, 0);
+            var queue = building.AddComponent(UnitProductionQueueType);
+            Invoke(queue, "Configure", wallet, null, definitions, 2, Vector3.right, Vector3.right * 2f);
+
+            LogAssert.Expect(LogType.Warning, "Cannot enqueue production: building is not completed.");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Medic), Is.False);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(100));
+            Assert.That(GetInt(supplyManager, "ReservedSupply"), Is.Zero);
+            Assert.That(GetInt(supplyManager, "ReservedAdvancedSupply"), Is.Zero);
+
+            Invoke(status, "MarkCompleted");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Medic), Is.True);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(50));
+            Assert.That(GetInt(supplyManager, "ReservedSupply"), Is.EqualTo(2));
+            Assert.That(GetInt(supplyManager, "ReservedAdvancedSupply"), Is.Zero);
+
+            Object.Destroy(building);
+            Object.Destroy(medicPrefab);
+            Object.Destroy(walletObject);
+            Object.Destroy(supplyObject);
+            yield return null;
+        }
+
         [UnityTest]
         public IEnumerator UnitProductionQueue_RechecksAdditionalConditionsBeforeStartingPendingProduction()
         {
@@ -2727,6 +2838,36 @@ namespace ProjectS.Tests.PlayMode
             Object.Destroy(productionBuilding);
             Object.Destroy(walletObject);
             Object.Destroy(supplyObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator UnitProductionQueue_BlocksSupplyCostWhenMatchSupplyManagerIsMissing()
+        {
+            var matchObject = new GameObject("MissingSupplyMatch");
+            matchObject.AddComponent(GetGameplayType("ProjectS.RtsMatchController"));
+            var walletObject = new GameObject("MissingSupplyWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(100, 0));
+            var productionBuilding = CreateProductionBuilding("MissingSupplyProduction", UnitTeam.Team1, Vector3.zero);
+            var unitPrefab = CreateUnitPrefab("MissingSupplyWorkerPrefab", PrototypeUnitType.Worker);
+            var definition = Activator.CreateInstance(UnitProductionDefinitionType);
+            Invoke(definition, "Configure", "Missing Supply Worker", PrototypeUnitType.Worker, unitPrefab, CreateResourceAmount(25, 0), 10f, 1, 1, null);
+            var definitions = Array.CreateInstance(UnitProductionDefinitionType, 1);
+            definitions.SetValue(definition, 0);
+            var queue = productionBuilding.AddComponent(UnitProductionQueueType);
+            Invoke(queue, "Configure", wallet, null, definitions, 1, Vector3.right, Vector3.right * 2f);
+
+            LogAssert.Expect(LogType.Warning,
+                "Cannot enqueue Missing Supply Worker: supply manager for Team1 is unavailable.");
+            Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Worker), Is.False);
+            Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(100));
+            Assert.That(GetInt(queue, "QueuedCount"), Is.Zero);
+
+            Object.Destroy(unitPrefab);
+            Object.Destroy(productionBuilding);
+            Object.Destroy(walletObject);
+            Object.Destroy(matchObject);
             yield return null;
         }
 

@@ -47,7 +47,10 @@ namespace ProjectS.UI
             BuildingKind.SupplyDepot,
             BuildingKind.AdvancedSupplyDepot,
             BuildingKind.ResourceDropOff,
-            BuildingKind.MainBase
+            BuildingKind.MainBase,
+            BuildingKind.VehicleFactory,
+            BuildingKind.MaintenanceBay,
+            BuildingKind.SignalRelay
         };
         private static readonly string[] CommandIconPaths =
         {
@@ -68,7 +71,7 @@ namespace ProjectS.UI
         private const float MatchTimerTopMargin = 14f;
         private const float BottomPanelMargin = 10f;
         private const float BottomPanelGap = 8f;
-        private const float BottomPanelHeight = 118f;
+        private const float BottomPanelHeight = 154f;
         private const float SelectionPanelMinWidth = 220f;
         private const float SelectionPanelMaxWidth = 300f;
         private const float CommandPanelMinWidth = 280f;
@@ -817,6 +820,9 @@ namespace ProjectS.UI
             DrawBuildOption(BuildOptionRect(panelRect, 5, columns, buttonWidth, buttonHeight, buttonGap), 5, columns == 5 ? "Adv. +10\n100M" : "Adv. +10 100M");
             DrawBuildOption(BuildOptionRect(panelRect, 6, columns, buttonWidth, buttonHeight, buttonGap), 6, columns >= 5 ? "Drop-off\n100M" : "Drop-off 100M");
             DrawBuildOption(BuildOptionRect(panelRect, 7, columns, buttonWidth, buttonHeight, buttonGap), 7, columns >= 5 ? "Main Base\n350M/75G" : "Main Base 350M/75G");
+            DrawBuildOption(BuildOptionRect(panelRect, 8, columns, buttonWidth, buttonHeight, buttonGap), 8, columns >= 5 ? "Siege Factory\n250M/75G" : "Siege Factory 250M/75G");
+            DrawBuildOption(BuildOptionRect(panelRect, 9, columns, buttonWidth, buttonHeight, buttonGap), 9, columns >= 5 ? "Medic Bay\n200M/50G" : "Medic Bay 200M/50G");
+            DrawBuildOption(BuildOptionRect(panelRect, 10, columns, buttonWidth, buttonHeight, buttonGap), 10, columns >= 5 ? "Scout Relay\n150M/50G" : "Scout Relay 150M/50G");
             var rowCount = Mathf.CeilToInt(BuildMenuBuildings.Length / (float)columns);
             GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 30f + rowCount * (buttonHeight + 4f), panelRect.width - 16f, 20f), "Choose a tile to place. Esc cancels.");
         }

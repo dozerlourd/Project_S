@@ -208,7 +208,16 @@ namespace ProjectS.Resources
         {
             if (ManagersByTeam.TryGetValue(team, out var existingManager) && existingManager != null && existingManager != this)
             {
-                Debug.LogWarning($"Replacing existing supply manager for {team}. Only one active manager should own a team's supply.", this);
+                // AddComponent invokes OnEnable before callers can configure a newly
+                // created manager's owner team. Do not let that temporary serialized
+                // default replace an already initialized manager for another team.
+                if (existingManager.isActiveAndEnabled)
+                {
+                    Debug.LogWarning($"A supply manager is already active for {team}. Delaying registration until this manager is initialized.", this);
+                    return;
+                }
+
+                Debug.LogWarning($"Replacing inactive supply manager for {team}.", this);
             }
 
             ManagersByTeam[team] = this;

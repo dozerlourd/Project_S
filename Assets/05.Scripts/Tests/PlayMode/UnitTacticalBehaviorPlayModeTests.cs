@@ -10,6 +10,54 @@ namespace ProjectS.Tests.PlayMode
 {
     public sealed class UnitTacticalBehaviorPlayModeTests
     {
+        [UnityTest]
+        public IEnumerator SelectionOutline_StaysHiddenUntilSelectedAndUsesThinAlphaWidths()
+        {
+            var texture = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+            var pixels = new Color[64 * 64];
+            for (var y = 16; y < 48; y++)
+            {
+                for (var x = 20; x < 44; x++)
+                {
+                    pixels[(y * 64) + x] = Color.white;
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply();
+            var sprite = Sprite.Create(texture, new Rect(0f, 0f, 64f, 64f), new Vector2(0.5f, 0.5f), 64f);
+            var unit = new GameObject("Selection Outline Test Unit");
+            var sourceRenderer = unit.AddComponent<SpriteRenderer>();
+            sourceRenderer.sprite = sprite;
+            var effect = unit.AddComponent<SelectionOutlineEffect>();
+
+            effect.Prepare();
+            Assert.That(effect.IsOutlineVisible, Is.False);
+            Assert.That(unit.transform.Find("SelectionOutline"), Is.Null);
+
+            effect.SetOutlineVisible(true);
+            var outline = unit.transform.Find("SelectionOutline");
+            Assert.That(outline, Is.Not.Null);
+            var outlineRenderer = outline.GetComponent<MeshRenderer>();
+            Assert.That(outlineRenderer, Is.Not.Null);
+            Assert.That(outlineRenderer.enabled, Is.True);
+            Assert.That(effect.SourceRenderer, Is.SameAs(sourceRenderer));
+
+            var properties = new MaterialPropertyBlock();
+            outlineRenderer.GetPropertyBlock(properties);
+            Assert.That(properties.GetFloat(Shader.PropertyToID("_InnerWidth")), Is.EqualTo(6f));
+            Assert.That(properties.GetFloat(Shader.PropertyToID("_OuterWidth")), Is.EqualTo(12f));
+
+            effect.SetOutlineVisible(false);
+            Assert.That(effect.IsOutlineVisible, Is.False);
+            Assert.That(outlineRenderer.enabled, Is.False);
+
+            Object.Destroy(unit);
+            Object.Destroy(sprite);
+            Object.Destroy(texture);
+            yield return null;
+        }
+
         [TestCase(PrototypeUnitType.Soldier, UnitEngagementStyle.Standard)]
         [TestCase(PrototypeUnitType.Spliter, UnitEngagementStyle.AreaPressure)]
         [TestCase(PrototypeUnitType.Ranger, UnitEngagementStyle.KeepDistance)]

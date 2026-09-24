@@ -23,17 +23,16 @@ namespace ProjectS.Units.Editor
             EnsureFolder(PrefabFolder, "Textures");
 
             var unitSprite = FindSprite("TX Player F");
-            var selectionSprite = FindSprite("TX Shadow Player");
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Worker, CreateOrUpdateTextureSprite(PrototypeUnitType.Worker, unitSprite), selectionSprite);
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Soldier, CreateOrUpdateTextureSprite(PrototypeUnitType.Soldier, unitSprite), selectionSprite);
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Spliter, CreateOrUpdateTextureSprite(PrototypeUnitType.Spliter, unitSprite), selectionSprite);
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Ranger, CreateOrUpdateTextureSprite(PrototypeUnitType.Ranger, unitSprite), selectionSprite);
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Tank, CreateOrUpdateTextureSprite(PrototypeUnitType.Tank, unitSprite), selectionSprite);
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Striker, CreateOrUpdateTextureSprite(PrototypeUnitType.Striker, unitSprite), selectionSprite);
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Swarm, CreateOrUpdateTextureSprite(PrototypeUnitType.Swarm, unitSprite), selectionSprite);
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Medic, CreateOrUpdateTextureSprite(PrototypeUnitType.Medic, unitSprite), selectionSprite);
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Siege, CreateOrUpdateTextureSprite(PrototypeUnitType.Siege, unitSprite), selectionSprite);
-            CreateOrUpdateUnitPrefab(PrototypeUnitType.Scout, CreateOrUpdateTextureSprite(PrototypeUnitType.Scout, unitSprite), selectionSprite);
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Worker, CreateOrUpdateTextureSprite(PrototypeUnitType.Worker, unitSprite));
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Soldier, CreateOrUpdateTextureSprite(PrototypeUnitType.Soldier, unitSprite));
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Spliter, CreateOrUpdateTextureSprite(PrototypeUnitType.Spliter, unitSprite));
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Ranger, CreateOrUpdateTextureSprite(PrototypeUnitType.Ranger, unitSprite));
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Tank, CreateOrUpdateTextureSprite(PrototypeUnitType.Tank, unitSprite));
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Striker, CreateOrUpdateTextureSprite(PrototypeUnitType.Striker, unitSprite));
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Swarm, CreateOrUpdateTextureSprite(PrototypeUnitType.Swarm, unitSprite));
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Medic, CreateOrUpdateTextureSprite(PrototypeUnitType.Medic, unitSprite));
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Siege, CreateOrUpdateTextureSprite(PrototypeUnitType.Siege, unitSprite));
+            CreateOrUpdateUnitPrefab(PrototypeUnitType.Scout, CreateOrUpdateTextureSprite(PrototypeUnitType.Scout, unitSprite));
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -127,10 +126,60 @@ namespace ProjectS.Units.Editor
             AssetDatabase.SaveAssets();
         }
 
+        [MenuItem("Tools/Project S/Remove Legacy Unit Selection Rings")]
+        public static void RemoveLegacyUnitSelectionRings()
+        {
+            foreach (PrototypeUnitType unitType in Enum.GetValues(typeof(PrototypeUnitType)))
+            {
+                var prefabPath = $"{PrefabFolder}/B_{unitType}.prefab";
+                if (!File.Exists(prefabPath))
+                {
+                    continue;
+                }
+
+                var root = PrefabUtility.LoadPrefabContents(prefabPath);
+                try
+                {
+                    var renderers = root.GetComponentsInChildren<SpriteRenderer>(true);
+                    var changed = false;
+                    for (var index = renderers.Length - 1; index >= 0; index--)
+                    {
+                        var renderer = renderers[index];
+                        if (renderer == null || renderer.transform == root.transform)
+                        {
+                            continue;
+                        }
+
+                        var isNamedSelectionRing = renderer.transform.name == "SelectionRing";
+                        var isLegacyShadowSprite = renderer.sprite != null
+                            && renderer.sprite.name == "TX Shadow Player";
+                        if (!isNamedSelectionRing && !isLegacyShadowSprite)
+                        {
+                            continue;
+                        }
+
+                        UnityEngine.Object.DestroyImmediate(renderer.gameObject);
+                        changed = true;
+                    }
+
+                    if (changed)
+                    {
+                        PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+                    }
+                }
+                finally
+                {
+                    PrefabUtility.UnloadPrefabContents(root);
+                }
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
         private static void CreateOrUpdateUnitPrefab(
             PrototypeUnitType unitType,
-            Sprite unitSprite,
-            Sprite selectionSprite)
+            Sprite unitSprite)
         {
             var unitName = $"B_{unitType}";
             var root = new GameObject(unitName);
@@ -152,8 +201,6 @@ namespace ProjectS.Units.Editor
                 rigidbody.bodyType = RigidbodyType2D.Kinematic;
                 rigidbody.gravityScale = 0f;
                 rigidbody.constraints = RigidbodyConstraints2D.FreezeRotation;
-
-                CreateSelectionRing(root.transform, selectionSprite);
 
                 var status = root.AddComponent<PrototypeUnitStatus>();
                 status.ConfigurePrototypeDefaults(unitType);
@@ -181,21 +228,6 @@ namespace ProjectS.Units.Editor
             {
                 UnityEngine.Object.DestroyImmediate(root);
             }
-        }
-
-        private static void CreateSelectionRing(Transform parent, Sprite selectionSprite)
-        {
-            var selectionRing = new GameObject("SelectionRing");
-            selectionRing.transform.SetParent(parent, false);
-            selectionRing.transform.localPosition = new Vector3(0f, -0.2f, 0f);
-            selectionRing.transform.localScale = new Vector3(0.85f, 0.45f, 1f);
-            selectionRing.SetActive(false);
-
-            var renderer = selectionRing.AddComponent<SpriteRenderer>();
-            renderer.sprite = selectionSprite;
-            renderer.color = new Color(1f, 1f, 1f, 0.75f);
-            renderer.sortingLayerName = "Units";
-            renderer.sortingOrder = 18;
         }
 
         private static Sprite FindSprite(string spriteName)

@@ -203,6 +203,14 @@ namespace ProjectS.Buildings
             }
 
             var requiredSupply = GetRequiredSupply(definition);
+            if ((requiredSupply.Standard > 0 || requiredSupply.Advanced > 0)
+                && supplyManager == null
+                && ProjectS.RtsMatchController.ActiveInstance != null)
+            {
+                failureReason = $"Cannot enqueue {definition.DisplayName}: supply manager for {Team} is unavailable.";
+                return false;
+            }
+
             if (supplyManager != null && !supplyManager.CanReserve(requiredSupply))
             {
                 failureReason = $"Cannot enqueue {definition.DisplayName}: insufficient supply: "
@@ -502,7 +510,13 @@ namespace ProjectS.Buildings
 
             if (supplyManager == null)
             {
-                // Standalone test scenes and legacy content can run without the match-level supply system.
+                if (ProjectS.RtsMatchController.ActiveInstance != null)
+                {
+                    failureReason = $"Cannot enqueue {definition.DisplayName}: supply manager for {Team} is unavailable.";
+                    return false;
+                }
+
+                // Legacy standalone scenes without a match controller do not own team supply.
                 failureReason = string.Empty;
                 return true;
             }

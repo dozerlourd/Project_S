@@ -6,8 +6,8 @@ Shader "ProjectS/SpriteSelectionOutline"
         _InnerColor ("Inner Outline Color", Color) = (1, 0.72, 0.18, 0.98)
         _OuterColor ("Outer Outline Color", Color) = (0.78, 0.34, 0.03, 0.9)
         _UvMinMax ("Sprite UV Min Max", Vector) = (0, 0, 1, 1)
-        _InnerWidth ("Inner Width Pixels", Float) = 45
-        _OuterWidth ("Outer Width Pixels", Float) = 100
+        _InnerWidth ("Inner Width Pixels", Float) = 6
+        _OuterWidth ("Outer Width Pixels", Float) = 12
         _AlphaThreshold ("Alpha Threshold", Range(0.001, 0.99)) = 0.08
     }
 

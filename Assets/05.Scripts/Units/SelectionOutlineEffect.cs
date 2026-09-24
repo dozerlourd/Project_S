@@ -24,8 +24,8 @@ namespace ProjectS.Units
         [SerializeField] private SpriteRenderer sourceRenderer;
         [SerializeField] private Color innerColor = new Color(1f, 0.72f, 0.18f, 0.98f);
         [SerializeField] private Color outerColor = new Color(0.78f, 0.34f, 0.03f, 0.9f);
-        [SerializeField, Min(0.25f)] private float innerWidthPixels = 45f;
-        [SerializeField, Min(0.25f)] private float outerWidthPixels = 100f;
+        [SerializeField, Min(0.25f)] private float innerWidthPixels = 6f;
+        [SerializeField, Min(0.25f)] private float outerWidthPixels = 12f;
         [SerializeField, Range(0.001f, 0.99f)] private float alphaThreshold = 0.08f;
         [SerializeField] private bool visibleOnEnable;
         [SerializeField] private int sortingOrderOffset = -1;

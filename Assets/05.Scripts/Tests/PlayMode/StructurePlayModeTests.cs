@@ -569,6 +569,36 @@ namespace ProjectS.Tests.PlayMode
             }
         }
 
+        [Test]
+        public void SupplyManagers_KeepTheFirstTeamRegistered_WhenSecondManagerIsCreatedAtRuntime()
+        {
+            var ownedObjects = new List<GameObject>();
+            try
+            {
+                var supplyManagerType = GetGameplayType("ProjectS.Resources.SupplyManager");
+                var playerObject = CreateOwnedObject(ownedObjects, "Runtime Player Supply");
+                var playerSupply = playerObject.AddComponent(supplyManagerType);
+                Invoke(playerSupply, "Initialize", UnitTeam.Team1);
+
+                var aiObject = CreateOwnedObject(ownedObjects, "Runtime AI Supply");
+                var aiSupply = aiObject.AddComponent(supplyManagerType);
+                Invoke(aiSupply, "Initialize", UnitTeam.Team2);
+
+                Assert.That(Invoke(supplyManagerType, "FindForTeam", UnitTeam.Team1), Is.SameAs(playerSupply));
+                Assert.That(Invoke(supplyManagerType, "FindForTeam", UnitTeam.Team2), Is.SameAs(aiSupply));
+            }
+            finally
+            {
+                for (var i = ownedObjects.Count - 1; i >= 0; i--)
+                {
+                    if (ownedObjects[i] != null)
+                    {
+                        Object.DestroyImmediate(ownedObjects[i]);
+                    }
+                }
+            }
+        }
+
         private static Vector2Int DefaultFootprint(string kind)
         {
             switch (kind)

@@ -422,12 +422,6 @@ namespace ProjectS.UI
             var currentEvent = Event.current;
             if (currentEvent.type == EventType.MouseDown && currentEvent.button == 0 && mapRect.Contains(currentEvent.mousePosition))
             {
-                if (TryHandleUnitCommand(currentEvent.mousePosition, mapRect, worldBounds, true))
-                {
-                    currentEvent.Use();
-                    return;
-                }
-
                 isDraggingCamera = true;
                 MoveCameraToGuiPosition(currentEvent.mousePosition, mapRect, worldBounds);
                 currentEvent.Use();
@@ -436,7 +430,6 @@ namespace ProjectS.UI
 
             if (currentEvent.type == EventType.MouseDown && currentEvent.button == 1 && mapRect.Contains(currentEvent.mousePosition))
             {
-                TryHandleUnitCommand(currentEvent.mousePosition, mapRect, worldBounds, false);
                 currentEvent.Use();
                 return;
             }
@@ -464,17 +457,6 @@ namespace ProjectS.UI
             {
                 cameraController.TryMoveToWorldPoint(worldPoint);
             }
-        }
-
-        private static bool TryHandleUnitCommand(Vector2 guiPosition, Rect mapRect, Bounds worldBounds, bool isPrimaryButton)
-        {
-            if (!TryMapGuiPointToWorld(guiPosition, mapRect, worldBounds, out var worldPoint))
-            {
-                return false;
-            }
-
-            var commandController = PlayerUnitCommandController.ActiveInstance;
-            return commandController != null && commandController.TryHandleMinimapCommand(worldPoint, isPrimaryButton);
         }
 
         private static bool TryMapGuiPointToWorld(Vector2 guiPoint, Rect mapRect, Bounds worldBounds, out Vector3 worldPoint)

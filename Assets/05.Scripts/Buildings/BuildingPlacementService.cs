@@ -212,7 +212,10 @@ namespace ProjectS.Buildings
             GameObject supplyDepotPrefab = null,
             GameObject advancedSupplyDepotPrefab = null,
             GameObject resourceDropOffPrefab = null,
-            GameObject mainBasePrefab = null)
+            GameObject mainBasePrefab = null,
+            GameObject vehicleFactoryPrefab = null,
+            GameObject maintenanceBayPrefab = null,
+            GameObject signalRelayPrefab = null)
         {
             var definitions = new List<BuildingConstructionDefinition>();
             if (selectedDefinition != null)
@@ -233,6 +236,21 @@ namespace ProjectS.Buildings
             if (speedAuraPrefab != null)
             {
                 definitions.Add(BuildingConstructionDefinition.Create("Speed Aura", BuildingKind.SpeedAura, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2), speedAuraPrefab));
+            }
+
+            if (vehicleFactoryPrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Vehicle Factory", BuildingKind.VehicleFactory, new ResourceAmount(250, 75), 10f, new Vector2Int(3, 3), vehicleFactoryPrefab));
+            }
+
+            if (maintenanceBayPrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Maintenance Bay", BuildingKind.MaintenanceBay, new ResourceAmount(200, 50), 9f, new Vector2Int(3, 2), maintenanceBayPrefab));
+            }
+
+            if (signalRelayPrefab != null)
+            {
+                definitions.Add(BuildingConstructionDefinition.Create("Signal Relay", BuildingKind.SignalRelay, new ResourceAmount(150, 50), 8f, new Vector2Int(2, 2), signalRelayPrefab));
             }
 
             if (supplyDepotPrefab != null)

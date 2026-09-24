@@ -39,6 +39,9 @@ namespace ProjectS
         [SerializeField] private GameObject tankPrefab;
         [SerializeField] private GameObject strikerPrefab;
         [SerializeField] private GameObject swarmPrefab;
+        [SerializeField] private GameObject medicPrefab;
+        [SerializeField] private GameObject siegePrefab;
+        [SerializeField] private GameObject scoutPrefab;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureBootstrap()
@@ -80,6 +83,30 @@ namespace ProjectS
 
             BuildTestSetup(buildingPrefabs);
             Destroy(gameObject);
+        }
+
+        public void ConfigureUnitPrefabs(
+            GameObject worker,
+            GameObject soldier,
+            GameObject spliter,
+            GameObject ranger,
+            GameObject tank,
+            GameObject striker,
+            GameObject swarm,
+            GameObject medic,
+            GameObject siege,
+            GameObject scout)
+        {
+            workerPrefab = worker;
+            soldierPrefab = soldier;
+            spliterPrefab = spliter;
+            rangerPrefab = ranger;
+            tankPrefab = tank;
+            strikerPrefab = striker;
+            swarmPrefab = swarm;
+            medicPrefab = medic;
+            siegePrefab = siege;
+            scoutPrefab = scout;
         }
 
         private static void EnsureGameplayPresentation()
@@ -154,10 +181,41 @@ namespace ProjectS
                 templates,
                 "Speed Aura Building Template",
                 buildingPrefabs.GetPrefab(BuildingKind.SpeedAura));
+            var vehicleFactoryTemplate = CreateBuildingTemplate(
+                templates,
+                "Vehicle Factory Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.VehicleFactory));
+            var maintenanceBayTemplate = CreateBuildingTemplate(
+                templates,
+                "Maintenance Bay Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.MaintenanceBay));
+            var signalRelayTemplate = CreateBuildingTemplate(
+                templates,
+                "Signal Relay Building Template",
+                buildingPrefabs.GetPrefab(BuildingKind.SignalRelay));
             var mainBaseTemplate = CreateBuildingTemplate(
                 templates,
                 "Main Base Building Template",
                 buildingPrefabs.GetPrefab(BuildingKind.MainBase));
+
+            vehicleFactoryTemplate = ConfigureProductionTemplate(
+                vehicleFactoryTemplate,
+                GetRequiredUnitPrefab(PrototypeUnitType.Siege),
+                new[] { CreateSpecializedProductionDefinition("Siege", PrototypeUnitType.Siege, GetRequiredUnitPrefab(PrototypeUnitType.Siege), 4, BuildingKind.VehicleFactory) },
+                new Vector3(3.5f, -0.5f, 0f),
+                new Vector3(6f, -1f, 0f));
+            maintenanceBayTemplate = ConfigureProductionTemplate(
+                maintenanceBayTemplate,
+                GetRequiredUnitPrefab(PrototypeUnitType.Medic),
+                new[] { CreateSpecializedProductionDefinition("Medic", PrototypeUnitType.Medic, GetRequiredUnitPrefab(PrototypeUnitType.Medic), 2, BuildingKind.MaintenanceBay) },
+                new Vector3(3.5f, -0.5f, 0f),
+                new Vector3(6f, -1f, 0f));
+            signalRelayTemplate = ConfigureProductionTemplate(
+                signalRelayTemplate,
+                GetRequiredUnitPrefab(PrototypeUnitType.Scout),
+                new[] { CreateSpecializedProductionDefinition("Scout", PrototypeUnitType.Scout, GetRequiredUnitPrefab(PrototypeUnitType.Scout), 1, BuildingKind.SignalRelay) },
+                new Vector3(2.5f, -0.5f, 0f),
+                new Vector3(5f, -1f, 0f));
 
             placementService.ConfigureBuildOptions(
                 ConfigureProductionTemplate(
@@ -170,6 +228,9 @@ namespace ProjectS
                 speedAuraTemplate,
                 supplyDepotPrefab: supplyDepotTemplate,
                 advancedSupplyDepotPrefab: advancedSupplyDepotTemplate,
+                vehicleFactoryPrefab: vehicleFactoryTemplate,
+                maintenanceBayPrefab: maintenanceBayTemplate,
+                signalRelayPrefab: signalRelayTemplate,
                 mainBasePrefab: ConfigureProductionTemplate(
                     mainBaseTemplate,
                     GetRequiredUnitPrefab(PrototypeUnitType.Worker),
@@ -188,6 +249,9 @@ namespace ProjectS
                 speedAuraTemplate,
                 supplyDepotTemplate,
                 advancedSupplyDepotTemplate,
+                vehicleFactoryTemplate,
+                maintenanceBayTemplate,
+                signalRelayTemplate,
                 mainBaseTemplate);
         }
 
@@ -254,6 +318,9 @@ namespace ProjectS
             var tankUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Tank);
             var strikerUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Striker);
             var swarmUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Swarm);
+            var medicUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Medic);
+            var siegeUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Siege);
+            var scoutUnitPrefab = GetRequiredUnitPrefab(PrototypeUnitType.Scout);
 
             var mainBasePrototype = CreateBuildingTemplate(
                 prototypeRoot.transform,
@@ -283,6 +350,18 @@ namespace ProjectS
                 prototypeRoot.transform,
                 "Speed Aura Building Prototype",
                 buildingPrefabs.GetPrefab(BuildingKind.SpeedAura));
+            var vehicleFactoryPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
+                "Vehicle Factory Building Prototype",
+                buildingPrefabs.GetPrefab(BuildingKind.VehicleFactory));
+            var maintenanceBayPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
+                "Maintenance Bay Building Prototype",
+                buildingPrefabs.GetPrefab(BuildingKind.MaintenanceBay));
+            var signalRelayPrototype = CreateBuildingTemplate(
+                prototypeRoot.transform,
+                "Signal Relay Building Prototype",
+                buildingPrefabs.GetPrefab(BuildingKind.SignalRelay));
             var constructionPrototype = CreateBuildingTemplate(
                 prototypeRoot.transform,
                 "Construction Site Prototype",
@@ -301,8 +380,14 @@ namespace ProjectS
                 CreateProductionDefinition("Swarm x3", PrototypeUnitType.Swarm, swarmUnitPrefab, new ResourceAmount(120, 0), 8f, 1, 3, allowedProductionBuildings: new[] { BuildingKind.Production })
             };
             var spliterDefinitions = new[] { CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterUnitPrefab, new ResourceAmount(125, 0), 8f, 3, allowedProductionBuildings: new[] { BuildingKind.SpliterProduction }) };
+            var medicDefinitions = new[] { CreateSpecializedProductionDefinition("Medic", PrototypeUnitType.Medic, medicUnitPrefab, 2, BuildingKind.MaintenanceBay) };
+            var siegeDefinitions = new[] { CreateSpecializedProductionDefinition("Siege", PrototypeUnitType.Siege, siegeUnitPrefab, 4, BuildingKind.VehicleFactory) };
+            var scoutDefinitions = new[] { CreateSpecializedProductionDefinition("Scout", PrototypeUnitType.Scout, scoutUnitPrefab, 1, BuildingKind.SignalRelay) };
 
             ConfigureProductionTemplate(mainBasePrototype, workerUnitPrefab, workerDefinitions, new Vector3(2.5f, -1.5f, 0f), new Vector3(5f, -2f, 0f));
+            ConfigureProductionTemplate(vehicleFactoryPrototype, siegeUnitPrefab, siegeDefinitions, new Vector3(3.5f, -0.5f, 0f), new Vector3(6f, -1f, 0f));
+            ConfigureProductionTemplate(maintenanceBayPrototype, medicUnitPrefab, medicDefinitions, new Vector3(3.5f, -0.5f, 0f), new Vector3(6f, -1f, 0f));
+            ConfigureProductionTemplate(signalRelayPrototype, scoutUnitPrefab, scoutDefinitions, new Vector3(2.5f, -0.5f, 0f), new Vector3(5f, -1f, 0f));
 
             if (!ResourceTilemapNodeSynchronizer.SceneHasResourceTiles())
             {
@@ -336,6 +421,9 @@ namespace ProjectS
                 speedAuraPrototype,
                 supplyDepotPrototype,
                 advancedSupplyDepotPrototype,
+                vehicleFactoryPrototype,
+                maintenanceBayPrototype,
+                signalRelayPrototype,
                 mainBasePrototype,
                 combatDefinitions,
                 spliterDefinitions,
@@ -351,6 +439,9 @@ namespace ProjectS
                 speedAuraPrototype,
                 supplyDepotPrototype,
                 advancedSupplyDepotPrototype,
+                vehicleFactoryPrototype,
+                maintenanceBayPrototype,
+                signalRelayPrototype,
                 mainBasePrototype,
                 root.transform);
         }
@@ -381,6 +472,15 @@ namespace ProjectS
                 case PrototypeUnitType.Swarm:
                     prefab = swarmPrefab;
                     break;
+                case PrototypeUnitType.Medic:
+                    prefab = medicPrefab;
+                    break;
+                case PrototypeUnitType.Siege:
+                    prefab = siegePrefab;
+                    break;
+                case PrototypeUnitType.Scout:
+                    prefab = scoutPrefab;
+                    break;
                 default:
                     throw new System.ArgumentOutOfRangeException(nameof(unitType), unitType, null);
             }
@@ -403,6 +503,9 @@ namespace ProjectS
             GameObject speedAuraPrototype,
             GameObject supplyDepotPrototype,
             GameObject advancedSupplyDepotPrototype,
+            GameObject vehicleFactoryPrototype,
+            GameObject maintenanceBayPrototype,
+            GameObject signalRelayPrototype,
             GameObject mainBasePrototype,
             UnitProductionDefinition[] combatDefinitions,
             UnitProductionDefinition[] spliterDefinitions,
@@ -457,6 +560,9 @@ namespace ProjectS
                 speedAuraPrototype,
                 supplyDepotPrefab: supplyDepotPrototype,
                 advancedSupplyDepotPrefab: advancedSupplyDepotPrototype,
+                vehicleFactoryPrefab: vehicleFactoryPrototype,
+                maintenanceBayPrefab: maintenanceBayPrototype,
+                signalRelayPrefab: signalRelayPrototype,
                 mainBasePrefab: mainBasePrototype);
 
             var hud = FindFirstObjectByType<RtsGameHud>();
@@ -480,6 +586,9 @@ namespace ProjectS
             GameObject speedAuraPrototype,
             GameObject supplyDepotPrototype,
             GameObject advancedSupplyDepotPrototype,
+            GameObject vehicleFactoryPrototype,
+            GameObject maintenanceBayPrototype,
+            GameObject signalRelayPrototype,
             GameObject mainBasePrototype,
             Transform parent)
         {
@@ -499,6 +608,9 @@ namespace ProjectS
                 speedAuraPrototype,
                 supplyDepotPrototype,
                 advancedSupplyDepotPrototype,
+                vehicleFactoryPrototype,
+                maintenanceBayPrototype,
+                signalRelayPrototype,
                 mainBasePrototype);
         }
 
@@ -513,6 +625,9 @@ namespace ProjectS
             GameObject speedAuraPrototype,
             GameObject supplyDepotPrototype,
             GameObject advancedSupplyDepotPrototype,
+            GameObject vehicleFactoryPrototype,
+            GameObject maintenanceBayPrototype,
+            GameObject signalRelayPrototype,
             GameObject mainBasePrototype)
         {
             if (ai == null || wallet == null || constructionPrototype == null)
@@ -533,6 +648,9 @@ namespace ProjectS
             templates.RegisterTemplate(BuildingKind.SpeedAura, speedAuraPrototype, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.SupplyDepot, supplyDepotPrototype, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1));
             templates.RegisterTemplate(BuildingKind.AdvancedSupplyDepot, advancedSupplyDepotPrototype, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1));
+            templates.RegisterTemplate(BuildingKind.VehicleFactory, vehicleFactoryPrototype, new ResourceAmount(250, 75), 10f, new Vector2Int(3, 3));
+            templates.RegisterTemplate(BuildingKind.MaintenanceBay, maintenanceBayPrototype, new ResourceAmount(200, 50), 9f, new Vector2Int(3, 2));
+            templates.RegisterTemplate(BuildingKind.SignalRelay, signalRelayPrototype, new ResourceAmount(150, 50), 8f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.MainBase, mainBasePrototype, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3));
         }
 
@@ -874,12 +992,34 @@ namespace ProjectS
             float duration,
             int supplyCost,
             int outputCount = 1,
-            BuildingKind[] allowedProductionBuildings = null)
+            BuildingKind[] allowedProductionBuildings = null,
+            UnitProductionRequirement[] requirements = null)
         {
             var definition = new UnitProductionDefinition();
-            definition.Configure(displayName, unitType, prefab, cost, duration, supplyCost, outputCount);
+            definition.Configure(displayName, unitType, prefab, cost, duration, supplyCost, outputCount, requirements);
             definition.ConfigureAllowedProductionBuildings(allowedProductionBuildings);
             return definition;
+        }
+
+        private static UnitProductionDefinition CreateSpecializedProductionDefinition(
+            string displayName,
+            PrototypeUnitType unitType,
+            GameObject prefab,
+            int standardSupplyCost,
+            BuildingKind productionBuilding)
+        {
+            var defaults = new UnitProductionDefinition();
+            var buildingRequirement = new UnitProductionRequirement();
+            buildingRequirement.ConfigureCompletedBuilding(productionBuilding);
+            return CreateProductionDefinition(
+                displayName,
+                unitType,
+                prefab,
+                defaults.Cost,
+                defaults.ProductionTime,
+                standardSupplyCost,
+                allowedProductionBuildings: new[] { productionBuilding },
+                requirements: new[] { buildingRequirement });
         }
 
         private static int GetSupplyCost(PrototypeUnitType unitType)
@@ -893,6 +1033,9 @@ namespace ProjectS
                 case PrototypeUnitType.Tank: return 3;
                 case PrototypeUnitType.Striker:
                 case PrototypeUnitType.Swarm: return 1;
+                case PrototypeUnitType.Medic: return 2;
+                case PrototypeUnitType.Siege: return 4;
+                case PrototypeUnitType.Scout: return 1;
                 default: return 0;
             }
         }

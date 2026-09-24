@@ -1448,7 +1448,7 @@ namespace ProjectS.Units
             }
         }
 
-        private static void SetSelectionVisible(UnitCommandAgent agent, bool visible)
+        private static void SetSelectionVisible(UnitCommandAgent agent, bool _)
         {
             if (agent == null)
             {
@@ -1458,13 +1458,8 @@ namespace ProjectS.Units
             var ring = agent.transform.Find("SelectionRing");
             if (ring != null)
             {
-                var renderer = ring.GetComponent<SpriteRenderer>();
-                if (renderer != null)
-                {
-                    renderer.color = new Color(0.1f, 0.8f, 1f, 0.85f);
-                }
-
-                ring.gameObject.SetActive(visible);
+                // SelectionOutlineManager owns the current alpha-following selection visual.
+                ring.gameObject.SetActive(false);
             }
         }
 
@@ -1911,6 +1906,11 @@ namespace ProjectS.Units
 
         private static bool IsPointerOverRuntimeHud(Vector2 screenPosition)
         {
+            if (TryGetRuntimeMinimapPointerHit(screenPosition, out var isOverMinimap) && isOverMinimap)
+            {
+                return true;
+            }
+
             if (TryGetRuntimeHudPointerHit(screenPosition, out var isOverHud))
             {
                 return isOverHud;
@@ -1924,6 +1924,21 @@ namespace ProjectS.Units
             }
 
             return false;
+        }
+
+        private static bool TryGetRuntimeMinimapPointerHit(Vector2 screenPosition, out bool isOverMinimap)
+        {
+            isOverMinimap = false;
+
+            var minimapType = System.Type.GetType("ProjectS.UI.RtsMinimap, Assembly-CSharp");
+            var hitMethod = minimapType != null ? minimapType.GetMethod("IsScreenPointOverMinimap", new[] { typeof(Vector2) }) : null;
+            if (hitMethod == null)
+            {
+                return false;
+            }
+
+            isOverMinimap = (bool)hitMethod.Invoke(null, new object[] { screenPosition });
+            return true;
         }
 
         private static bool TryGetRuntimeHudPointerHit(Vector2 screenPosition, out bool isOverHud)

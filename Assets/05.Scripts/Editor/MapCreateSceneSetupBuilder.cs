@@ -40,6 +40,9 @@ namespace ProjectS.Editor
         private const string TankPrefabPath = "Assets/03.Prefabs/Units/B_Tank.prefab";
         private const string StrikerPrefabPath = "Assets/03.Prefabs/Units/B_Striker.prefab";
         private const string SwarmPrefabPath = "Assets/03.Prefabs/Units/B_Swarm.prefab";
+        private const string MedicPrefabPath = "Assets/03.Prefabs/Units/B_Medic.prefab";
+        private const string SiegePrefabPath = "Assets/03.Prefabs/Units/B_Siege.prefab";
+        private const string ScoutPrefabPath = "Assets/03.Prefabs/Units/B_Scout.prefab";
         private const string MineralPrefabPath = "Assets/03.Prefabs/Resources/MineralField.prefab";
         private const string GasPrefabPath = "Assets/03.Prefabs/Resources/VespeneGeyser.prefab";
         private const int ResourceSortingOrder = 12;
@@ -73,6 +76,9 @@ namespace ProjectS.Editor
             var tankPrefab = LoadRequired<GameObject>(TankPrefabPath);
             var strikerPrefab = LoadRequired<GameObject>(StrikerPrefabPath);
             var swarmPrefab = LoadRequired<GameObject>(SwarmPrefabPath);
+            var medicPrefab = LoadRequired<GameObject>(MedicPrefabPath);
+            var siegePrefab = LoadRequired<GameObject>(SiegePrefabPath);
+            var scoutPrefab = LoadRequired<GameObject>(ScoutPrefabPath);
             var mainBasePrefab = LoadRequired<GameObject>(MainBasePrefabPath);
             var productionPrefab = LoadRequired<GameObject>(ProductionPrefabPath);
             var spliterProductionPrefab = LoadRequired<GameObject>(SpliterProductionPrefabPath);
@@ -80,6 +86,9 @@ namespace ProjectS.Editor
             var advancedSupplyDepotPrefab = LoadRequired<GameObject>(AdvancedSupplyDepotPrefabPath);
             var autoTurretPrefab = LoadRequired<GameObject>(AutoTurretPrefabPath);
             var speedAuraPrefab = LoadRequired<GameObject>(SpeedAuraPrefabPath);
+            var vehicleFactoryPrefab = LoadRequired<GameObject>(VehicleFactoryPrefabPath);
+            var maintenanceBayPrefab = LoadRequired<GameObject>(MaintenanceBayPrefabPath);
+            var signalRelayPrefab = LoadRequired<GameObject>(SignalRelayPrefabPath);
             var constructionSitePrefab = LoadRequired<GameObject>(ConstructionSitePrefabPath);
 
             var workerDefinitions = new[]
@@ -98,6 +107,39 @@ namespace ProjectS.Editor
             {
                 CreateProductionDefinition("Spliter", PrototypeUnitType.Spliter, spliterPrefab, new ResourceAmount(125, 0), 8f, allowedProductionBuildings: new[] { BuildingKind.SpliterProduction })
             };
+            var medicDefinitions = new[]
+            {
+                CreateSpecializedProductionDefinition("Medic", PrototypeUnitType.Medic, medicPrefab, 2, BuildingKind.MaintenanceBay)
+            };
+            var siegeDefinitions = new[]
+            {
+                CreateSpecializedProductionDefinition("Siege", PrototypeUnitType.Siege, siegePrefab, 4, BuildingKind.VehicleFactory)
+            };
+            var scoutDefinitions = new[]
+            {
+                CreateSpecializedProductionDefinition("Scout", PrototypeUnitType.Scout, scoutPrefab, 1, BuildingKind.SignalRelay)
+            };
+
+            ConfigureProductionPrefab(vehicleFactoryPrefab, playerWallet, tilemapWorld, siegeDefinitions, new Vector3(3.5f, -0.5f, 0f), new Vector3(6f, -1f, 0f));
+            ConfigureProductionPrefab(maintenanceBayPrefab, playerWallet, tilemapWorld, medicDefinitions, new Vector3(3.5f, -0.5f, 0f), new Vector3(6f, -1f, 0f));
+            ConfigureProductionPrefab(signalRelayPrefab, playerWallet, tilemapWorld, scoutDefinitions, new Vector3(2.5f, -0.5f, 0f), new Vector3(5f, -1f, 0f));
+
+            var bootstrap = Object.FindFirstObjectByType<MapCreateSceneAutoBootstrap>();
+            if (bootstrap != null)
+            {
+                bootstrap.ConfigureUnitPrefabs(
+                    workerPrefab,
+                    soldierPrefab,
+                    spliterPrefab,
+                    rangerPrefab,
+                    tankPrefab,
+                    strikerPrefab,
+                    swarmPrefab,
+                    medicPrefab,
+                    siegePrefab,
+                    scoutPrefab);
+                EditorUtility.SetDirty(bootstrap);
+            }
 
             CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
             CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
@@ -148,6 +190,9 @@ namespace ProjectS.Editor
                 advancedSupplyDepotPrefab,
                 autoTurretPrefab,
                 speedAuraPrefab,
+                vehicleFactoryPrefab,
+                maintenanceBayPrefab,
+                signalRelayPrefab,
                 combatDefinitions,
                 spliterDefinitions,
                 root.transform);
@@ -162,6 +207,9 @@ namespace ProjectS.Editor
                 speedAuraPrefab,
                 supplyDepotPrefab,
                 advancedSupplyDepotPrefab,
+                vehicleFactoryPrefab,
+                maintenanceBayPrefab,
+                signalRelayPrefab,
                 mainBasePrefab,
                 root.transform);
 
@@ -386,6 +434,9 @@ namespace ProjectS.Editor
             GameObject advancedSupplyDepotPrefab,
             GameObject autoTurretPrefab,
             GameObject speedAuraPrefab,
+            GameObject vehicleFactoryPrefab,
+            GameObject maintenanceBayPrefab,
+            GameObject signalRelayPrefab,
             UnitProductionDefinition[] combatDefinitions,
             UnitProductionDefinition[] spliterDefinitions,
             Transform parent)
@@ -414,7 +465,10 @@ namespace ProjectS.Editor
                 autoTurretPrefab,
                 speedAuraPrefab,
                 supplyDepotPrefab: supplyDepotPrefab,
-                advancedSupplyDepotPrefab: advancedSupplyDepotPrefab);
+                advancedSupplyDepotPrefab: advancedSupplyDepotPrefab,
+                vehicleFactoryPrefab: vehicleFactoryPrefab,
+                maintenanceBayPrefab: maintenanceBayPrefab,
+                signalRelayPrefab: signalRelayPrefab);
 
             var hud = runtime.AddComponent<RtsGameHud>();
             hud.Configure(UnitTeam.Team1, placementService);
@@ -435,6 +489,7 @@ namespace ProjectS.Editor
             if (queue != null)
             {
                 queue.Configure(wallet, tilemapWorld, definitions, 5, spawnOffset, rallyOffset);
+                EditorUtility.SetDirty(queue);
             }
         }
 
@@ -449,6 +504,9 @@ namespace ProjectS.Editor
             GameObject speedAuraPrefab,
             GameObject supplyDepotPrefab,
             GameObject advancedSupplyDepotPrefab,
+            GameObject vehicleFactoryPrefab,
+            GameObject maintenanceBayPrefab,
+            GameObject signalRelayPrefab,
             GameObject mainBasePrefab,
             Transform parent)
         {
@@ -466,6 +524,9 @@ namespace ProjectS.Editor
             templates.RegisterTemplate(BuildingKind.SpeedAura, speedAuraPrefab, new ResourceAmount(125, 25), 7f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.SupplyDepot, supplyDepotPrefab, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1));
             templates.RegisterTemplate(BuildingKind.AdvancedSupplyDepot, advancedSupplyDepotPrefab, new ResourceAmount(100, 0), 6f, new Vector2Int(2, 1));
+            templates.RegisterTemplate(BuildingKind.VehicleFactory, vehicleFactoryPrefab, new ResourceAmount(250, 75), 10f, new Vector2Int(3, 3));
+            templates.RegisterTemplate(BuildingKind.MaintenanceBay, maintenanceBayPrefab, new ResourceAmount(200, 50), 9f, new Vector2Int(3, 2));
+            templates.RegisterTemplate(BuildingKind.SignalRelay, signalRelayPrefab, new ResourceAmount(150, 50), 8f, new Vector2Int(2, 2));
             templates.RegisterTemplate(BuildingKind.MainBase, mainBasePrefab, new ResourceAmount(350, 75), 12f, new Vector2Int(3, 3));
         }
 
@@ -613,12 +674,34 @@ namespace ProjectS.Editor
             float duration,
             int supplyCost = 1,
             int outputCount = 1,
-            BuildingKind[] allowedProductionBuildings = null)
+            BuildingKind[] allowedProductionBuildings = null,
+            UnitProductionRequirement[] requirements = null)
         {
             var definition = new UnitProductionDefinition();
-            definition.Configure(displayName, unitType, prefab, cost, duration, supplyCost, outputCount);
+            definition.Configure(displayName, unitType, prefab, cost, duration, supplyCost, outputCount, requirements);
             definition.ConfigureAllowedProductionBuildings(allowedProductionBuildings);
             return definition;
+        }
+
+        private static UnitProductionDefinition CreateSpecializedProductionDefinition(
+            string displayName,
+            PrototypeUnitType unitType,
+            GameObject prefab,
+            int standardSupplyCost,
+            BuildingKind productionBuilding)
+        {
+            var defaults = new UnitProductionDefinition();
+            var buildingRequirement = new UnitProductionRequirement();
+            buildingRequirement.ConfigureCompletedBuilding(productionBuilding);
+            return CreateProductionDefinition(
+                displayName,
+                unitType,
+                prefab,
+                defaults.Cost,
+                defaults.ProductionTime,
+                standardSupplyCost,
+                allowedProductionBuildings: new[] { productionBuilding },
+                requirements: new[] { buildingRequirement });
         }
 
         private static Vector3 Snap(ProjectSTilemapWorld tilemapWorld, Vector3 position)

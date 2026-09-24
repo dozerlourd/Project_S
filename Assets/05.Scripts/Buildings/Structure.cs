@@ -116,7 +116,7 @@ namespace ProjectS.Buildings
 
             team = ownerTeam;
             kind = RoleKind ?? buildingKind;
-            if ((Kind == BuildingKind.SupplyDepot || Kind == BuildingKind.AdvancedSupplyDepot)
+            if ((Kind == BuildingKind.MainBase || Kind == BuildingKind.SupplyDepot || Kind == BuildingKind.AdvancedSupplyDepot)
                 && supplyProvided == 0
                 && advancedSupplyProvided == 0)
             {

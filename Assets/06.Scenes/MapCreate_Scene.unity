@@ -42008,6 +42008,9 @@ MonoBehaviour:
   tankPrefab: {fileID: 100000, guid: 76a125d4e8bf4c0ca37e615ccdbf04ba, type: 3}
   strikerPrefab: {fileID: 100000, guid: e19f3408bbd64b89ac4e2b68a0c761d5, type: 3}
   swarmPrefab: {fileID: 100000, guid: 0db17e6f2b4a4f7e8ce3a49e6d520bc1, type: 3}
+  medicPrefab: {fileID: 100000, guid: 28401f2a3a32fbb45a2cbf0781e5a5d1, type: 3}
+  siegePrefab: {fileID: 100000, guid: 34ea36b941521d54486e389f6ace55ed, type: 3}
+  scoutPrefab: {fileID: 100000, guid: 5b62df844fdcd714ca3b56e1bcedcecd, type: 3}
 --- !u!483693784 &7328748713201759982
 TilemapRenderer:
   serializedVersion: 2
