@@ -416,7 +416,7 @@ namespace ProjectS.Resources
             if (pathAgent != null)
             {
                 pathAgent.SetOccupancyParticipation(
-                    state != GatherState.Gathering && state != GatherState.ReturningToDropOff);
+                    state == GatherState.Idle);
             }
         }
 

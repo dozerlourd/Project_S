@@ -332,6 +332,8 @@
 
 ### 기술 및 해금 시스템 기반
 
+- [x] 한글 편집용 `UnlockRuleCatalog_Template.csv`와 비활성 기본값의 카탈로그 데이터 구조, Editor 가져오기 메뉴를 추가했다. 런타임 생산·건설 판정에는 아직 연결하지 않았다.
+- [ ] `UnlockRuleCatalogTests`를 Unity Test Runner에서 실행해 헤더 전용 빈 템플릿과 비활성 규칙의 다중 조건 열 가져오기를 확인한다.
 - [ ] 조건이 없는 생산 및 건설 항목이 기존과 동일하게 항상 사용 가능한지 Unity PlayMode에서 확인한다.
 - [ ] 팀별 `TeamUnlockState`에 해금 ID를 부여했을 때 해당 조건을 가진 생산 버튼과 건설 버튼이 `LOCKED` 상태로 보이고, 클릭 및 `Q/E/R/T/Y/U/I` 단축키가 같은 실패 사유를 표시하는지 확인한다.
 - [ ] 잠긴 생산 요청과 건설 배치 요청이 자원·보급을 소비하지 않으며, 해금 직후에는 즉시 다시 사용할 수 있는지 확인한다.
@@ -369,4 +371,5 @@
 - 자원 규칙 통일: Gas의 초기량, 1회 채집량, 채집 시간, 상호작용 거리, Collider 크기를 Minerals와 동일하게 맞추고 `ResourceType`만 다르게 유지했다.
 - 자원 이동 예외: Resource 전용 상호작용 경로는 자원 Collider 내부 셀도 후보로 허용하고, ResourceNode의 BoxCollider2D를 항상 Trigger로 보장해 채집 worker의 접근·재채집이 자원 Collider나 자원 셀 판정 때문에 취소되지 않도록 했다. 일반 이동 및 반납 경로에는 이 예외를 적용하지 않는다.
 - 재개 분석 및 보강: WorkerResourceController 역할을 담당하는 `WorkerGatherController`는 `UnitCommandMode.Interact`를 유지한 채 자원 접근 경로를 반복 요청해야 하며, `UnitPathAgent`의 자원 전용 상호작용은 내부 셀 후보를 허용해야 한다. 자원 전용 API 진입 시에도 Collider를 Trigger로 강제해 프리팹 설정 누락이 물리 이동을 막지 않도록 보강하고, 가스의 채집→반납→재채집 회귀 테스트를 추가했다.
+- 다수 Worker 접근 보강: `MovingToResource`에서도 Worker 점유 셀을 해제해 같은 자원에 접근하는 Worker끼리의 목적지 후보 차단을 제거했다. `Idle`로 명령이 종료되면 점유를 다시 등록하며 일반 이동 유닛의 점유 정책은 변경하지 않는다.
 - [ ] 실제 Unity PlayMode에서 다수 Worker를 MineralField와 VespeneGeyser에 각각 배정해 채집→운반→반납→재채집을 반복하고, 자원 내부 이동 중 경로 재요청·무한 재경로·상태 취소가 없는지 확인한다.

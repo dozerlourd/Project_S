@@ -1,0 +1,316 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9784f08b8c01b4d41bf54d12095f2039, type: 3}
+  m_Name: UnitBalanceCatalog
+  m_EditorClassIdentifier: 
+  sourceCsv: {fileID: 4900000, guid: 4f1c5849c6874f44a98ec7c5de919a7d, type: 3}
+  entries:
+  - unitType: 0
+    trial: 0
+    movementDomain: 0
+    roles: 3
+    attackDistanceType: 0
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 60
+    physicalAttackPower: 3
+    magicalAttackPower: 0
+    attackRange: 1.2
+    detectionRange: 4
+    attackSpeed: 1
+    movementSpeed: 3
+    visionRadius: 6
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 1
+    advancedSupplyCost: 0
+    canGatherResources: 1
+    areaDamageRadius: 0
+    maxAreaTargets: 0
+    productionDisplayName: Worker
+    productionMineralCost: 50
+    productionGasCost: 0
+    productionTime: 5
+    unitsPerProduction: 1
+    allowedProductionBuildings:
+    - MainBase
+    unlockRequirementIds: []
+  - unitType: 1
+    trial: 0
+    movementDomain: 0
+    roles: 4
+    attackDistanceType: 0
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 100
+    physicalAttackPower: 10
+    magicalAttackPower: 0
+    attackRange: 1.5
+    detectionRange: 5
+    attackSpeed: 1
+    movementSpeed: 3.2
+    visionRadius: 7
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 2
+    advancedSupplyCost: 0
+    canGatherResources: 0
+    areaDamageRadius: 0
+    maxAreaTargets: 0
+    productionDisplayName: Soldier
+    productionMineralCost: 100
+    productionGasCost: 0
+    productionTime: 7
+    unitsPerProduction: 1
+    allowedProductionBuildings:
+    - Production
+    unlockRequirementIds: []
+  - unitType: 2
+    trial: 0
+    movementDomain: 0
+    roles: 4
+    attackDistanceType: 0
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 90
+    physicalAttackPower: 8
+    magicalAttackPower: 0
+    attackRange: 1.4
+    detectionRange: 5
+    attackSpeed: 0.9
+    movementSpeed: 3
+    visionRadius: 7
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 3
+    advancedSupplyCost: 0
+    canGatherResources: 0
+    areaDamageRadius: 2
+    maxAreaTargets: 3
+    productionDisplayName: Spliter
+    productionMineralCost: 125
+    productionGasCost: 0
+    productionTime: 8
+    unitsPerProduction: 1
+    allowedProductionBuildings:
+    - SpliterProduction
+    unlockRequirementIds: []
+  - unitType: 3
+    trial: 0
+    movementDomain: 0
+    roles: 4
+    attackDistanceType: 1
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 70
+    physicalAttackPower: 8
+    magicalAttackPower: 0
+    attackRange: 6
+    detectionRange: 8
+    attackSpeed: 0.8
+    movementSpeed: 2.8
+    visionRadius: 9
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 2
+    advancedSupplyCost: 0
+    canGatherResources: 0
+    areaDamageRadius: 0
+    maxAreaTargets: 0
+    productionDisplayName: Ranger
+    productionMineralCost: 100
+    productionGasCost: 25
+    productionTime: 8
+    unitsPerProduction: 1
+    allowedProductionBuildings:
+    - Production
+    unlockRequirementIds: []
+  - unitType: 4
+    trial: 0
+    movementDomain: 0
+    roles: 4
+    attackDistanceType: 1
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 260
+    physicalAttackPower: 26
+    magicalAttackPower: 0
+    attackRange: 5.5
+    detectionRange: 7
+    attackSpeed: 0.55
+    movementSpeed: 2
+    visionRadius: 8
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 3
+    advancedSupplyCost: 0
+    canGatherResources: 0
+    areaDamageRadius: 0
+    maxAreaTargets: 0
+    productionDisplayName: Tank
+    productionMineralCost: 150
+    productionGasCost: 0
+    productionTime: 10
+    unitsPerProduction: 1
+    allowedProductionBuildings:
+    - Production
+    unlockRequirementIds: []
+  - unitType: 5
+    trial: 0
+    movementDomain: 0
+    roles: 4
+    attackDistanceType: 0
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 55
+    physicalAttackPower: 6
+    magicalAttackPower: 0
+    attackRange: 0.8
+    detectionRange: 4
+    attackSpeed: 3
+    movementSpeed: 4.2
+    visionRadius: 6
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 1
+    advancedSupplyCost: 0
+    canGatherResources: 0
+    areaDamageRadius: 0
+    maxAreaTargets: 0
+    productionDisplayName: Striker
+    productionMineralCost: 75
+    productionGasCost: 0
+    productionTime: 6
+    unitsPerProduction: 1
+    allowedProductionBuildings:
+    - Production
+    unlockRequirementIds: []
+  - unitType: 6
+    trial: 0
+    movementDomain: 0
+    roles: 4
+    attackDistanceType: 0
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 45
+    physicalAttackPower: 4
+    magicalAttackPower: 0
+    attackRange: 1.1
+    detectionRange: 4.5
+    attackSpeed: 1.1
+    movementSpeed: 3.5
+    visionRadius: 5.5
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 1
+    advancedSupplyCost: 0
+    canGatherResources: 0
+    areaDamageRadius: 0
+    maxAreaTargets: 0
+    productionDisplayName: Swarm x3
+    productionMineralCost: 120
+    productionGasCost: 0
+    productionTime: 8
+    unitsPerProduction: 3
+    allowedProductionBuildings:
+    - Production
+    unlockRequirementIds: []
+  - unitType: 7
+    trial: 0
+    movementDomain: 0
+    roles: 16
+    attackDistanceType: 1
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 90
+    physicalAttackPower: 0
+    magicalAttackPower: 0
+    attackRange: 0
+    detectionRange: 0
+    attackSpeed: 0
+    movementSpeed: 3.6
+    visionRadius: 10
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 2
+    advancedSupplyCost: 0
+    canGatherResources: 0
+    areaDamageRadius: 0
+    maxAreaTargets: 0
+    productionDisplayName: Medic
+    productionMineralCost: 50
+    productionGasCost: 0
+    productionTime: 6
+    unitsPerProduction: 1
+    allowedProductionBuildings:
+    - MaintenanceBay
+    unlockRequirementIds: []
+  - unitType: 8
+    trial: 0
+    movementDomain: 0
+    roles: 12
+    attackDistanceType: 1
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 180
+    physicalAttackPower: 36
+    magicalAttackPower: 0
+    attackRange: 8.5
+    detectionRange: 9.5
+    attackSpeed: 0.45
+    movementSpeed: 1.7
+    visionRadius: 8
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 4
+    advancedSupplyCost: 0
+    canGatherResources: 0
+    areaDamageRadius: 2.5
+    maxAreaTargets: 6
+    productionDisplayName: Siege
+    productionMineralCost: 50
+    productionGasCost: 0
+    productionTime: 6
+    unitsPerProduction: 1
+    allowedProductionBuildings:
+    - VehicleFactory
+    unlockRequirementIds: []
+  - unitType: 9
+    trial: 0
+    movementDomain: 0
+    roles: 4
+    attackDistanceType: 1
+    attackPowerType: 0
+    placementType: 0
+    grade: 0
+    maxHealth: 55
+    physicalAttackPower: 5
+    magicalAttackPower: 0
+    attackRange: 4.5
+    detectionRange: 7
+    attackSpeed: 1.2
+    movementSpeed: 4.8
+    visionRadius: 11
+    occupiedCells: {x: 1, y: 1}
+    standardSupplyCost: 1
+    advancedSupplyCost: 0
+    canGatherResources: 0
+    areaDamageRadius: 0
+    maxAreaTargets: 0
+    productionDisplayName: Scout
+    productionMineralCost: 50
+    productionGasCost: 0
+    productionTime: 6
+    unitsPerProduction: 1
+    allowedProductionBuildings:
+    - SignalRelay
+    unlockRequirementIds: []
