@@ -16,6 +16,8 @@ namespace ProjectS.Units
 
         public float CurrentHealth => currentHealth;
         public float MaxHealth => status != null ? status.MaxHealth : 0f;
+        public float HealthRatio => MaxHealth > 0f ? Mathf.Clamp01(currentHealth / MaxHealth) : 0f;
+        public bool IsAtFullHealth => currentHealth >= MaxHealth;
         public bool IsDead => isDead;
         public IUnitAttackTarget RecentAttacker { get; private set; }
 
@@ -69,6 +71,19 @@ namespace ProjectS.Units
             {
                 Die();
             }
+        }
+
+        public float Heal(float amount)
+        {
+            if (isDead || amount <= 0f || currentHealth >= MaxHealth)
+            {
+                return 0f;
+            }
+
+            var previousHealth = currentHealth;
+            currentHealth = Mathf.Min(MaxHealth, currentHealth + amount);
+            HealthChanged?.Invoke(this, currentHealth);
+            return currentHealth - previousHealth;
         }
 
         private void Die()

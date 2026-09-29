@@ -87,6 +87,26 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator SiegeAreaAttack_FallsOffLinearlyAndDealsNothingAtOrBeyondRadius()
+        {
+            var attacker = CreateUnit("SiegeAreaAttacker", Vector3.zero, UnitTeam.Team1, PrototypeUnitType.Siege, 2f, 8);
+            var primary = CreateUnit("SiegeAreaPrimary", new Vector3(1f, 0f), UnitTeam.Team2, PrototypeUnitType.Worker);
+            var halfway = CreateUnit("SiegeAreaHalfway", new Vector3(2f, 0f), UnitTeam.Team2, PrototypeUnitType.Worker);
+            var boundary = CreateUnit("SiegeAreaBoundary", new Vector3(3f, 0f), UnitTeam.Team2, PrototypeUnitType.Worker);
+            var outside = CreateUnit("SiegeAreaOutside", new Vector3(3.1f, 0f), UnitTeam.Team2, PrototypeUnitType.Worker);
+
+            ApplyAttack(attacker, primary.GetComponent<PrototypeUnitStatus>());
+
+            Assert.That(Health(primary), Is.EqualTo(90f));
+            Assert.That(Health(halfway), Is.EqualTo(95f));
+            Assert.That(Health(boundary), Is.EqualTo(100f));
+            Assert.That(Health(outside), Is.EqualTo(100f));
+
+            Destroy(attacker, primary, halfway, boundary, outside);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator PrototypeDefaults_UseCatalogAreaDamageValues()
         {
             foreach (PrototypeUnitType unitType in Enum.GetValues(typeof(PrototypeUnitType)))
@@ -100,6 +120,12 @@ namespace ProjectS.Tests.PlayMode
                 {
                     Assert.That(status.AreaDamageRadius, Is.EqualTo(2f));
                     Assert.That(status.MaxAreaTargets, Is.EqualTo(3));
+                    Assert.That(status.HasAreaAttack, Is.True);
+                }
+                else if (unitType == PrototypeUnitType.Siege)
+                {
+                    Assert.That(status.AreaDamageRadius, Is.EqualTo(2.5f));
+                    Assert.That(status.MaxAreaTargets, Is.EqualTo(6));
                     Assert.That(status.HasAreaAttack, Is.True);
                 }
                 else

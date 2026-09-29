@@ -38,20 +38,6 @@ namespace ProjectS.UI
             Key.I,
             Key.O
         };
-        private static readonly BuildingKind[] BuildMenuBuildings =
-        {
-            BuildingKind.Production,
-            BuildingKind.SpliterProduction,
-            BuildingKind.AutoTurret,
-            BuildingKind.SpeedAura,
-            BuildingKind.SupplyDepot,
-            BuildingKind.AdvancedSupplyDepot,
-            BuildingKind.ResourceDropOff,
-            BuildingKind.MainBase,
-            BuildingKind.VehicleFactory,
-            BuildingKind.MaintenanceBay,
-            BuildingKind.SignalRelay
-        };
         private static readonly string[] CommandIconPaths =
         {
             "Temp/Commands/Command_Move",
@@ -319,13 +305,13 @@ namespace ProjectS.UI
             return false;
         }
 
-        private static bool IsPointerOverBuildOption(Vector2 guiPosition, Rect panelRect)
+        private bool IsPointerOverBuildOption(Vector2 guiPosition, Rect panelRect)
         {
             var buttonGap = 6f;
             var columns = panelRect.width >= 560f ? 5 : panelRect.width >= 420f ? 3 : 2;
             var buttonWidth = (panelRect.width - 16f - buttonGap * (columns - 1)) / columns;
             var buttonHeight = columns == 4 ? 46f : 28f;
-            for (var i = 0; i < BuildMenuBuildings.Length; i++)
+            for (var i = 0; i < GetBuildOptionCount(); i++)
             {
                 if (BuildOptionRect(panelRect, i, columns, buttonWidth, buttonHeight, buttonGap).Contains(guiPosition))
                 {
@@ -812,18 +798,16 @@ namespace ProjectS.UI
             var columns = panelRect.width >= 560f ? 5 : panelRect.width >= 420f ? 3 : 2;
             var buttonWidth = (panelRect.width - 16f - buttonGap * (columns - 1)) / columns;
             var buttonHeight = columns == 4 ? 46f : 28f;
-            DrawBuildOption(BuildOptionRect(panelRect, 0, columns, buttonWidth, buttonHeight, buttonGap), 0, columns == 4 ? "Combat\n150M" : "Combat 150M");
-            DrawBuildOption(BuildOptionRect(panelRect, 1, columns, buttonWidth, buttonHeight, buttonGap), 1, columns == 4 ? "Spliter\n175M" : "Spliter 175M");
-            DrawBuildOption(BuildOptionRect(panelRect, 2, columns, buttonWidth, buttonHeight, buttonGap), 2, columns == 4 ? "Turret\n125M" : "Turret 125M");
-            DrawBuildOption(BuildOptionRect(panelRect, 3, columns, buttonWidth, buttonHeight, buttonGap), 3, columns == 4 ? "Speed\n125M/25G" : "Speed 125M/25G");
-            DrawBuildOption(BuildOptionRect(panelRect, 4, columns, buttonWidth, buttonHeight, buttonGap), 4, columns == 5 ? "Supply +10\n100M" : "Supply +10 100M");
-            DrawBuildOption(BuildOptionRect(panelRect, 5, columns, buttonWidth, buttonHeight, buttonGap), 5, columns == 5 ? "Adv. +10\n100M" : "Adv. +10 100M");
-            DrawBuildOption(BuildOptionRect(panelRect, 6, columns, buttonWidth, buttonHeight, buttonGap), 6, columns >= 5 ? "Drop-off\n100M" : "Drop-off 100M");
-            DrawBuildOption(BuildOptionRect(panelRect, 7, columns, buttonWidth, buttonHeight, buttonGap), 7, columns >= 5 ? "Main Base\n350M/75G" : "Main Base 350M/75G");
-            DrawBuildOption(BuildOptionRect(panelRect, 8, columns, buttonWidth, buttonHeight, buttonGap), 8, columns >= 5 ? "Siege Factory\n250M/75G" : "Siege Factory 250M/75G");
-            DrawBuildOption(BuildOptionRect(panelRect, 9, columns, buttonWidth, buttonHeight, buttonGap), 9, columns >= 5 ? "Medic Bay\n200M/50G" : "Medic Bay 200M/50G");
-            DrawBuildOption(BuildOptionRect(panelRect, 10, columns, buttonWidth, buttonHeight, buttonGap), 10, columns >= 5 ? "Scout Relay\n150M/50G" : "Scout Relay 150M/50G");
-            var rowCount = Mathf.CeilToInt(BuildMenuBuildings.Length / (float)columns);
+            var optionCount = GetBuildOptionCount();
+            for (var i = 0; i < optionCount; i++)
+            {
+                DrawBuildOption(
+                    BuildOptionRect(panelRect, i, columns, buttonWidth, buttonHeight, buttonGap),
+                    i,
+                    GetBuildDefinition(i));
+            }
+
+            var rowCount = Mathf.CeilToInt(optionCount / (float)columns);
             GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 30f + rowCount * (buttonHeight + 4f), panelRect.width - 16f, 20f), "Choose a tile to place. Esc cancels.");
         }
 
@@ -834,12 +818,14 @@ namespace ProjectS.UI
             return new Rect(panelRect.x + 8f + column * (width + gap), panelRect.y + 28f + row * (height + 4f), width, height);
         }
 
-        private void DrawBuildOption(Rect buttonRect, int hotkeyIndex, string label)
+        private void DrawBuildOption(
+            Rect buttonRect,
+            int hotkeyIndex,
+            BuildingConstructionDefinition definition)
         {
-            var buildingKind = BuildMenuBuildings[hotkeyIndex];
-            var isLocked = buildingPlacementService != null
-                && !buildingPlacementService.CanSelectBuilding(buildingKind, out _);
-            var buttonLabel = isLocked ? "LOCKED" : label;
+            var isLocked = buildingPlacementService == null
+                || !buildingPlacementService.CanSelectConstructionDefinition(definition, out _);
+            var buttonLabel = isLocked ? "LOCKED" : FormatBuildOptionLabel(definition);
             if (!GUI.Button(buttonRect, WithHotkeyLabel(buttonLabel, hotkeyIndex)))
             {
                 return;
@@ -850,7 +836,8 @@ namespace ProjectS.UI
 
         private bool TryBeginBuildPlacement(int hotkeyIndex)
         {
-            if (hotkeyIndex < 0 || hotkeyIndex >= BuildMenuBuildings.Length)
+            var definition = GetBuildDefinition(hotkeyIndex);
+            if (definition == null)
             {
                 return false;
             }
@@ -862,7 +849,8 @@ namespace ProjectS.UI
                 return false;
             }
 
-            if (buildingPlacementService == null || !buildingPlacementService.SelectBuilding(BuildMenuBuildings[hotkeyIndex]))
+            if (buildingPlacementService == null
+                || !buildingPlacementService.SelectConstructionDefinition(definition))
             {
                 productionFeedback = buildingPlacementService != null
                     ? buildingPlacementService.LastPlacementFailureReason
@@ -872,6 +860,63 @@ namespace ProjectS.UI
 
             commandController.BeginBuildPlacement(buildingPlacementService);
             return true;
+        }
+
+        private int GetBuildOptionCount()
+        {
+            var definitions = buildingPlacementService != null
+                ? buildingPlacementService.ConstructionDefinitions
+                : null;
+            if (definitions == null)
+            {
+                return 0;
+            }
+
+            var count = 0;
+            for (var i = 0; i < definitions.Count; i++)
+            {
+                if (definitions[i] != null)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private BuildingConstructionDefinition GetBuildDefinition(int optionIndex)
+        {
+            if (optionIndex < 0 || buildingPlacementService == null)
+            {
+                return null;
+            }
+
+            var definitions = buildingPlacementService.ConstructionDefinitions;
+            var currentIndex = 0;
+            for (var i = 0; i < definitions.Count; i++)
+            {
+                var definition = definitions[i];
+                if (definition == null)
+                {
+                    continue;
+                }
+
+                if (currentIndex == optionIndex)
+                {
+                    return definition;
+                }
+
+                currentIndex++;
+            }
+
+            return null;
+        }
+
+        private static string FormatBuildOptionLabel(BuildingConstructionDefinition definition)
+        {
+            return definition != null
+                ? $"{definition.DisplayName} {FormatCost(definition.Cost)}"
+                : string.Empty;
         }
 
         public bool TryQueueProduction(UnitProductionQueue productionQueue, int hotkeyIndex)

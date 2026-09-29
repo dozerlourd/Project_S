@@ -1996,6 +1996,58 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator WorkerGatherController_GasRepeatsGatherAndDepositThroughResourceCollider()
+        {
+            var worldObject = CreateNavigationTestWorld(
+                "GasGatherWorld",
+                RectCells(-6, -6, 13, 13),
+                new HashSet<Vector3Int>(),
+                out _,
+                out _);
+            var walletObject = new GameObject("GasGatherWallet");
+            var wallet = walletObject.AddComponent(PlayerResourceWalletType);
+            Invoke(wallet, "Initialize", UnitTeam.Team1, CreateResourceAmount(0, 0));
+            var dropOffObject = CreateDropOff("GasGatherDropOff", UnitTeam.Team1, new Vector3(0f, 4f, 0f));
+            var resourceObject = CreateResourceNode(
+                "GasResource",
+                Enum.Parse(ResourceTypeType, "Gas"),
+                40,
+                5,
+                0.05f,
+                Vector3.zero);
+            var resourceCollider = resourceObject.GetComponent<BoxCollider2D>();
+            resourceCollider.isTrigger = false;
+            resourceCollider.size = new Vector2(2.5f, 2.5f);
+            var worker = CreateWorkerUnit("GasGatherWorker", new Vector3(-4f, 0f, 0f));
+            var resourceNode = resourceObject.GetComponent(ResourceNodeType);
+            var interactableResource = (IUnitInteractableTarget)resourceNode;
+
+            worker.GetComponent<UnitCommandAgent>().Issue(new UnitCommand(
+                UnitCommandMode.Interact,
+                interactableResource.InteractionPoint,
+                null,
+                interactableResource,
+                false));
+
+            for (var i = 0; i < 360 && GetInt(wallet, "Gas") < 10; i++)
+            {
+                yield return null;
+            }
+
+            Assert.That(GetInt(wallet, "Gas"), Is.GreaterThanOrEqualTo(10));
+            Assert.That(GetInt(resourceNode, "RemainingAmount"), Is.LessThan(40));
+            Assert.That(worker.GetComponent<UnitCommandAgent>().Mode, Is.EqualTo(UnitCommandMode.Interact));
+            Assert.That(resourceCollider.isTrigger, Is.True);
+
+            Object.Destroy(worker);
+            Object.Destroy(resourceObject);
+            Object.Destroy(dropOffObject);
+            Object.Destroy(walletObject);
+            Object.Destroy(worldObject);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator WorkerGatherController_StopsWithFailureReasonWhenNoDropOffExists()
         {
             LogAssert.Expect(LogType.Warning, "No available resource drop-off found for carried resources.");
@@ -2776,6 +2828,66 @@ namespace ProjectS.Tests.PlayMode
             Object.Destroy(productionBuilding);
             Object.Destroy(unlockStateObject);
             Object.Destroy(walletObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BuildMenu_UsesConfiguredConstructionDefinitionsInDataOrder()
+        {
+            var firstPrefab = new GameObject("DataDrivenFirstBuildingPrefab");
+            var secondPrefab = new GameObject("DataDrivenSecondBuildingPrefab");
+            var firstDefinition = Activator.CreateInstance(BuildingConstructionDefinitionType);
+            var secondDefinition = Activator.CreateInstance(BuildingConstructionDefinitionType);
+            Invoke(
+                firstDefinition,
+                "Configure",
+                "First Structure",
+                Enum.Parse(BuildingKindType, "AutoTurret"),
+                CreateResourceAmount(45, 0),
+                3f,
+                new Vector2Int(2, 2),
+                firstPrefab,
+                null);
+            Invoke(
+                secondDefinition,
+                "Configure",
+                "Second Structure",
+                Enum.Parse(BuildingKindType, "SignalRelay"),
+                CreateResourceAmount(80, 15),
+                5f,
+                new Vector2Int(3, 2),
+                secondPrefab,
+                null);
+
+            var definitions = Array.CreateInstance(BuildingConstructionDefinitionType, 3);
+            definitions.SetValue(firstDefinition, 0);
+            definitions.SetValue(null, 1);
+            definitions.SetValue(secondDefinition, 2);
+
+            var placementObject = new GameObject("DataDrivenBuildMenuPlacement");
+            var placement = placementObject.AddComponent(BuildingPlacementServiceType);
+            Invoke(placement, "ConfigureConstructionDefinitions", definitions);
+            var hudObject = new GameObject("DataDrivenBuildMenuHud");
+            var hud = hudObject.AddComponent(RtsGameHudType);
+            Invoke(hud, "Configure", UnitTeam.Team1, placement);
+
+            Assert.That((int)Invoke(hud, "GetBuildOptionCount"), Is.EqualTo(2));
+            Assert.That(Invoke(hud, "GetBuildDefinition", 0), Is.SameAs(firstDefinition));
+            Assert.That(Invoke(hud, "GetBuildDefinition", 1), Is.SameAs(secondDefinition));
+            Assert.That(
+                (string)InvokeStatic(RtsGameHudType, "FormatBuildOptionLabel", firstDefinition),
+                Is.EqualTo("First Structure 45M/0G"));
+            Assert.That(
+                (bool)Invoke(placement, "SelectConstructionDefinition", secondDefinition),
+                Is.True);
+            Assert.That(GetProperty(placement, "SelectedDefinition"), Is.SameAs(secondDefinition));
+            Assert.That(GetProperty(placement, "SelectedBuildingCost"), Is.EqualTo(CreateResourceAmount(80, 15)));
+            Assert.That(GetProperty(secondDefinition, "CompletedBuildingPrefab"), Is.SameAs(secondPrefab));
+
+            Object.Destroy(hudObject);
+            Object.Destroy(placementObject);
+            Object.Destroy(firstPrefab);
+            Object.Destroy(secondPrefab);
             yield return null;
         }
 

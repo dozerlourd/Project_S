@@ -26,6 +26,9 @@
 - [ ] 세 건물이 각각 `UnitProductionQueue`를 하나만 가지며 전용 유닛 정의 하나만 노출하는지 확인한다.
 - [ ] 미완성 MaintenanceBay에서 Medic 큐 요청 시 `building is not completed` 실패 사유가 표시되고 미네랄과 일반/고급 인구 예약이 변하지 않는지 확인한다.
 - [ ] `SpecializedProductionDefinition_UsesCatalogBuildingAndStandardSupply`, `SpecializedProductionQueue_IncompleteBuildingRejectsBeforeResourceAndSupplyReservation` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+- [ ] AI가 기본 전투 유닛 생산 성공 4회마다 특수 유닛을 최대 1회만 추가하고, 전투 유닛 6기 미만에서는 특수 생산을 보류하는지 확인한다.
+- [ ] VehicleFactory, MaintenanceBay, SignalRelay 중 일부만 있을 때 AI가 가용 큐로 폴백하고 자원·인구·건물 조건 또는 큐 용량이 부족하면 예약 없이 다음 판단 주기로 넘기는지 확인한다.
+- [ ] `SpecializedProduction_RequiresMatureArmyAndBasicProductionQuota`, `SpecializedProduction_FallsBackToAnAvailableSpecializedQueue` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 
 ### 핵심 건물 역할 및 고유 텍스처
 
@@ -257,8 +260,8 @@
 ### 유닛별 전술 행동
 
 - [ ] `Tools > Project S > Create B Prototype Unit Assets`를 실행해 `B_Medic`, `B_Siege`, `B_Scout` 프리팹과 전용 텍스처가 생성되는지 확인한다.
-- [ ] Medic가 팀 선택과 안개 시야, 이동 명령에는 참여하지만 자동 표적 획득, 공격, 반격을 수행하지 않고 `UnitCombat` 및 `TemporaryAttackEffect`를 갖지 않는지 확인한다.
-- [ ] Siege가 체력 180, 공격력 36, 사거리 8.5, 감지 9.5, 공격 속도 0.45, 이동 속도 1.7, 시야 8로 기존 포격 프로필과 단일 대상 공격을 사용하는지 확인한다.
+- [ ] Medic가 팀 선택과 안개 시야, 이동 명령에는 참여하되 공격·반격은 수행하지 않고, 사거리 4.5 안에서 체력 비율이 가장 낮은 아군 유닛을 1초마다 8씩 회복하는지 확인한다. 회복 중에도 현재 명령과 이동 목적지가 바뀌지 않아야 한다.
+- [ ] Siege가 체력 180, 공격력 36, 사거리 8.5, 감지 9.5, 공격 속도 0.45, 이동 속도 1.7, 시야 8을 사용하고, 주 대상 중심 반경 2.5·최대 6대상에 거리에 따른 선형 감쇠 피해를 주며 경계와 반경 밖에는 피해를 주지 않는지 확인한다.
 - [ ] Scout가 체력 55, 공격력 5, 사거리 4.5, 감지 7, 공격 속도 1.2, 이동 속도 4.8, 시야 11로 기존 원거리 공격과 표준 추적을 사용하는지 확인한다.
 - [ ] `ExtendedUnitDefaults_ConfigureDocumentedRolesStatsAndCombatComponents` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 - [ ] Soldier가 표준 사거리 경계에서 안정적으로 정지하고, 새 직접 명령을 받으면 추격이나 공격을 즉시 중단하는지 확인한다.
@@ -267,7 +270,7 @@
 - [ ] Tank 프리팹에 체력 260, 공격력 26, 사거리 5.5, 감지 7, 공격 속도 0.55, 이동 속도 2가 적용되는지 확인한다.
 - [ ] Striker와 Swarm이 표준 유닛보다 깊게 접근하고 더 짧은 재경로 간격으로 목표를 추적하면서 기존 점유 분산을 유지하는지 확인한다.
 - [ ] Spliter가 주 대상 포함, 반경 2, 최대 3대상 광역 공격 규칙을 유지하는지 확인한다.
-- [ ] `UnitTacticalBehaviorPlayModeTests`와 기존 명령·광역 공격 PlayMode 테스트를 Unity Test Runner에서 함께 실행한다.
+- [ ] `Medic_AutomaticallyHealsLowestHealthAllyWithinRangeWithoutChangingCommands`, `SiegeAreaAttack_FallsOffLinearlyAndDealsNothingAtOrBeyondRadius`와 기존 명령·광역 공격 PlayMode 테스트를 Unity Test Runner에서 함께 실행한다.
 
 ### 유닛 선택 아웃라인
 
@@ -338,7 +341,9 @@
 
 - [ ] `BuildingConstructionDefinition`에 권장 트리 전체의 표시명, 비용, 건설 시간, 풋프린트, 완성 프리팹, TeamUnlock 및 CompletedBuilding 조건을 연결하고 MapCreate 런타임·에디터 셋업에서 동일 정의 배열을 주입한다.
 - [ ] MainBase, Production, SupplyDepot, ResourceDropOff는 기본 해금 상태로 유지하면서 ResearchLab 이후 field-engineering, adaptive-combat, mechanized-systems, tactical-command 분기와 Tank, Striker, Swarm, Spliter 생산 조건을 연결한다.
-- [ ] B 건설 메뉴를 하드코딩 슬롯 대신 `BuildingPlacementService.ConstructionDefinitions` 목록으로 렌더링하고, 잠김 항목의 정확한 조건 사유와 페이지 또는 슬롯 이동을 제공한다.
+- [x] B 건설 메뉴의 항목 순서, 표시명, 비용, 선택 대상을 하드코딩 슬롯 대신 `BuildingPlacementService.ConstructionDefinitions`에서 공급한다.
+- [ ] 사용자가 해금 트리를 확정한 뒤 잠김 항목의 정확한 조건 사유와 페이지 또는 슬롯 이동 정책을 정한다.
+- [ ] `BuildMenu_UsesConfiguredConstructionDefinitionsInDataOrder` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 - [ ] 선택한 건설 정의의 프리뷰, 실제 배치, 비용 차감이 동일한 cost/footprint를 사용하며 성공한 배치만 비용을 한 번 차감하고 메뉴를 닫는지 PlayMode 테스트를 추가하고 실행한다.
 - [ ] 공사 중 ConstructionSite 풋프린트를 등록 기반 동적 경로 장애물로 노출하고 완료·비활성화 때 해제하며, 작업자가 접근 가능한 인접 칸으로 이동하는 처리는 Structure 및 경로 담당 변경과 조율한 뒤 구현한다.
 
@@ -363,4 +368,5 @@
 - 추가 조정: MainBase Collider를 `2.2 x 1.8`에서 `2.0 x 1.6`으로 추가 축소하고, 프리팹·에디터 생성 경로에 반영했다. ResourceNode, ResourceTile, 런타임/에디터 자원 생성 경로와 MineralField/VespeneGeyser 프리팹의 채집 시간을 기존 값의 2배로 조정했다.
 - 자원 규칙 통일: Gas의 초기량, 1회 채집량, 채집 시간, 상호작용 거리, Collider 크기를 Minerals와 동일하게 맞추고 `ResourceType`만 다르게 유지했다.
 - 자원 이동 예외: Resource 전용 상호작용 경로는 자원 Collider 내부 셀도 후보로 허용하고, ResourceNode의 BoxCollider2D를 항상 Trigger로 보장해 채집 worker의 접근·재채집이 자원 Collider나 자원 셀 판정 때문에 취소되지 않도록 했다. 일반 이동 및 반납 경로에는 이 예외를 적용하지 않는다.
+- 재개 분석 및 보강: WorkerResourceController 역할을 담당하는 `WorkerGatherController`는 `UnitCommandMode.Interact`를 유지한 채 자원 접근 경로를 반복 요청해야 하며, `UnitPathAgent`의 자원 전용 상호작용은 내부 셀 후보를 허용해야 한다. 자원 전용 API 진입 시에도 Collider를 Trigger로 강제해 프리팹 설정 누락이 물리 이동을 막지 않도록 보강하고, 가스의 채집→반납→재채집 회귀 테스트를 추가했다.
 - [ ] 실제 Unity PlayMode에서 다수 Worker를 MineralField와 VespeneGeyser에 각각 배정해 채집→운반→반납→재채집을 반복하고, 자원 내부 이동 중 경로 재요청·무한 재경로·상태 취소가 없는지 확인한다.

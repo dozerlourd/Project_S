@@ -205,6 +205,12 @@ namespace ProjectS.Units
 
         public bool MoveToResourceInteraction(Vector3 destination, Collider2D resourceCollider, float range)
         {
+            // Resource colliders are interaction volumes, never physical movement blockers.
+            if (resourceCollider != null)
+            {
+                resourceCollider.isTrigger = true;
+            }
+
             return MoveToInteractionInternal(destination, resourceCollider, range, true);
         }
 

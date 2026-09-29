@@ -48,16 +48,32 @@ namespace ProjectS.Units
         private void ApplyAttack(IUnitAttackTarget primaryTarget)
         {
             CollectAttackTargets(primaryTarget);
+            var areaCenter = primaryTarget.SelectionTransform.position;
             for (var i = 0; i < attackTargets.Count; i++)
             {
                 var target = attackTargets[i];
+                var damage = GetAttackDamage(target);
+                if (HasAreaAttack())
+                {
+                    var distanceFromCenter = Vector3.Distance(areaCenter, target.SelectionTransform.position);
+                    damage *= UnitCombatRules.GetAreaDamageFalloff(
+                        status.UnitType,
+                        distanceFromCenter,
+                        status.AreaDamageRadius);
+                }
+
+                if (damage <= 0f)
+                {
+                    continue;
+                }
+
                 UnitTargetPriority.RecordRecentAttacker(target, status);
                 CombatFeedbackEvents.Publish(
                     CombatFeedbackType.AttackHit,
                     target.SelectionTransform.position,
                     target.Team,
                     status.Team);
-                target.TakeDamage(GetAttackDamage(target), status);
+                target.TakeDamage(damage, status);
             }
         }
 

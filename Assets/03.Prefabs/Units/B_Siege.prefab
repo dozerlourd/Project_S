@@ -190,21 +190,21 @@ MonoBehaviour:
   team: 0
   unitType: 8
   movementDomain: 0
-  roles: 4
+  roles: 12
   attackDistanceType: 1
   attackPowerType: 0
   placementType: 0
   grade: 0
-  attackTargetType: 0
-  maxHealth: 260
-  physicalAttackPower: 26
+  attackTargetType: 1
+  maxHealth: 180
+  physicalAttackPower: 36
   magicalAttackPower: 0
-  attackRange: 5.5
-  detectionRange: 7
-  attackSpeed: 0.55
-  movementSpeed: 2
+  attackRange: 8.5
+  detectionRange: 9.5
+  attackSpeed: 0.45
+  movementSpeed: 1.7
   occupiedCells: {x: 1, y: 1}
-  supplyCost: 3
+  supplyCost: 4
   advancedSupplyCost: 0
   visionRadius: 8
   hasHealthRegeneration: 0
@@ -218,8 +218,8 @@ MonoBehaviour:
   hasManaRegeneration: 0
   manaRegenerationAmount: 0
   canGatherResources: 0
-  areaDamageRadius: 0
-  maxAreaTargets: 0
+  areaDamageRadius: 2.5
+  maxAreaTargets: 6
 --- !u!114 &100006
 MonoBehaviour:
   m_ObjectHideFlags: 0

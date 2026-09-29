@@ -93,6 +93,40 @@ namespace ProjectS.Buildings
             unlockRequirements = productionUnlockRequirements ?? new UnlockRequirement[0];
         }
 
+        public void ApplyBalanceCatalog(UnitBalanceCatalog catalog = null)
+        {
+            catalog = catalog != null ? catalog : UnitBalanceCatalog.LoadDefault();
+            UnitBalanceEntry entry;
+            if (catalog != null && catalog.TryGetEntry(unitType, out entry))
+            {
+                ApplyBalanceEntry(entry);
+                return;
+            }
+
+            ApplyBalanceEntry(UnitBalanceEntry.CreateFallback(unitType));
+        }
+
+        private void ApplyBalanceEntry(UnitBalanceEntry entry)
+        {
+            if (entry == null)
+            {
+                return;
+            }
+
+            Configure(
+                entry.ProductionDisplayName,
+                entry.UnitType,
+                unitPrefab,
+                new ResourceAmount(entry.ProductionMineralCost, entry.ProductionGasCost),
+                entry.ProductionTime,
+                entry.SupplyUsage.Standard,
+                entry.UnitsPerProduction,
+                CreateProductionRequirements(entry.AllowedProductionBuildings));
+            ConfigureSupplyRequirement(entry.SupplyUsage);
+            ConfigureAllowedProductionBuildings(CreateAllowedProductionBuildings(entry.AllowedProductionBuildings));
+            ConfigureUnlockRequirements(CreateUnlockRequirements(entry.UnlockRequirementIds));
+        }
+
         public bool CanMeetAdditionalProductionConditions(UnitTeam team, string action, out string failureReason)
         {
             var requirementsToCheck = requirements ?? Array.Empty<UnitProductionRequirement>();
@@ -146,6 +180,66 @@ namespace ProjectS.Buildings
             }
 
             return $"Cannot enqueue {DisplayName}: cannot be produced at {buildingKind}. Allowed building(s): {allowedNames}.";
+        }
+
+        private static BuildingKind[] CreateAllowedProductionBuildings(IReadOnlyList<string> buildingNames)
+        {
+            if (buildingNames == null || buildingNames.Count == 0)
+            {
+                return Array.Empty<BuildingKind>();
+            }
+
+            var result = new List<BuildingKind>();
+            for (var i = 0; i < buildingNames.Count; i++)
+            {
+                if (Enum.TryParse(buildingNames[i], true, out BuildingKind kind))
+                {
+                    result.Add(kind);
+                }
+            }
+
+            return result.ToArray();
+        }
+
+        private static UnitProductionRequirement[] CreateProductionRequirements(IReadOnlyList<string> buildingNames)
+        {
+            var buildings = CreateAllowedProductionBuildings(buildingNames);
+            if (buildings.Length == 0)
+            {
+                return Array.Empty<UnitProductionRequirement>();
+            }
+
+            var requirements = new UnitProductionRequirement[buildings.Length];
+            for (var i = 0; i < buildings.Length; i++)
+            {
+                requirements[i] = new UnitProductionRequirement();
+                requirements[i].ConfigureCompletedBuilding(buildings[i]);
+            }
+
+            return requirements;
+        }
+
+        private static UnlockRequirement[] CreateUnlockRequirements(IReadOnlyList<string> unlockIds)
+        {
+            if (unlockIds == null || unlockIds.Count == 0)
+            {
+                return Array.Empty<UnlockRequirement>();
+            }
+
+            var requirements = new List<UnlockRequirement>();
+            for (var i = 0; i < unlockIds.Count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(unlockIds[i]))
+                {
+                    continue;
+                }
+
+                var requirement = new UnlockRequirement();
+                requirement.ConfigureTeamUnlock(unlockIds[i]);
+                requirements.Add(requirement);
+            }
+
+            return requirements.ToArray();
         }
     }
 }

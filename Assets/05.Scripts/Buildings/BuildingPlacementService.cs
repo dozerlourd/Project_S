@@ -286,6 +286,20 @@ namespace ProjectS.Buildings
                 return false;
             }
 
+            return CanSelectConstructionDefinition(definition, out failureReason);
+        }
+
+        public bool CanSelectConstructionDefinition(
+            BuildingConstructionDefinition definition,
+            out string failureReason)
+        {
+            ResolveReferences();
+            if (definition == null || !ContainsConstructionDefinition(definition))
+            {
+                failureReason = "Building definition is not available.";
+                return false;
+            }
+
             if (!definition.CanBeBuiltBy(team, out failureReason))
             {
                 return false;
@@ -298,16 +312,28 @@ namespace ProjectS.Buildings
         public bool SelectBuilding(BuildingKind buildingKind)
         {
             ResolveReferences();
-            if (!CanSelectBuilding(buildingKind, out var unlockFailureReason))
+            var definition = FindConstructionDefinition(buildingKind);
+            if (definition == null)
+            {
+                LastPlacementFailureReason = $"Building type {buildingKind} is not available.";
+                return false;
+            }
+
+            return SelectConstructionDefinition(definition);
+        }
+
+        public bool SelectConstructionDefinition(BuildingConstructionDefinition definition)
+        {
+            ResolveReferences();
+            if (!CanSelectConstructionDefinition(definition, out var unlockFailureReason))
             {
                 LastPlacementFailureReason = unlockFailureReason;
                 return false;
             }
 
-            var definition = FindConstructionDefinition(buildingKind);
             if (definition.CompletedBuildingPrefab == null)
             {
-                LastPlacementFailureReason = $"Building type {buildingKind} has no configured prefab.";
+                LastPlacementFailureReason = $"Building type {definition.BuildingKind} has no configured prefab.";
                 return false;
             }
 
@@ -389,6 +415,24 @@ namespace ProjectS.Buildings
             }
 
             return null;
+        }
+
+        private bool ContainsConstructionDefinition(BuildingConstructionDefinition target)
+        {
+            if (constructionDefinitions == null || target == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < constructionDefinitions.Length; i++)
+            {
+                if (ReferenceEquals(constructionDefinitions[i], target))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void ResolveReferences()

@@ -15,12 +15,9 @@ GameObject:
   - component: {fileID: 100005}
   - component: {fileID: 100006}
   - component: {fileID: 100007}
-  - component: {fileID: 100008}
   - component: {fileID: 100010}
-  - component: {fileID: 100011}
   - component: {fileID: 100012}
-  - component: {fileID: 100013}
-  - component: {fileID: 100014}
+  - component: {fileID: 100015}
   m_Layer: 0
   m_Name: B_Medic
   m_TagString: Untagged
@@ -192,23 +189,23 @@ MonoBehaviour:
   team: 0
   unitType: 7
   movementDomain: 0
-  roles: 3
-  attackDistanceType: 0
+  roles: 16
+  attackDistanceType: 1
   attackPowerType: 0
   placementType: 0
   grade: 0
   attackTargetType: 0
-  maxHealth: 60
-  physicalAttackPower: 3
+  maxHealth: 90
+  physicalAttackPower: 0
   magicalAttackPower: 0
-  attackRange: 1.2
-  detectionRange: 4
-  attackSpeed: 1
-  movementSpeed: 3
+  attackRange: 0
+  detectionRange: 0
+  attackSpeed: 0
+  movementSpeed: 3.6
   occupiedCells: {x: 1, y: 1}
-  supplyCost: 1
+  supplyCost: 2
   advancedSupplyCost: 0
-  visionRadius: 6
+  visionRadius: 10
   hasHealthRegeneration: 0
   healthRegenerationAmount: 0
   hasShield: 0
@@ -219,7 +216,7 @@ MonoBehaviour:
   manaAmount: 0
   hasManaRegeneration: 0
   manaRegenerationAmount: 0
-  canGatherResources: 1
+  canGatherResources: 0
   areaDamageRadius: 0
   maxAreaTargets: 0
 --- !u!114 &100006
@@ -263,24 +260,6 @@ MonoBehaviour:
   detectionRangeGizmoColor: {r: 1, g: 0.85, b: 0.1, a: 0.28}
   attackRangeGizmoColor: {r: 1, g: 0.2, b: 0.1, a: 0.35}
   targetLineGizmoColor: {r: 1, g: 0.1, b: 0.1, a: 0.8}
---- !u!114 &100008
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 100000}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8d2c07f04d8b4e9eb4c4de0b4fb7aa61, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  effectColor: {r: 1, g: 0.85, b: 0.25, a: 0.9}
-  lineWidth: 0.08
-  effectDuration: 0.08
-  muzzleOffset: 0.25
-  sortingLayerName: Default
-  sortingOrder: 30
 --- !u!114 &100010
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -291,18 +270,6 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 63dd0ef8d5524c649937b7f90aa5f2e1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &100011
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 100000}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4cb150d1a99e47babc5ec075404a3ef1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!114 &100012
@@ -324,7 +291,7 @@ MonoBehaviour:
   size: {x: 0.62, y: 0.075}
   sortingOrder: 41
   lowHealthThreshold: 0.35
---- !u!114 &100013
+--- !u!114 &100015
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -333,27 +300,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 100000}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d625444529bf4dbbb3dedce59903228d, type: 3}
+  m_Script: {fileID: 11500000, guid: 7c1df10ce7534a789c55d4521f6e71f2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  carryCapacity: 5
-  gatherRange: 0.2
-  dropOffRange: 0.45
-  resourcePathRetryInterval: 0.25
-  logGathering: 1
---- !u!114 &100014
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 100000}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e1555832ac1743a6bdb34da0fe0b9712, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  buildPower: 1
+  healRange: 4.5
+  healAmount: 8
+  healInterval: 1
+  targetScanInterval: 0.2
 --- !u!1 &100100
 GameObject:
   m_ObjectHideFlags: 0

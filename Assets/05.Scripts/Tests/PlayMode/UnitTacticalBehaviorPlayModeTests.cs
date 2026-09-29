@@ -145,6 +145,55 @@ namespace ProjectS.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator Medic_AutomaticallyHealsLowestHealthAllyWithinRangeWithoutChangingCommands()
+        {
+            var medic = CreateDefaultUnit("Healing Medic", PrototypeUnitType.Medic);
+            medic.transform.position = Vector3.zero;
+            var mostWounded = CreateDefaultUnit("Most Wounded Ally", PrototypeUnitType.Soldier);
+            mostWounded.transform.position = new Vector3(2f, 0f);
+            var lessWounded = CreateDefaultUnit("Less Wounded Ally", PrototypeUnitType.Soldier);
+            lessWounded.transform.position = new Vector3(1f, 0f);
+            var outOfRange = CreateDefaultUnit("Out Of Range Ally", PrototypeUnitType.Soldier);
+            outOfRange.transform.position = new Vector3(6f, 0f);
+            var enemy = CreateDefaultUnit("Wounded Enemy", PrototypeUnitType.Soldier);
+            enemy.GetComponent<PrototypeUnitStatus>().SetTeam(UnitTeam.Team4);
+            enemy.transform.position = new Vector3(0.5f, 0f);
+
+            var mostWoundedHealth = mostWounded.GetComponent<UnitHealth>();
+            var lessWoundedHealth = lessWounded.GetComponent<UnitHealth>();
+            var outOfRangeHealth = outOfRange.GetComponent<UnitHealth>();
+            var enemyHealth = enemy.GetComponent<UnitHealth>();
+            mostWoundedHealth.TakeDamage(60f);
+            lessWoundedHealth.TakeDamage(20f);
+            outOfRangeHealth.TakeDamage(80f);
+            enemyHealth.TakeDamage(90f);
+
+            var agent = medic.GetComponent<UnitCommandAgent>();
+            var initialMode = agent.Mode;
+            var initialActionState = agent.ActionState;
+            var initialPriorityTarget = agent.PriorityTarget;
+            var support = medic.GetComponent<MedicSupportController>();
+
+            Assert.That(support, Is.Not.Null);
+            Assert.That(support.TryHealNow(), Is.True);
+            Assert.That(support.TryHealNow(), Is.False);
+            Assert.That(mostWoundedHealth.CurrentHealth, Is.EqualTo(48f));
+            Assert.That(lessWoundedHealth.CurrentHealth, Is.EqualTo(80f));
+            Assert.That(outOfRangeHealth.CurrentHealth, Is.EqualTo(20f));
+            Assert.That(enemyHealth.CurrentHealth, Is.EqualTo(10f));
+            Assert.That(agent.Mode, Is.EqualTo(initialMode));
+            Assert.That(agent.ActionState, Is.EqualTo(initialActionState));
+            Assert.That(agent.PriorityTarget, Is.EqualTo(initialPriorityTarget));
+
+            Object.Destroy(medic);
+            Object.Destroy(mostWounded);
+            Object.Destroy(lessWounded);
+            Object.Destroy(outOfRange);
+            Object.Destroy(enemy);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator ExtendedUnitDefaults_ConfigureDocumentedRolesStatsAndCombatComponents()
         {
             var medic = CreateDefaultUnit("Default Medic", PrototypeUnitType.Medic);
@@ -165,6 +214,7 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(medicStatus.SupplyCost, Is.EqualTo(2));
             Assert.That(medic.GetComponent<UnitCombat>(), Is.Null);
             Assert.That(medic.GetComponent<TemporaryAttackEffect>(), Is.Null);
+            Assert.That(medic.GetComponent<MedicSupportController>(), Is.Not.Null);
 
             var siegeStatus = siege.GetComponent<PrototypeUnitStatus>();
             Assert.That(siegeStatus.Roles, Is.EqualTo(UnitRole.Combat | UnitRole.Siege));
@@ -176,6 +226,8 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(siegeStatus.MovementSpeed, Is.EqualTo(1.7f));
             Assert.That(siegeStatus.VisionRadius, Is.EqualTo(8f));
             Assert.That(siegeStatus.SupplyCost, Is.EqualTo(4));
+            Assert.That(siegeStatus.AreaDamageRadius, Is.EqualTo(2.5f));
+            Assert.That(siegeStatus.MaxAreaTargets, Is.EqualTo(6));
             Assert.That(siege.GetComponent<UnitCombat>(), Is.Not.Null);
 
             var scoutStatus = scout.GetComponent<PrototypeUnitStatus>();

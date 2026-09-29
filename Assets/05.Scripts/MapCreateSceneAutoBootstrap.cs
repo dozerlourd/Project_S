@@ -998,6 +998,7 @@ namespace ProjectS
             var definition = new UnitProductionDefinition();
             definition.Configure(displayName, unitType, prefab, cost, duration, supplyCost, outputCount, requirements);
             definition.ConfigureAllowedProductionBuildings(allowedProductionBuildings);
+            definition.ApplyBalanceCatalog();
             return definition;
         }
 

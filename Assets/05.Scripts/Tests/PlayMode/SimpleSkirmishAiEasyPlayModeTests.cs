@@ -18,6 +18,10 @@ namespace ProjectS.Tests.PlayMode
         private static readonly Type ResourceTypeType = GetGameplayType("ProjectS.Resources.ResourceType");
         private static readonly Type TeamUpgradeResearchType = GetGameplayType("ProjectS.Upgrades.TeamUpgradeResearch");
         private static readonly Type UnitUpgradeDefinitionType = GetGameplayType("ProjectS.Upgrades.UnitUpgradeDefinition");
+        private static readonly Type BuildingStatusType = GetGameplayType("ProjectS.Buildings.BuildingStatus");
+        private static readonly Type BuildingKindType = GetGameplayType("ProjectS.Buildings.BuildingKind");
+        private static readonly Type UnitProductionQueueType = GetGameplayType("ProjectS.Buildings.UnitProductionQueue");
+        private static readonly Type UnitProductionDefinitionType = GetGameplayType("ProjectS.Buildings.UnitProductionDefinition");
 
         [Test]
         public void EasyArmyComposition_UsesSoldiersWithAlternatingOccasionalSupportUnits()
@@ -48,6 +52,90 @@ namespace ProjectS.Tests.PlayMode
                 Is.EqualTo(PrototypeUnitType.Soldier));
 
             Object.DestroyImmediate(aiObject);
+        }
+
+        [Test]
+        public void SpecializedProduction_RequiresMatureArmyAndBasicProductionQuota()
+        {
+            var aiObject = new GameObject("Specialized Production Quota AI");
+            var ai = aiObject.AddComponent(SimpleSkirmishAiType);
+            ((Behaviour)ai).enabled = false;
+
+            SetField(ai, "minimumCombatUnitsForSpecializedUnit", 6);
+            SetField(ai, "specializedUnitFrequency", 4);
+            SetField(ai, "successfulCombatProductions", 3);
+
+            Assert.That((bool)Invoke(ai, "ShouldAttemptSpecializedProduction", 6), Is.False);
+
+            SetField(ai, "successfulCombatProductions", 4);
+            Assert.That((bool)Invoke(ai, "ShouldAttemptSpecializedProduction", 5), Is.False);
+            Assert.That((bool)Invoke(ai, "ShouldAttemptSpecializedProduction", 6), Is.True);
+
+            SetField(ai, "successfulSpecializedProductions", 1);
+            Assert.That((bool)Invoke(ai, "ShouldAttemptSpecializedProduction", 6), Is.False);
+            SetField(ai, "successfulCombatProductions", 8);
+            Assert.That((bool)Invoke(ai, "ShouldAttemptSpecializedProduction", 6), Is.True);
+
+            Object.DestroyImmediate(aiObject);
+        }
+
+        [Test]
+        public void SpecializedProduction_FallsBackToAnAvailableSpecializedQueue()
+        {
+            var aiObject = new GameObject("Specialized Production Fallback AI");
+            var ai = aiObject.AddComponent(SimpleSkirmishAiType);
+            ((Behaviour)ai).enabled = false;
+            var medicPrefab = new GameObject("AI Medic Prefab");
+            var maintenanceBay = new GameObject("AI Maintenance Bay");
+
+            try
+            {
+                SetField(ai, "minimumCombatUnitsForSpecializedUnit", 6);
+                SetField(ai, "specializedUnitFrequency", 4);
+                SetField(ai, "successfulCombatProductions", 4);
+
+                var status = maintenanceBay.AddComponent(BuildingStatusType);
+                var maintenanceBayKind = Enum.Parse(BuildingKindType, "MaintenanceBay");
+                Invoke(status, "Initialize", UnitTeam.Team8, maintenanceBayKind, new Vector2Int(3, 2), true);
+
+                var definition = Activator.CreateInstance(UnitProductionDefinitionType);
+                Invoke(
+                    definition,
+                    "Configure",
+                    "Medic",
+                    PrototypeUnitType.Medic,
+                    medicPrefab,
+                    CreateResourceAmount(0, 0),
+                    10f,
+                    0,
+                    1,
+                    null);
+                var allowedBuildings = Array.CreateInstance(BuildingKindType, 1);
+                allowedBuildings.SetValue(maintenanceBayKind, 0);
+                Invoke(definition, "ConfigureAllowedProductionBuildings", allowedBuildings);
+
+                var definitions = Array.CreateInstance(UnitProductionDefinitionType, 1);
+                definitions.SetValue(definition, 0);
+                var queue = maintenanceBay.AddComponent(UnitProductionQueueType);
+                Invoke(queue, "Configure", null, null, definitions, 2, Vector3.right, Vector3.right * 2f);
+
+                var queueListType = typeof(System.Collections.Generic.List<>).MakeGenericType(UnitProductionQueueType);
+                var queues = Activator.CreateInstance(queueListType);
+                queueListType.GetMethod("Add")?.Invoke(queues, new[] { queue });
+
+                Assert.That((bool)Invoke(ai, "TryEnqueueSpecializedCombatUnit", queues, 6), Is.True);
+                var activeDefinition = GetProperty(queue, "ActiveProduction");
+                Assert.That(GetProperty(activeDefinition, "UnitType"), Is.EqualTo(PrototypeUnitType.Medic));
+                Assert.That(GetField(ai, "successfulSpecializedProductions"), Is.EqualTo(1));
+                Assert.That(GetField(ai, "nextSpecializedUnitIndex"), Is.EqualTo(2));
+                Assert.That((bool)Invoke(ai, "ShouldAttemptSpecializedProduction", 6), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(maintenanceBay);
+                Object.DestroyImmediate(medicPrefab);
+                Object.DestroyImmediate(aiObject);
+            }
         }
 
         [UnityTest]
@@ -173,6 +261,12 @@ namespace ProjectS.Tests.PlayMode
         private static object GetProperty(object target, string propertyName)
         {
             return target.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)
+                ?.GetValue(target);
+        }
+
+        private static object GetField(object target, string fieldName)
+        {
+            return target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)
                 ?.GetValue(target);
         }
 

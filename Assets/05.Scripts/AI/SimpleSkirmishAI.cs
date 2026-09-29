@@ -27,6 +27,8 @@ namespace ProjectS.AI
         [SerializeField] private PrototypeUnitType defaultWorkerType = PrototypeUnitType.Worker;
         [SerializeField, Min(1)] private int occasionalUnitFrequency = 5;
         [SerializeField, Min(0)] private int minimumCombatUnitsForOccasionalUnit = 5;
+        [SerializeField, Min(1)] private int specializedUnitFrequency = 4;
+        [SerializeField, Min(0)] private int minimumCombatUnitsForSpecializedUnit = 6;
         [SerializeField, Min(0)] private int minimumCombatUnitsForResearch = 6;
         [SerializeField] private ResourceAmount researchResourceReserve = new ResourceAmount(200, 50);
         [SerializeField, Min(0.1f)] private float researchAttemptInterval = 5f;
@@ -37,6 +39,8 @@ namespace ProjectS.AI
         private float nextAttackCommandTime;
         private float nextResearchAttemptTime;
         private int successfulCombatProductions;
+        private int successfulSpecializedProductions;
+        private int nextSpecializedUnitIndex;
         private ConstructionSite pendingConstructionSite;
         private BuildingKind pendingConstructionKind;
         private bool hasPendingConstruction;
@@ -119,6 +123,7 @@ namespace ProjectS.AI
             var workers = CountUnits(defaultWorkerType);
             var combatUnits = CountCombatUnits();
             var buildings = BuildingRegistry.GetBuildings(team);
+            var specializedQueues = new List<UnitProductionQueue>(3);
             for (var i = 0; i < buildings.Count; i++)
             {
                 var building = buildings[i];
@@ -133,6 +138,12 @@ namespace ProjectS.AI
                     continue;
                 }
 
+                if (IsSpecializedProductionBuilding(building.Kind))
+                {
+                    specializedQueues.Add(queue);
+                    continue;
+                }
+
                 if (workers < desiredWorkers && queue.TryEnqueue(defaultWorkerType))
                 {
                     workers++;
@@ -144,6 +155,8 @@ namespace ProjectS.AI
                     combatUnits++;
                 }
             }
+
+            TryEnqueueSpecializedCombatUnit(specializedQueues, combatUnits);
         }
 
         private bool TryEnqueueEasyCombatUnit(UnitProductionQueue queue, int currentCombatUnits)
@@ -183,6 +196,69 @@ namespace ProjectS.AI
             return supportProductionNumber % 2 == 1
                 ? PrototypeUnitType.Ranger
                 : PrototypeUnitType.Striker;
+        }
+
+        private bool TryEnqueueSpecializedCombatUnit(
+            IReadOnlyList<UnitProductionQueue> queues,
+            int currentCombatUnits)
+        {
+            if (!ShouldAttemptSpecializedProduction(currentCombatUnits))
+            {
+                return false;
+            }
+
+            for (var offset = 0; offset < 3; offset++)
+            {
+                var candidateIndex = (nextSpecializedUnitIndex + offset) % 3;
+                var candidateType = GetSpecializedUnitType(candidateIndex);
+                for (var queueIndex = 0; queueIndex < queues.Count; queueIndex++)
+                {
+                    var queue = queues[queueIndex];
+                    if (queue == null || queue.QueuedCount >= queue.MaxQueueSize)
+                    {
+                        continue;
+                    }
+
+                    if (!TryEnqueueAvailableUnit(queue, candidateType))
+                    {
+                        continue;
+                    }
+
+                    successfulSpecializedProductions++;
+                    nextSpecializedUnitIndex = (candidateIndex + 1) % 3;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool ShouldAttemptSpecializedProduction(int currentCombatUnits)
+        {
+            if (currentCombatUnits < minimumCombatUnitsForSpecializedUnit)
+            {
+                return false;
+            }
+
+            var frequency = Mathf.Max(1, specializedUnitFrequency);
+            return successfulCombatProductions >= (successfulSpecializedProductions + 1) * frequency;
+        }
+
+        private static bool IsSpecializedProductionBuilding(BuildingKind buildingKind)
+        {
+            return buildingKind == BuildingKind.VehicleFactory
+                || buildingKind == BuildingKind.MaintenanceBay
+                || buildingKind == BuildingKind.SignalRelay;
+        }
+
+        private static PrototypeUnitType GetSpecializedUnitType(int index)
+        {
+            switch (index % 3)
+            {
+                case 0: return PrototypeUnitType.Siege;
+                case 1: return PrototypeUnitType.Medic;
+                default: return PrototypeUnitType.Scout;
+            }
         }
 
         private static bool TryEnqueueAvailableUnit(UnitProductionQueue queue, PrototypeUnitType unitType)

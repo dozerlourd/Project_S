@@ -275,6 +275,7 @@ namespace ProjectS.Units
             EnsureGroundPathAgent();
             EnsureCommandAgent();
             EnsureCombatComponents();
+            EnsureSupportComponents();
             EnsureFogVisibilityTarget();
             EnsureSelectionOutlineEffect();
         }
@@ -380,6 +381,8 @@ namespace ProjectS.Units
                 UnitAttackTargetRegistry.Register(this);
                 FogOfWarRegistry.Register(this);
             }
+
+            SynchronizeSupportComponents();
         }
 
         public void SetTeam(UnitTeam newTeam)
@@ -407,6 +410,12 @@ namespace ProjectS.Units
 
         public void ConfigurePrototypeDefaults(PrototypeUnitType type, UnitTeam initialTeam = UnitTeam.Team1)
         {
+            UnitBalanceCatalog.GetDefaultEntry(type).ApplyTo(this, initialTeam);
+            SynchronizeCombatComponents();
+            SynchronizeSupportComponents();
+            return;
+
+#pragma warning disable CS0162
             switch (type)
             {
                 case PrototypeUnitType.Worker:
@@ -478,6 +487,7 @@ namespace ProjectS.Units
                         UnitRole.Combat | UnitRole.Siege, AttackDistanceType.Ranged, AttackPowerType.Physical,
                         PlacementType.Movable, UnitGrade.Common, AttackTargetType.SingleTarget, 180f, 36f, 0f,
                         8.5f, 9.5f, 0.45f, 1.7f, 1, Vector2Int.one, false, false, 0f);
+                    ConfigureAreaDamage(2.5f, 6);
                     ConfigureSupplyCost(4);
                     ConfigureVisionRadius(8f);
                     break;
@@ -494,6 +504,8 @@ namespace ProjectS.Units
             }
 
             SynchronizeCombatComponents();
+            SynchronizeSupportComponents();
+#pragma warning restore CS0162
         }
 
         public void ConfigureVisionRadius(float radius)
@@ -627,6 +639,30 @@ namespace ProjectS.Units
 
             RemoveCombatComponent(GetComponent<UnitCombat>());
             RemoveCombatComponent(GetComponent<TemporaryAttackEffect>());
+        }
+
+        private void EnsureSupportComponents()
+        {
+            if (unitType != PrototypeUnitType.Medic || !roles.HasFlag(UnitRole.Support))
+            {
+                return;
+            }
+
+            if (GetComponent<MedicSupportController>() == null)
+            {
+                gameObject.AddComponent<MedicSupportController>();
+            }
+        }
+
+        private void SynchronizeSupportComponents()
+        {
+            if (unitType == PrototypeUnitType.Medic && roles.HasFlag(UnitRole.Support))
+            {
+                EnsureSupportComponents();
+                return;
+            }
+
+            RemoveCombatComponent(GetComponent<MedicSupportController>());
         }
 
         private static void RemoveCombatComponent(Component component)
