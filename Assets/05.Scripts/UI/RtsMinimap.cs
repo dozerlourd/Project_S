@@ -9,10 +9,10 @@ namespace ProjectS.UI
 {
     public sealed class RtsMinimap : MonoBehaviour
     {
-        private const float PanelWidth = 224f;
+        private const float PanelWidth = 302.4f;
         private const float PanelMargin = 12f;
         private const float BattleInfoHeight = 42f;
-        private const float MapHeight = 144f;
+        private const float MapHeight = 194.4f;
         private const float MapToInfoGap = 8f;
         private const float UnitSize = 4f;
         private const float BuildingSize = 8f;
@@ -422,6 +422,12 @@ namespace ProjectS.UI
             var currentEvent = Event.current;
             if (currentEvent.type == EventType.MouseDown && currentEvent.button == 0 && mapRect.Contains(currentEvent.mousePosition))
             {
+                if (TryHandleUnitCommand(currentEvent.mousePosition, mapRect, worldBounds, true))
+                {
+                    currentEvent.Use();
+                    return;
+                }
+
                 isDraggingCamera = true;
                 MoveCameraToGuiPosition(currentEvent.mousePosition, mapRect, worldBounds);
                 currentEvent.Use();
@@ -430,6 +436,7 @@ namespace ProjectS.UI
 
             if (currentEvent.type == EventType.MouseDown && currentEvent.button == 1 && mapRect.Contains(currentEvent.mousePosition))
             {
+                TryHandleUnitCommand(currentEvent.mousePosition, mapRect, worldBounds, false);
                 currentEvent.Use();
                 return;
             }
@@ -446,6 +453,17 @@ namespace ProjectS.UI
                 isDraggingCamera = false;
                 currentEvent.Use();
             }
+        }
+
+        private static bool TryHandleUnitCommand(Vector2 guiPosition, Rect mapRect, Bounds worldBounds, bool isPrimaryButton)
+        {
+            if (!TryMapGuiPointToWorld(guiPosition, mapRect, worldBounds, out var worldPoint))
+            {
+                return false;
+            }
+
+            var commandController = PlayerUnitCommandController.ActiveInstance;
+            return commandController != null && commandController.TryHandleMinimapCommand(worldPoint, isPrimaryButton);
         }
 
         private void MoveCameraToGuiPosition(Vector2 guiPosition, Rect mapRect, Bounds worldBounds)

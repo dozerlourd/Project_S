@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using ProjectS.Tilemaps;
+using ProjectS.Units;
 using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.Tilemaps;
@@ -63,9 +64,11 @@ namespace ProjectS.Tests.PlayMode
 
             yield return null;
 
-            var mapWidth = 224f;
-            var mapHeight = Mathf.Min(mapWidth, Screen.height - 412f - 116f - 46f);
-            var guiCenter = new Vector2(Screen.width - mapWidth - 12f + mapWidth * 0.5f, 116f + mapHeight * 0.5f);
+            var mapWidth = 302.4f;
+            var mapHeight = 194.4f;
+            var guiCenter = new Vector2(
+                Screen.width - mapWidth - 12f + mapWidth * 0.5f,
+                Screen.height - 12f - 42f - 8f - mapHeight + mapHeight * 0.5f);
             var arguments = new object[] { guiCenter, null };
             var mapped = (bool)minimap.GetType().GetMethod("TryGetWorldPoint").Invoke(minimap, arguments);
 
@@ -134,7 +137,11 @@ namespace ProjectS.Tests.PlayMode
             minimapObject.AddComponent(GetGameplayType("ProjectS.UI.RtsMinimap"));
             yield return null;
 
-            var guiPointInsideMinimap = new Vector2(1280f - 224f - 12f + 112f, 720f - 12f - 42f - 8f - 144f + 72f);
+            var mapWidth = 302.4f;
+            var mapHeight = 194.4f;
+            var guiPointInsideMinimap = new Vector2(
+                1280f - mapWidth - 12f + mapWidth * 0.5f,
+                720f - 12f - 42f - 8f - mapHeight + mapHeight * 0.5f);
             var screenPointInsideMinimap = new Vector2(guiPointInsideMinimap.x, Screen.height - guiPointInsideMinimap.y);
             var controllerType = GetGameplayType("ProjectS.Units.PlayerUnitCommandController");
             var method = controllerType.GetMethod("IsPointerOverRuntimeHud", BindingFlags.Static | BindingFlags.NonPublic);
@@ -146,6 +153,39 @@ namespace ProjectS.Tests.PlayMode
 
             Object.Destroy(minimapObject);
             Screen.SetResolution(originalWidth, originalHeight, originalFullScreen);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RtsMinimap_RightClickIssuesSelectedUnitCommandOnce()
+        {
+            var controllerObject = new GameObject("Minimap Command Controller");
+            var controller = controllerObject.AddComponent<PlayerUnitCommandController>();
+            var unitObject = new GameObject("Minimap Command Unit");
+            unitObject.transform.position = Vector3.zero;
+            unitObject.AddComponent<BoxCollider2D>();
+            var status = unitObject.AddComponent<PrototypeUnitStatus>();
+            status.ConfigurePrototypeDefaults(PrototypeUnitType.Worker, UnitTeam.Team1);
+            var commandAgent = unitObject.GetComponent<UnitCommandAgent>();
+            GetPrivateField<List<UnitCommandAgent>>(controller, "selectedUnits").Add(commandAgent);
+            yield return null;
+
+            var minimapType = GetGameplayType("ProjectS.UI.RtsMinimap");
+            var method = minimapType.GetMethod("TryHandleUnitCommand", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null, "Could not find TryHandleUnitCommand.");
+
+            var mapRect = new Rect(100f, 100f, 302.4f, 194.4f);
+            var worldBounds = new Bounds(new Vector3(5f, 5f, 0f), new Vector3(10f, 10f, 0f));
+            var guiPoint = new Vector2(mapRect.xMin + mapRect.width * 0.75f, mapRect.yMin + mapRect.height * 0.25f);
+            var handled = (bool)method.Invoke(null, new object[] { guiPoint, mapRect, worldBounds, false });
+
+            Assert.That(handled, Is.True);
+            Assert.That(commandAgent.Mode, Is.EqualTo(UnitCommandMode.Move));
+            Assert.That(commandAgent.CommandDestination.x, Is.EqualTo(7.5f).Within(0.001f));
+            Assert.That(commandAgent.CommandDestination.y, Is.EqualTo(7.5f).Within(0.001f));
+
+            Object.Destroy(unitObject);
+            Object.Destroy(controllerObject);
             yield return null;
         }
 
