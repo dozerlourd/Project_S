@@ -25,10 +25,11 @@
 - [ ] VehicleFactory 3x3/1250 HP, MaintenanceBay 3x2/850 HP, SignalRelay 2x2/550 HP 및 시야 12가 실제 프리팹 인스턴스에 적용되는지 확인한다.
 - [ ] 세 건물이 각각 `UnitProductionQueue`를 하나만 가지며 전용 유닛 정의 하나만 노출하는지 확인한다.
 - [ ] 미완성 MaintenanceBay에서 Medic 큐 요청 시 `building is not completed` 실패 사유가 표시되고 미네랄과 일반/고급 인구 예약이 변하지 않는지 확인한다.
-- [ ] `SpecializedProductionDefinition_UsesCatalogBuildingAndStandardSupply`, `SpecializedProductionQueue_IncompleteBuildingRejectsBeforeResourceAndSupplyReservation` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+- [x] `SpecializedProductionDefinition_UsesCatalogBuildingAndStandardSupply` Headless 테스트 3건으로 Siege·Medic·Scout의 전용 건물 및 일반 인구 요구를 확인했다.
+- [x] `SpecializedProductionQueue_IncompleteBuildingRejectsBeforeResourceAndSupplyReservation` Headless 테스트로 미완성 전용 건물의 생산 요청이 비용·인구 예약 전에 거부되는 것을 확인했다.
 - [ ] AI가 기본 전투 유닛 생산 성공 4회마다 특수 유닛을 최대 1회만 추가하고, 전투 유닛 6기 미만에서는 특수 생산을 보류하는지 확인한다.
 - [ ] VehicleFactory, MaintenanceBay, SignalRelay 중 일부만 있을 때 AI가 가용 큐로 폴백하고 자원·인구·건물 조건 또는 큐 용량이 부족하면 예약 없이 다음 판단 주기로 넘기는지 확인한다.
-- [ ] `SpecializedProduction_RequiresMatureArmyAndBasicProductionQuota`, `SpecializedProduction_FallsBackToAnAvailableSpecializedQueue` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+- [x] `SimpleSkirmishAiEasyPlayModeTests` Headless 5건으로 특수 생산의 병력·기본 생산 쿼터, 가용 전용 큐 폴백, 해금 기반 전용 건물 1회 건설, 쉬운 연구·병력 구성을 확인했다.
 - [ ] AI가 특수 생산 조건을 충족했지만 필요한 전용 건물이 없을 때 해금·자원·배치 조건을 통과한 건물 하나만 건설하고, 건설 중에는 중복 요청하지 않는지 확인한다.
 - [ ] `SpecializedConstruction_RespectsUnlockAndStartsOnlyOneMatchingBuilding` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 
@@ -37,7 +38,7 @@
 - [ ] 활성 규칙의 `필요건물`, `필요연구`, `선행해금`을 순서대로 충족할 때 생산 및 건설 버튼의 `LOCKED` 상태와 실패 사유가 즉시 갱신되는지 확인한다.
 - [ ] 큐 등록 뒤 생산 시작 전에 조건이 철회되면 예약 자원과 인구가 환불되고 생산이 시작되지 않는지 확인한다.
 - [ ] 헤더만 있는 빈 카탈로그, 대상 규칙이 없는 항목, 비활성 규칙이 기존 생산·건설·AI 행동을 막지 않는지 확인한다.
-- [ ] `EmptyAndInactiveCatalogs_DoNotBlockExistingRuntimeActions`, `ActiveRules_BlockQueueAndBuildDefinitionUntilAllColumnsAreSatisfied` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+- [x] `UnlockRuleCatalogTests` Headless 4건으로 빈/비활성 CSV가 기존 행동을 막지 않고, 활성 규칙의 건물·연구·선행 해금 조건이 생산과 건설을 차단·해제하는 것을 확인했다.
 
 ### 핵심 건물 역할 및 고유 텍스처
 
@@ -59,15 +60,16 @@
 
 ### Unity 테스트 실행 환경
 
-- [ ] Unity Headless PlayMode 테스트가 테스트 러너에 진입하지 못하고 즉시 종료되는 원인을 확인한다.
-- [ ] 기존 Unity 프로세스, 프로젝트 잠금, 사용자 캐시 DB, 라이선스 연결 상태가 테스트 실행을 막는지 확인한다.
-- [ ] `Temp/playmode-results.xml` 결과 파일이 정상 생성되는지 확인한다.
+- [x] Unity Headless PlayMode 테스트는 `-testPlatform playmode`의 소문자 플랫폼 값을 사용해야 Test Runner에 진입함을 확인했다. `PlayMode`는 실행 전 종료된다.
+- [x] `-nographics` 환경에서 `Camera.Render()`를 호출하던 건물 체력바 스크린샷 테스트는 Null Graphics 장치에서 캡처만 건너뛰도록 수정했고, 레이아웃 단언은 계속 실행한다.
+- [x] Headless 결과는 종료 뒤 `C:/Users/HCH/AppData/LocalLow/DefaultCompany/My project/TestResults.xml`에 안정적으로 기록되는 것을 확인했다. 명령행의 `Temp/playmode-results.xml`은 종료 과정에서 보존되지 않을 수 있다.
+- [ ] 전체 PlayMode 묶음의 기존 실패 테스트를 최신 런타임 API와 격리 규칙에 맞게 정비한다. P0 개별 흐름은 통과했지만 전체 실행에서는 오래된 반사 호출·정적 상태 공유를 포함한 실패가 남아 있다.
 
 ### 승패 판정
 
 - [ ] 유닛이 모두 사망해도 해당 팀 건물이 남아 있으면 경기가 종료되지 않는지 Unity PlayMode에서 확인한다.
-- [ ] 상대 팀의 모든 완성 건물이 파괴되었을 때만 승리/패배가 확정되는지 Unity PlayMode에서 확인한다.
-- [ ] 경기 종료 후 AI, 생산 큐, 플레이어 명령 컨트롤러가 기존처럼 정지되는지 Unity PlayMode에서 확인한다.
+- [x] `EnemyBuildingsDestroyed_EndsWithVictoryOnceAndStopsAiActivity` Headless 테스트로 상대 완성 건물 파괴 시 승리가 한 번만 확정되는 것을 확인했다.
+- [x] 경기 종료 시 AI와 활성·비활성 생산 큐를 모두 정지하도록 수정하고 같은 Headless 테스트로 확인했다. 플레이어 명령 컨트롤러 정지는 별도 입력 기반 검증이 남아 있다.
 
 ### 유닛 명령 생명주기
 
@@ -75,6 +77,7 @@
 - [ ] 이동 중 새 명령을 빠르게 입력했을 때 이전 경로 결과가 뒤늦게 적용되지 않는지 확인한다.
 - [ ] 건설/채집 중 이동, 정지, 공격 명령을 내렸을 때 이전 상호작용이 계속 실행되지 않는지 확인한다.
 - [ ] 이동 또는 명령 수행 완료 후 `Mode`, `ActionState`, `LatestCommand`가 모두 정지 상태로 정리되는지 확인한다.
+- [x] `MoveCommand_CompletesAsIdleLatestCommand` Headless 테스트로 기본 이동 명령이 완료 후 최신 명령과 함께 Idle 상태로 정리되는 것을 확인했다.
 
 ### 정지 상태 자동 전투
 
@@ -139,6 +142,7 @@
 - [ ] 일반 전용, 고급 전용, 일반·고급 동시 요구 유닛의 Inspector 값과 생성된 유닛의 점유량이 일치하는지 확인한다.
 - [ ] 일반·고급 인구를 동시에 예약한 활성/대기 생산을 취소하거나 생산 건물을 비활성화했을 때 두 예약량과 비용이 한 번씩만 반환되는지 확인한다.
 - [ ] 다수 유닛 생산 완료 후 두 현재 점유량이 합계와 일치하고, 각 생성 유닛 파괴 또는 비활성화 뒤 두 점유량이 회수되는지 확인한다.
+- [x] `UnitProductionQueue_SeparatelyBlocksAndResumesStandardAndAdvancedSupply` Headless 테스트로 일반·고급 인구가 각각 부족할 때 생산을 막고, 해당 보급 건물 완성 후 재개하는 흐름을 확인했다.
 
 ### 공격 목표 우선순위
 
@@ -149,6 +153,7 @@
 
 ### 미니맵 및 전장 정보
 
+- [x] `RtsMinimapPlayModeTests` Headless 6건으로 실제 Tilemap 점유 셀 경계, 지형 캐시, 미니맵 좌표 변환, 유닛 명령 1회 처리와 미니맵 HUD 입력 차단을 확인했다. 별도 어셈블리에 배치된 UI 타입도 명령 컨트롤러가 탐색하도록 보정했다.
 - [ ] 미니맵이 Tilemap 실제 셀 범위와 맞게 표시되고, 아군/적군 유닛과 건물이 식별 가능한 색으로 갱신되는지 확인한다.
 - [ ] 미니맵 지형 캐시가 이동 가능, 이동 불가, 이동 가능하지만 건설 불가, 맵 외부 영역을 서로 다른 색으로 표시하며 실제 타일 형태와 일치하는지 확인한다.
 - [ ] 미니맵에서 미네랄·가스, 선택 유닛, 현재 공격 중인 대상의 표시가 기존 유닛·건물·카메라 뷰포트와 겹쳐도 식별 가능한지 확인한다.
@@ -163,6 +168,7 @@
 
 ### 광역 공격 및 상성
 
+- [x] `UnitCombatAreaAttackPlayModeTests` Headless 11건으로 주 대상 중심의 최대 대상 수, 적군 필터, 범위 경계와 중심에서 멀어질수록 감소하는 광역 피해를 확인했다.
 - [ ] 광역 공격 유닛이 주 대상과 반경 안의 적 유닛·건물만 최대 대상 수까지 동시에 피해를 주는지 확인한다.
 - [ ] 주 대상이 광역 반경 밖에 있거나 아군·중립 대상이 반경 안에 있어도 잘못된 추가 피해가 발생하지 않는지 확인한다.
 - [ ] Soldier-Spliter-Ranger 및 Tank-Striker-Swarm 상성에서 유리 상성 125%, 불리 상성 80%, 그 외 100% 피해가 적용되는지 확인한다.
@@ -193,6 +199,7 @@
 - [ ] 조건이 없는 기존 생산 정의가 이전과 동일하게 생산 가능한지 확인한다.
 - [ ] 나중에 `CompletedBuilding` 조건을 설정한 정의만 요구 건물이 완성되기 전 생산을 거부하고, 자원·보급 예약을 소비하지 않는지 확인한다.
 - [ ] 조건을 만족한 뒤 생산 버튼과 생산 큐가 즉시 다시 사용 가능한지 확인한다.
+- [x] `UnitProductionQueue_RechecksAdditionalConditionsBeforeStartingPendingProduction` Headless 테스트로 대기열 등록 뒤 요구 건물이 사라지면 생산 시작 전 취소·환불되는 것을 확인했다.
 
 ### 자원 거점 확장
 
@@ -240,6 +247,7 @@
 
 ### Worker 채집 접근 안정성
 
+- [x] `WorkerGatherController_RepeatsGatherAndDepositIntoTeamWallet` 및 `WorkerGatherController_GasRepeatsGatherAndDepositThroughResourceCollider` Headless 테스트로 미네랄·가스 각각의 채집→반납→팀 지갑 증가 흐름을 확인했다. 가스 장거리 검증은 프레임 수 대신 실제 게임 시간 8초를 기준으로 실행한다.
 - [ ] 여러 Worker가 같은 자원 노드를 우클릭했을 때 목적지 보정 셀에서도 콜라이더 기준 상호작용 범위에 진입해 `Gathering`으로 안정적으로 전환하는지 확인한다.
 - [ ] 같은 자원 노드 채집 중 Worker가 중심점과 주변 접근 셀 사이에서 반복 경로 요청을 하지 않고, 실제 자원 감소와 팀 지갑 입금이 진행되는지 확인한다.
 
@@ -270,6 +278,7 @@
 
 ### 유닛별 전술 행동
 
+- [x] `UnitTacticalBehaviorPlayModeTests` Headless 14건으로 Ranger 거리 유지·재교전, Striker 근접 진입, Medic 회복 우선순위, Scout 시야와 유닛별 명령 전환을 확인했다.
 - [ ] 실제 MapCreate PlayMode에서 Worker가 이전 시각 크기의 1/2, 나머지 유닛이 각각 이전 크기의 2/3로 표시되고 Tank·Siege·Striker·Swarm의 상대적인 크기 차이가 유지되는지 확인한다.
 - [ ] 축소된 유닛을 클릭·드래그 선택하고 이동시켜 콜라이더, 선택 아웃라인, 체력바가 본체와 같은 크기·위치를 유지하며 `1 x 1` 셀 점유와 유닛 간 비겹침이 정상인지 확인한다. 건물과 자원 크기는 변경되지 않아야 한다.
 - [ ] `Tools > Project S > Create B Prototype Unit Assets`를 실행해 `B_Medic`, `B_Siege`, `B_Scout` 프리팹과 전용 텍스처가 생성되는지 확인한다.
@@ -292,6 +301,7 @@
 
 ### 능동 스킬 최소 루프
 
+- [x] `UnitActiveSkillPlayModeTests` Headless 4건으로 Overdrive의 사용 조건, 효과 적용, 지속시간과 재사용 대기 흐름을 확인했다.
 - [ ] Striker 선택 HUD에 `Overdrive [F]` 버튼과 준비, 활성 지속시간, 쿨다운이 정상 표시되는지 확인한다.
 - [ ] 이동, 공격 이동, 집중 공격, 위치 사수 중 Overdrive를 사용해도 최신 명령과 현재 목적지가 초기화되지 않는지 확인한다.
 - [ ] Overdrive가 4초 동안 이동 속도를 50% 높이고 종료 뒤 건물 오라와 연구 보너스를 보존한 채 자기 수정자만 제거하는지 확인한다.
@@ -302,6 +312,7 @@
 
 ### 전투 시각 피드백
 
+- [x] `CombatFeedbackPlayModeTests` Headless 4건과 `BuildingHealthBarPlayModeTests` 1건으로 공격 이펙트 풀 회수, 가시성 필터, 건물 체력바 렌더러 생성·갱신을 확인했다.
 - [ ] 공격 선이 안개 가시성 갱신 중에도 기본 0.08초 후 사라지고, 연속 공격·컴포넌트 비활성화·제거 이후에는 잔상이 남지 않는지 PlayMode에서 확인한다.
 - [ ] 공격 적중 파동이 기본 0.08초 후 풀로 복귀하며 다음 적중 시 기존 슬롯을 재사용하는지 확인한다.
 - [ ] 유닛과 자동 포탑 공격 적중 시 황색 파동, 피격 시 적색 파동, 사망 시 큰 소멸 파동이 각각 한 번씩 표시되는지 확인한다.
@@ -321,6 +332,7 @@
 
 ### 안개 전쟁
 
+- [x] `FogOfWarPlayModeTests` Headless 4건으로 제공자 셀 변경 시에만 시야를 재계산하고, 시야 차단 타일, 미니맵 적 마커 숨김, 마지막 관측 위치 표시를 확인했다.
 - [ ] 아군 유닛과 건물이 현재 시야를 제공하고, 이동·파괴·비활성화 뒤 이전 시야가 탐색 완료 상태로 전환되는지 확인한다.
 - [ ] `BlocksVision` Obstacle 뒤의 셀이 미탐색 또는 탐색 완료 상태로 유지되고, 장애물을 제거하면 시야가 즉시 확장되는지 확인한다.
 - [ ] 메인 화면 오버레이와 미니맵 모두 현재 시야 밖 적 유닛·건물 마커를 숨기고, 탐색 완료 지형은 어둡게 남기는지 확인한다.
@@ -350,10 +362,11 @@
 - [ ] 조건이 없는 생산 및 건설 항목이 기존과 동일하게 항상 사용 가능한지 Unity PlayMode에서 확인한다.
 - [ ] 팀별 `TeamUnlockState`에 해금 ID를 부여했을 때 해당 조건을 가진 생산 버튼과 건설 버튼이 `LOCKED` 상태로 보이고, 클릭 및 `Q/E/R/T/Y/U/I` 단축키가 같은 실패 사유를 표시하는지 확인한다.
 - [ ] 잠긴 생산 요청과 건설 배치 요청이 자원·보급을 소비하지 않으며, 해금 직후에는 즉시 다시 사용할 수 있는지 확인한다.
-- [ ] `UnlockRequirement_UsesSameTeamStateForProductionAndConstruction` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+- [x] `UnlockRequirement_UsesSameTeamStateForProductionAndConstruction` Headless 테스트로 팀 해금 전에는 생산·건설 요청이 비용 소모 없이 거부되고, 해금 뒤 두 요청이 함께 허용되는 것을 확인했다.
 
 ### 건설 정의 및 배치 보강 후속
 
+- [x] `ConstructionSite_TryCreateDeferredSpendsCostOnlyWhenBuilderStarts` Headless 테스트로 작업자가 착공하기 전에는 비용과 건물 프리팹이 생성되지 않고, 착공 시점에만 비용이 소모되는 흐름을 확인했다.
 - [ ] `BuildingConstructionDefinition`에 권장 트리 전체의 표시명, 비용, 건설 시간, 풋프린트, 완성 프리팹, TeamUnlock 및 CompletedBuilding 조건을 연결하고 MapCreate 런타임·에디터 셋업에서 동일 정의 배열을 주입한다.
 - [ ] MainBase, Production, SupplyDepot, ResourceDropOff는 기본 해금 상태로 유지하면서 ResearchLab 이후 field-engineering, adaptive-combat, mechanized-systems, tactical-command 분기와 Tank, Striker, Swarm, Spliter 생산 조건을 연결한다.
 - [x] B 건설 메뉴의 항목 순서, 표시명, 비용, 선택 대상을 하드코딩 슬롯 대신 `BuildingPlacementService.ConstructionDefinitions`에서 공급한다.

@@ -418,6 +418,10 @@ namespace ProjectS.Tilemaps
                     continue;
                 }
 
+                // A fresh Tilemap may retain an allocation origin at (0, 0) even when
+                // all authored tiles live elsewhere. Minimap and navigation bounds must
+                // follow the occupied map cells rather than that stale allocation range.
+                tilemap.CompressBounds();
                 var bounds = tilemap.cellBounds;
                 if (!hasBounds)
                 {

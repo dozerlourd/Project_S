@@ -277,7 +277,9 @@ namespace ProjectS
                 aiControllers[i].enabled = false;
             }
 
-            var productionQueues = FindObjectsByType<UnitProductionQueue>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            // Destroyed buildings are immediately deactivated by BuildingHealth. Include them so
+            // their queues cannot retain pending production after the match has ended.
+            var productionQueues = FindObjectsByType<UnitProductionQueue>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             for (var i = 0; i < productionQueues.Length; i++)
             {
                 productionQueues[i].enabled = false;

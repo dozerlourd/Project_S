@@ -85,6 +85,7 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(agent.ActionState, Is.EqualTo(UnitActionState.RetreatingFromTarget));
 
             ranger.transform.position = new Vector3(-4.5f, 0f);
+            Physics2D.SyncTransforms();
             InvokePrivate(agent, "UpdateTargetEngagement");
 
             Assert.That(agent.PriorityTarget, Is.EqualTo(targetStatus));
@@ -117,12 +118,15 @@ namespace ProjectS.Tests.PlayMode
         public IEnumerator CloseAssault_ChasesDeeperWhileSoldierAttacksAtRangeEdge()
         {
             var striker = CreateUnit("Entry Striker", Vector3.zero, UnitTeam.Team1, PrototypeUnitType.Striker, 1f);
-            var soldier = CreateUnit("Entry Soldier", new Vector3(0f, 3f), UnitTeam.Team1, PrototypeUnitType.Soldier, 1f);
-            var strikerTarget = CreateUnit("Striker Entry Target", new Vector3(1f, 0f), UnitTeam.Team2, PrototypeUnitType.Worker, 1f, false);
-            var soldierTarget = CreateUnit("Soldier Entry Target", new Vector3(1f, 3f), UnitTeam.Team2, PrototypeUnitType.Worker, 1f, false);
+            var soldier = CreateUnit("Entry Soldier", new Vector3(0f, 3f), UnitTeam.Team1, PrototypeUnitType.Soldier, 1.5f);
+            // Use a non-boundary distance for the Striker so the comparison verifies its
+            // deeper approach behavior rather than a Collider2D contact-edge rounding case.
+            var strikerTarget = CreateUnit("Striker Entry Target", new Vector3(5f, 0f), UnitTeam.Team2, PrototypeUnitType.Worker, 1f, false);
+            var soldierTarget = CreateUnit("Soldier Entry Target", new Vector3(1.3f, 3f), UnitTeam.Team2, PrototypeUnitType.Worker, 1f, false);
             var strikerAgent = striker.GetComponent<UnitCommandAgent>();
             var soldierAgent = soldier.GetComponent<UnitCommandAgent>();
 
+            Physics2D.SyncTransforms();
             strikerAgent.Issue(new UnitCommand(
                 UnitCommandMode.FocusAttack,
                 strikerTarget.transform.position,

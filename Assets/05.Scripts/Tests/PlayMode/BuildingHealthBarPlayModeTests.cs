@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
@@ -31,7 +32,12 @@ namespace ProjectS.Tests.PlayMode
             Assert.That(background.bounds.size.x, Is.GreaterThanOrEqualTo(buildingRenderer.bounds.size.x * 0.6f));
             Assert.That(background.bounds.size.y, Is.GreaterThanOrEqualTo(0.11f));
 
-            CapturePreview(building);
+            // The headless runner uses Null Graphics Device, which cannot service Camera.Render.
+            // Keep the layout assertion above in every run and reserve the PNG artifact for a GPU-backed run.
+            if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+            {
+                CapturePreview(building);
+            }
             Object.Destroy(building);
             yield return null;
         }

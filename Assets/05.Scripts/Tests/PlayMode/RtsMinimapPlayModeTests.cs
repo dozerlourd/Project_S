@@ -140,8 +140,8 @@ namespace ProjectS.Tests.PlayMode
             var mapWidth = 448f;
             var mapHeight = 288f;
             var guiPointInsideMinimap = new Vector2(
-                1280f - mapWidth - 12f + mapWidth * 0.5f,
-                720f - 12f - 42f - 8f - mapHeight + mapHeight * 0.5f);
+                Screen.width - mapWidth - 12f + mapWidth * 0.5f,
+                Screen.height - 12f - 42f - 8f - mapHeight + mapHeight * 0.5f);
             var screenPointInsideMinimap = new Vector2(guiPointInsideMinimap.x, Screen.height - guiPointInsideMinimap.y);
             var controllerType = GetGameplayType("ProjectS.Units.PlayerUnitCommandController");
             var method = controllerType.GetMethod("IsPointerOverRuntimeHud", BindingFlags.Static | BindingFlags.NonPublic);
@@ -256,6 +256,15 @@ namespace ProjectS.Tests.PlayMode
         private static Type GetGameplayType(string typeName)
         {
             var type = Type.GetType($"{typeName}, Assembly-CSharp");
+            if (type == null)
+            {
+                var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                for (var i = 0; i < assemblies.Length && type == null; i++)
+                {
+                    type = assemblies[i].GetType(typeName, false);
+                }
+            }
+
             Assert.That(type, Is.Not.Null, $"Could not resolve gameplay type {typeName}.");
             return type;
         }

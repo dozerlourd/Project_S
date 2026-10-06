@@ -2029,12 +2029,19 @@ namespace ProjectS.Tests.PlayMode
                 interactableResource,
                 false));
 
-            for (var i = 0; i < 360 && GetInt(wallet, "Gas") < 10; i++)
+            var deadline = Time.time + 8f;
+            while (Time.time < deadline && GetInt(wallet, "Gas") < 10)
             {
                 yield return null;
             }
 
-            Assert.That(GetInt(wallet, "Gas"), Is.GreaterThanOrEqualTo(10));
+            var gatherController = worker.GetComponent(WorkerGatherControllerType);
+            Assert.That(
+                GetInt(wallet, "Gas"),
+                Is.GreaterThanOrEqualTo(10),
+                gatherController != null
+                    ? (string)GetProperty(gatherController, "DebugStateSnapshot")
+                    : "WorkerGatherController is missing.");
             Assert.That(GetInt(resourceNode, "RemainingAmount"), Is.LessThan(40));
             Assert.That(worker.GetComponent<UnitCommandAgent>().Mode, Is.EqualTo(UnitCommandMode.Interact));
             Assert.That(resourceCollider.isTrigger, Is.True);
@@ -2723,9 +2730,29 @@ namespace ProjectS.Tests.PlayMode
             var unitPrefab = CreateUnitPrefab("StartConditionWorkerPrefab", PrototypeUnitType.Worker);
 
             var activeDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
-            Invoke(activeDefinition, "Configure", "Active Worker", PrototypeUnitType.Worker, unitPrefab, CreateResourceAmount(10, 0), 10f);
+            Invoke(
+                activeDefinition,
+                "Configure",
+                "Active Worker",
+                PrototypeUnitType.Worker,
+                unitPrefab,
+                CreateResourceAmount(10, 0),
+                10f,
+                1,
+                1,
+                null);
             var requiredDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
-            Invoke(requiredDefinition, "Configure", "Conditional Worker", PrototypeUnitType.Worker, unitPrefab, CreateResourceAmount(25, 0), 10f);
+            Invoke(
+                requiredDefinition,
+                "Configure",
+                "Conditional Worker",
+                PrototypeUnitType.Worker,
+                unitPrefab,
+                CreateResourceAmount(25, 0),
+                10f,
+                1,
+                1,
+                null);
             var requirement = Activator.CreateInstance(UnitProductionRequirementType);
             Invoke(requirement, "ConfigureCompletedBuilding", Enum.Parse(BuildingKindType, "SupplyDepot"), 1);
             var requirements = Array.CreateInstance(UnitProductionRequirementType, 1);
@@ -2760,18 +2787,19 @@ namespace ProjectS.Tests.PlayMode
         [UnityTest]
         public IEnumerator UnlockRequirement_UsesSameTeamStateForProductionAndConstruction()
         {
+            const UnitTeam isolatedTeam = UnitTeam.Team8;
             var walletObject = new GameObject("UnlockRequirementWallet");
             var wallet = walletObject.AddComponent(PlayerResourceWalletType);
-            Invoke(wallet, "Initialize", UnitTeam.Team2, CreateResourceAmount(100, 0));
+            Invoke(wallet, "Initialize", isolatedTeam, CreateResourceAmount(100, 0));
             var unlockStateObject = new GameObject("UnlockRequirementState");
             var unlockState = unlockStateObject.AddComponent(TeamUnlockStateType);
-            Invoke(unlockState, "Configure", UnitTeam.Team2, Array.CreateInstance(typeof(string), 0));
+            Invoke(unlockState, "Configure", isolatedTeam, Array.CreateInstance(typeof(string), 0));
             var requirement = Activator.CreateInstance(UnlockRequirementType);
             Invoke(requirement, "ConfigureTeamUnlock", "advanced-combat");
             var requirements = Array.CreateInstance(UnlockRequirementType, 1);
             requirements.SetValue(requirement, 0);
 
-            var productionBuilding = CreateProductionBuilding("UnlockRequirementProduction", UnitTeam.Team2, Vector3.zero);
+            var productionBuilding = CreateProductionBuilding("UnlockRequirementProduction", isolatedTeam, Vector3.zero);
             var unitPrefab = CreateUnitPrefab("UnlockRequirementSoldierPrefab", PrototypeUnitType.Soldier);
             var unitDefinition = Activator.CreateInstance(UnitProductionDefinitionType);
             Invoke(
@@ -2781,24 +2809,36 @@ namespace ProjectS.Tests.PlayMode
                 PrototypeUnitType.Soldier,
                 unitPrefab,
                 CreateResourceAmount(25, 0),
-                10f);
+                10f,
+                1,
+                1,
+                null);
             Invoke(unitDefinition, "ConfigureUnlockRequirements", requirements);
             var unitDefinitions = Array.CreateInstance(UnitProductionDefinitionType, 1);
             unitDefinitions.SetValue(unitDefinition, 0);
             var queue = productionBuilding.AddComponent(UnitProductionQueueType);
             Invoke(queue, "Configure", wallet, null, unitDefinitions, 2, Vector3.right, Vector3.right * 2f);
 
+            var constructionPrefab = new GameObject("UnlockRequirementConstructionPrefab");
             var constructionDefinition = Activator.CreateInstance(BuildingConstructionDefinitionType);
-            Invoke(constructionDefinition, "Configure", Enum.Parse(BuildingKindType, "Production"), requirements);
+            Invoke(
+                constructionDefinition,
+                "Configure",
+                "Locked Production",
+                Enum.Parse(BuildingKindType, "Production"),
+                CreateResourceAmount(150, 0),
+                8f,
+                Vector2Int.one,
+                constructionPrefab,
+                requirements);
             var constructionDefinitions = Array.CreateInstance(BuildingConstructionDefinitionType, 1);
             constructionDefinitions.SetValue(constructionDefinition, 0);
-            var constructionPrefab = new GameObject("UnlockRequirementConstructionPrefab");
             var placementObject = new GameObject("UnlockRequirementPlacement");
             var placement = placementObject.AddComponent(BuildingPlacementServiceType);
             Invoke(
                 placement,
                 "Configure",
-                UnitTeam.Team2,
+                isolatedTeam,
                 wallet,
                 null,
                 null,
@@ -2809,9 +2849,9 @@ namespace ProjectS.Tests.PlayMode
                 Vector2Int.one);
             Invoke(placement, "ConfigureConstructionDefinitions", constructionDefinitions);
 
-            LogAssert.Expect(LogType.Warning, "Cannot produce Locked Soldier: requires team unlock 'advanced-combat'.");
+            LogAssert.Expect(LogType.Warning, "Cannot enqueue Locked Soldier: requires team unlock 'advanced-combat'.");
             Assert.That((bool)Invoke(queue, "TryEnqueue", PrototypeUnitType.Soldier), Is.False);
-            Assert.That((string)GetProperty(queue, "LastEnqueueFailureReason"), Is.EqualTo("Cannot produce Locked Soldier: requires team unlock 'advanced-combat'."));
+            Assert.That((string)GetProperty(queue, "LastEnqueueFailureReason"), Is.EqualTo("Cannot enqueue Locked Soldier: requires team unlock 'advanced-combat'."));
             Assert.That((bool)Invoke(placement, "SelectBuilding", Enum.Parse(BuildingKindType, "Production")), Is.False);
             Assert.That((string)GetProperty(placement, "LastPlacementFailureReason"), Is.EqualTo("Cannot build Production: requires team unlock 'advanced-combat'."));
             Assert.That(GetInt(wallet, "Minerals"), Is.EqualTo(100));
@@ -3467,6 +3507,7 @@ namespace ProjectS.Tests.PlayMode
             dropOff.transform.position = position;
             var status = dropOff.AddComponent(BuildingStatusType);
             Invoke(status, "Initialize", team, Enum.Parse(BuildingKindType, "MainBase"), Vector2Int.one, true);
+            dropOff.AddComponent<BoxCollider2D>().isTrigger = true;
             dropOff.AddComponent(ResourceDropOffType);
             return dropOff;
         }

@@ -1930,7 +1930,7 @@ namespace ProjectS.Units
         {
             isOverMinimap = false;
 
-            var minimapType = System.Type.GetType("ProjectS.UI.RtsMinimap, Assembly-CSharp");
+            var minimapType = ResolveRuntimeUiType("ProjectS.UI.RtsMinimap");
             var hitMethod = minimapType != null ? minimapType.GetMethod("IsScreenPointOverMinimap", new[] { typeof(Vector2) }) : null;
             if (hitMethod == null)
             {
@@ -1945,7 +1945,7 @@ namespace ProjectS.Units
         {
             isOverHud = false;
 
-            var hudType = System.Type.GetType("ProjectS.UI.RtsGameHud, Assembly-CSharp");
+            var hudType = ResolveRuntimeUiType("ProjectS.UI.RtsGameHud");
             var activeProperty = hudType != null ? hudType.GetProperty("ActiveInstance") : null;
             var activeHud = activeProperty != null ? activeProperty.GetValue(null) : null;
             if (activeHud == null)
@@ -1961,6 +1961,27 @@ namespace ProjectS.Units
 
             isOverHud = (bool)hitMethod.Invoke(activeHud, new object[] { screenPosition });
             return true;
+        }
+
+        private static Type ResolveRuntimeUiType(string typeName)
+        {
+            var type = Type.GetType(typeName + ", Assembly-CSharp");
+            if (type != null)
+            {
+                return type;
+            }
+
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (var i = 0; i < assemblies.Length; i++)
+            {
+                type = assemblies[i].GetType(typeName, false);
+                if (type != null)
+                {
+                    return type;
+                }
+            }
+
+            return null;
         }
 
         private static string FormatInteractableTargetName(IUnitInteractableTarget target)

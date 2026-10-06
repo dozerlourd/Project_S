@@ -145,6 +145,10 @@ namespace ProjectS.Tests.PlayMode
         [Test]
         public void SpecializedConstruction_RespectsUnlockAndStartsOnlyOneMatchingBuilding()
         {
+            // Use an isolated team because other AI fixtures may register Team8 while their
+            // GameObjects are pending end-of-frame destruction.
+            const UnitTeam controlledTeam = UnitTeam.Team6;
+            const UnitTeam enemyTeam = UnitTeam.Team5;
             var stateObject = new GameObject("Specialized Construction Unlocks");
             var state = stateObject.AddComponent(TeamUnlockStateType);
             var catalog = ScriptableObject.CreateInstance(UnlockRuleCatalogType);
@@ -161,32 +165,32 @@ namespace ProjectS.Tests.PlayMode
                     + "vehicle-runtime,건물,VehicleFactory,Production,,vehicle-license,TRUE,AI gate";
                 var entries = InvokeStatic(UnlockRuleCsvParserType, "Parse", csv);
                 Invoke(catalog, "Configure", null, entries);
-                Invoke(state, "Configure", UnitTeam.Team8, Array.Empty<string>());
+                Invoke(state, "Configure", controlledTeam, Array.Empty<string>());
                 Invoke(state, "ConfigureRuleCatalog", catalog);
 
                 var productionStatus = productionBuilding.AddComponent(BuildingStatusType);
                 Invoke(
                     productionStatus,
                     "Initialize",
-                    UnitTeam.Team8,
+                    controlledTeam,
                     Enum.Parse(BuildingKindType, "Production"),
                     new Vector2Int(2, 2),
                     true);
 
                 worker.AddComponent<BoxCollider2D>().isTrigger = true;
                 var workerStatus = worker.AddComponent<PrototypeUnitStatus>();
-                workerStatus.ConfigurePrototypeDefaults(PrototypeUnitType.Worker, UnitTeam.Team8);
+                workerStatus.ConfigurePrototypeDefaults(PrototypeUnitType.Worker, controlledTeam);
 
                 var ai = aiObject.AddComponent(SimpleSkirmishAiType);
                 ((Behaviour)ai).enabled = false;
-                Invoke(ai, "Configure", UnitTeam.Team8, UnitTeam.Team7, 0, 7, Vector3.zero);
+                Invoke(ai, "Configure", controlledTeam, enemyTeam, 0, 7, Vector3.zero);
                 SetField(ai, "minimumCombatUnitsForSpecializedUnit", 0);
                 SetField(ai, "specializedUnitFrequency", 4);
                 SetField(ai, "successfulCombatProductions", 4);
                 SetField(ai, "specializedConstructionAttemptInterval", 8f);
 
                 var templates = aiObject.AddComponent(AiBuildingTemplateRegistryType);
-                Invoke(templates, "Configure", UnitTeam.Team8, null, null, null);
+                Invoke(templates, "Configure", controlledTeam, null, null, null);
                 Invoke(
                     templates,
                     "RegisterTemplate",
@@ -263,7 +267,8 @@ namespace ProjectS.Tests.PlayMode
             RunResearchDecision(ai);
             Assert.That(GetProperty(research, "ActiveDefinition"), Is.EqualTo(weapon));
 
-            for (var i = 0; i < 120 && GetProperty(research, "ActiveDefinition") != null; i++)
+            var completionDeadline = Time.time + 1f;
+            while (Time.time < completionDeadline && GetProperty(research, "ActiveDefinition") != null)
             {
                 yield return null;
             }
