@@ -29,6 +29,15 @@
 - [ ] AI가 기본 전투 유닛 생산 성공 4회마다 특수 유닛을 최대 1회만 추가하고, 전투 유닛 6기 미만에서는 특수 생산을 보류하는지 확인한다.
 - [ ] VehicleFactory, MaintenanceBay, SignalRelay 중 일부만 있을 때 AI가 가용 큐로 폴백하고 자원·인구·건물 조건 또는 큐 용량이 부족하면 예약 없이 다음 판단 주기로 넘기는지 확인한다.
 - [ ] `SpecializedProduction_RequiresMatureArmyAndBasicProductionQuota`, `SpecializedProduction_FallsBackToAnAvailableSpecializedQueue` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+- [ ] AI가 특수 생산 조건을 충족했지만 필요한 전용 건물이 없을 때 해금·자원·배치 조건을 통과한 건물 하나만 건설하고, 건설 중에는 중복 요청하지 않는지 확인한다.
+- [ ] `SpecializedConstruction_RespectsUnlockAndStartsOnlyOneMatchingBuilding` PlayMode 테스트를 Unity Test Runner에서 실행한다.
+
+### CSV 해금 규칙 런타임 적용
+
+- [ ] 활성 규칙의 `필요건물`, `필요연구`, `선행해금`을 순서대로 충족할 때 생산 및 건설 버튼의 `LOCKED` 상태와 실패 사유가 즉시 갱신되는지 확인한다.
+- [ ] 큐 등록 뒤 생산 시작 전에 조건이 철회되면 예약 자원과 인구가 환불되고 생산이 시작되지 않는지 확인한다.
+- [ ] 헤더만 있는 빈 카탈로그, 대상 규칙이 없는 항목, 비활성 규칙이 기존 생산·건설·AI 행동을 막지 않는지 확인한다.
+- [ ] `EmptyAndInactiveCatalogs_DoNotBlockExistingRuntimeActions`, `ActiveRules_BlockQueueAndBuildDefinitionUntilAllColumnsAreSatisfied` PlayMode 테스트를 Unity Test Runner에서 실행한다.
 
 ### 핵심 건물 역할 및 고유 텍스처
 
@@ -169,6 +178,7 @@
 - [ ] AI가 전투 생산 건물을 잃었을 때 작업 유닛으로 새 건설 부지를 만들고 건설을 완료하는지 확인한다.
 - [ ] AI 주요 건물 반경 안에 적 전투 유닛이 진입하면 AI 전투 유닛이 해당 위협을 우선 공격하는지 확인한다.
 - [ ] 건설 대기 중인 AI 작업 유닛이 자원 채집 명령에서 건설 명령으로 전환되고, 건설 완료 뒤 정상 채집 루프로 복귀하는지 확인한다.
+- [ ] AI 작업 유닛이 15초 안에 착공하지 못하면 자원을 소비하지 않은 임시 건설지가 정리되고, 6초 뒤 동일 우선순위 건설을 한 번만 재시도하는지 확인한다.
 
 ### 쉬운 AI 병력 구성 및 연구
 
@@ -190,6 +200,7 @@
 - [ ] Resource Drop-off 및 확장 Main Base를 건설한 뒤 일꾼이 가장 가까운 살아 있는 반납처로 복귀하는지 확인한다.
 - [ ] 반납처가 파괴되거나 비활성화되면 일꾼이 남아 있는 가까운 반납처를 다시 선택하는지 확인한다.
 - [ ] AI가 확장 자원 지대 근처에 확장 본진을 건설하고 해당 거점을 실제 채집에 활용하는지 확인한다.
+- [ ] AI가 전투 유닛 5기 전에는 확장을 보류하고, 이후 최대 본진 수 2개까지 12초 간격으로만 확장 후보를 판단하는지 확인한다.
 
 ### 전술 명령 및 생산 중단
 
@@ -259,6 +270,8 @@
 
 ### 유닛별 전술 행동
 
+- [ ] 실제 MapCreate PlayMode에서 Worker가 이전 시각 크기의 1/2, 나머지 유닛이 각각 이전 크기의 2/3로 표시되고 Tank·Siege·Striker·Swarm의 상대적인 크기 차이가 유지되는지 확인한다.
+- [ ] 축소된 유닛을 클릭·드래그 선택하고 이동시켜 콜라이더, 선택 아웃라인, 체력바가 본체와 같은 크기·위치를 유지하며 `1 x 1` 셀 점유와 유닛 간 비겹침이 정상인지 확인한다. 건물과 자원 크기는 변경되지 않아야 한다.
 - [ ] `Tools > Project S > Create B Prototype Unit Assets`를 실행해 `B_Medic`, `B_Siege`, `B_Scout` 프리팹과 전용 텍스처가 생성되는지 확인한다.
 - [ ] Medic가 팀 선택과 안개 시야, 이동 명령에는 참여하되 공격·반격은 수행하지 않고, 사거리 4.5 안에서 체력 비율이 가장 낮은 아군 유닛을 1초마다 8씩 회복하는지 확인한다. 회복 중에도 현재 명령과 이동 목적지가 바뀌지 않아야 한다.
 - [ ] Siege가 체력 180, 공격력 36, 사거리 8.5, 감지 9.5, 공격 속도 0.45, 이동 속도 1.7, 시야 8을 사용하고, 주 대상 중심 반경 2.5·최대 6대상에 거리에 따른 선형 감쇠 피해를 주며 경계와 반경 밖에는 피해를 주지 않는지 확인한다.
@@ -373,3 +386,10 @@
 - 재개 분석 및 보강: WorkerResourceController 역할을 담당하는 `WorkerGatherController`는 `UnitCommandMode.Interact`를 유지한 채 자원 접근 경로를 반복 요청해야 하며, `UnitPathAgent`의 자원 전용 상호작용은 내부 셀 후보를 허용해야 한다. 자원 전용 API 진입 시에도 Collider를 Trigger로 강제해 프리팹 설정 누락이 물리 이동을 막지 않도록 보강하고, 가스의 채집→반납→재채집 회귀 테스트를 추가했다.
 - 다수 Worker 접근 보강: `MovingToResource`에서도 Worker 점유 셀을 해제해 같은 자원에 접근하는 Worker끼리의 목적지 후보 차단을 제거했다. `Idle`로 명령이 종료되면 점유를 다시 등록하며 일반 이동 유닛의 점유 정책은 변경하지 않는다.
 - [ ] 실제 Unity PlayMode에서 다수 Worker를 MineralField와 VespeneGeyser에 각각 배정해 채집→운반→반납→재채집을 반복하고, 자원 내부 이동 중 경로 재요청·무한 재경로·상태 취소가 없는지 확인한다.
+- [ ] 자원 전용 경로가 다른 유닛의 동적 셀 점유는 무시하되, 완성 건물 풋프린트와 이동 불가 지형은 우회하는지 Unity PlayMode에서 확인한다.
+
+### 정식 맵 레이아웃
+
+- [ ] `Tools > Project S > Setup MapCreate Combat Test Scene` 실행 시 Resource Tilemap에 양 진영 시작 자원 2곳과 중앙 확장 자원 2곳이 생성되고, 기존 사용자가 배치한 자원 타일은 덮어쓰지 않는지 확인한다.
+- [ ] 중앙 Obstacle Tilemap의 2개 우회 동선이 실제 경로 탐색, 건설 가능 판정, 안개 전쟁, 미니맵에 일관되게 반영되는지 Unity PlayMode에서 확인한다.
+- [ ] Medic의 최저 체력 아군 우선 회복, Spliter 반경 2 최대 3대상 광역 피해, Siege 반경 2.5 최대 6대상 선형 감쇠 피해가 정식 맵 매치에서도 유지되는지 확인한다.

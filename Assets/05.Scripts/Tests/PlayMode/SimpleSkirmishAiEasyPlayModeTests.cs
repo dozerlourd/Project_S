@@ -22,6 +22,10 @@ namespace ProjectS.Tests.PlayMode
         private static readonly Type BuildingKindType = GetGameplayType("ProjectS.Buildings.BuildingKind");
         private static readonly Type UnitProductionQueueType = GetGameplayType("ProjectS.Buildings.UnitProductionQueue");
         private static readonly Type UnitProductionDefinitionType = GetGameplayType("ProjectS.Buildings.UnitProductionDefinition");
+        private static readonly Type AiBuildingTemplateRegistryType = GetGameplayType("ProjectS.Buildings.AiBuildingTemplateRegistry");
+        private static readonly Type UnlockRuleCatalogType = GetGameplayType("ProjectS.Unlocks.UnlockRuleCatalog");
+        private static readonly Type UnlockRuleCsvParserType = GetGameplayType("ProjectS.Unlocks.UnlockRuleCsvParser");
+        private static readonly Type TeamUnlockStateType = GetGameplayType("ProjectS.Unlocks.TeamUnlockState");
 
         [Test]
         public void EasyArmyComposition_UsesSoldiersWithAlternatingOccasionalSupportUnits()
@@ -138,6 +142,87 @@ namespace ProjectS.Tests.PlayMode
             }
         }
 
+        [Test]
+        public void SpecializedConstruction_RespectsUnlockAndStartsOnlyOneMatchingBuilding()
+        {
+            var stateObject = new GameObject("Specialized Construction Unlocks");
+            var state = stateObject.AddComponent(TeamUnlockStateType);
+            var catalog = ScriptableObject.CreateInstance(UnlockRuleCatalogType);
+            var productionBuilding = new GameObject("Specialized Construction Production");
+            var worker = new GameObject("Specialized Construction Worker");
+            var completedPrefab = new GameObject("Vehicle Factory Completed Prefab");
+            var aiObject = new GameObject("Specialized Construction AI");
+            Component pendingSite = null;
+
+            try
+            {
+                var csv =
+                    "규칙ID,대상종류,대상ID,필요건물,필요연구,선행해금,활성,메모\n"
+                    + "vehicle-runtime,건물,VehicleFactory,Production,,vehicle-license,TRUE,AI gate";
+                var entries = InvokeStatic(UnlockRuleCsvParserType, "Parse", csv);
+                Invoke(catalog, "Configure", null, entries);
+                Invoke(state, "Configure", UnitTeam.Team8, Array.Empty<string>());
+                Invoke(state, "ConfigureRuleCatalog", catalog);
+
+                var productionStatus = productionBuilding.AddComponent(BuildingStatusType);
+                Invoke(
+                    productionStatus,
+                    "Initialize",
+                    UnitTeam.Team8,
+                    Enum.Parse(BuildingKindType, "Production"),
+                    new Vector2Int(2, 2),
+                    true);
+
+                worker.AddComponent<BoxCollider2D>().isTrigger = true;
+                var workerStatus = worker.AddComponent<PrototypeUnitStatus>();
+                workerStatus.ConfigurePrototypeDefaults(PrototypeUnitType.Worker, UnitTeam.Team8);
+
+                var ai = aiObject.AddComponent(SimpleSkirmishAiType);
+                ((Behaviour)ai).enabled = false;
+                Invoke(ai, "Configure", UnitTeam.Team8, UnitTeam.Team7, 0, 7, Vector3.zero);
+                SetField(ai, "minimumCombatUnitsForSpecializedUnit", 0);
+                SetField(ai, "specializedUnitFrequency", 4);
+                SetField(ai, "successfulCombatProductions", 4);
+                SetField(ai, "specializedConstructionAttemptInterval", 8f);
+
+                var templates = aiObject.AddComponent(AiBuildingTemplateRegistryType);
+                Invoke(templates, "Configure", UnitTeam.Team8, null, null, null);
+                Invoke(
+                    templates,
+                    "RegisterTemplate",
+                    Enum.Parse(BuildingKindType, "VehicleFactory"),
+                    completedPrefab,
+                    CreateResourceAmount(0, 0),
+                    10f,
+                    new Vector2Int(3, 3));
+
+                Assert.That((bool)Invoke(ai, "TryBeginSpecializedProductionBuilding"), Is.False);
+                Assert.That(GetField(ai, "pendingConstructionSite"), Is.Null);
+
+                Invoke(state, "Unlock", "vehicle-license");
+                SetField(ai, "nextSpecializedConstructionAttemptTime", 0f);
+                Assert.That((bool)Invoke(ai, "TryBeginSpecializedProductionBuilding"), Is.True);
+                pendingSite = GetField(ai, "pendingConstructionSite") as Component;
+                Assert.That(pendingSite, Is.Not.Null);
+                Assert.That(GetField(ai, "pendingConstructionKind").ToString(), Is.EqualTo("VehicleFactory"));
+                Assert.That((bool)Invoke(ai, "TryBeginSpecializedProductionBuilding"), Is.False);
+            }
+            finally
+            {
+                if (pendingSite != null)
+                {
+                    Object.DestroyImmediate(pendingSite.gameObject);
+                }
+
+                Object.DestroyImmediate(aiObject);
+                Object.DestroyImmediate(completedPrefab);
+                Object.DestroyImmediate(worker);
+                Object.DestroyImmediate(productionBuilding);
+                Object.DestroyImmediate(stateObject);
+                Object.DestroyImmediate(catalog);
+            }
+        }
+
         [UnityTest]
         public IEnumerator EasyResearch_RequiresArmyAndReserveThenResearchesWeaponBeforeMobility()
         {
@@ -154,6 +239,9 @@ namespace ProjectS.Tests.PlayMode
             var researchObject = new GameObject("Easy AI Research");
             var research = researchObject.AddComponent(TeamUpgradeResearchType);
             Invoke(research, "Configure", UnitTeam.Team8, wallet, definitions);
+            var unlockStateObject = new GameObject("Easy AI Research Unlock State");
+            var unlockState = unlockStateObject.AddComponent(TeamUnlockStateType);
+            Invoke(unlockState, "Configure", UnitTeam.Team8, Array.Empty<string>());
 
             var aiObject = new GameObject("Easy Research AI");
             var ai = aiObject.AddComponent(SimpleSkirmishAiType);
@@ -180,6 +268,9 @@ namespace ProjectS.Tests.PlayMode
                 yield return null;
             }
             Assert.That(GetProperty(research, "ActiveDefinition"), Is.Null);
+            Assert.That(
+                (bool)InvokeStatic(TeamUnlockStateType, "IsResearchCompleted", UnitTeam.Team8, "attack-damage"),
+                Is.True);
 
             Invoke(wallet, "Add", addResource, 25);
             RunResearchDecision(ai);
@@ -187,6 +278,7 @@ namespace ProjectS.Tests.PlayMode
 
             Object.Destroy(aiObject);
             Object.Destroy(researchObject);
+            Object.Destroy(unlockStateObject);
             Object.Destroy(walletObject);
             Object.Destroy(unitOne);
             Object.Destroy(unitTwo);
@@ -204,6 +296,10 @@ namespace ProjectS.Tests.PlayMode
             var definition = (ScriptableObject)ScriptableObject.CreateInstance(UnitUpgradeDefinitionType);
             definition.name = name;
             Invoke(definition, "Configure", name, kind, CreateResourceAmount(minerals, gas), 0.01f, 1f);
+            Invoke(
+                definition,
+                "ConfigureResearchId",
+                kind == UnitUpgradeKind.AttackDamage ? "attack-damage" : "movement-speed");
             return definition;
         }
 
@@ -247,6 +343,13 @@ namespace ProjectS.Tests.PlayMode
         private static object CreateResourceAmount(int minerals, int gas)
         {
             return Activator.CreateInstance(ResourceAmountType, minerals, gas);
+        }
+
+        private static object InvokeStatic(Type targetType, string methodName, params object[] arguments)
+        {
+            var method = targetType.GetMethod(methodName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null, $"Method was not found: {methodName}");
+            return method.Invoke(null, arguments);
         }
 
         private static Type GetGameplayType(string typeName)

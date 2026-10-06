@@ -730,6 +730,7 @@ namespace ProjectS
                 new ResourceAmount(100, 25),
                 10f,
                 3f);
+            weaponUpgrade.ConfigureResearchId("attack-damage");
 
             var mobilityUpgrade = ScriptableObject.CreateInstance<UnitUpgradeDefinition>();
             mobilityUpgrade.name = "Mobility Tuning";
@@ -739,6 +740,7 @@ namespace ProjectS
                 new ResourceAmount(75, 25),
                 8f,
                 0.15f);
+            mobilityUpgrade.ConfigureResearchId("movement-speed");
 
             return new[] { weaponUpgrade, mobilityUpgrade };
         }

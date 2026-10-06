@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using ProjectS.Resources;
 using ProjectS.Tilemaps;
 using ProjectS.Units;
+using ProjectS.Unlocks;
 using UnityEngine;
 
 namespace ProjectS.Buildings
@@ -73,6 +74,11 @@ namespace ProjectS.Buildings
         public bool TryCreateConstructionSite(BuildingKind buildingKind, Vector3 worldPosition, out ConstructionSite site)
         {
             site = null;
+            if (!TeamUnlockState.CanBuild(team, buildingKind, "build", buildingKind.ToString(), out _))
+            {
+                return false;
+            }
+
             if (!TryGetTemplate(buildingKind, out var completedPrefab, out var cost, out var buildTime, out var footprint))
             {
                 return false;

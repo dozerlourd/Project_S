@@ -508,7 +508,12 @@ namespace ProjectS.Buildings
 
         public bool CanBeBuiltBy(UnitTeam team, out string failureReason)
         {
-            return UnlockRequirement.AreMet(unlockRequirements, team, "build", buildingKind.ToString(), out failureReason);
+            if (!UnlockRequirement.AreMet(unlockRequirements, team, "build", buildingKind.ToString(), out failureReason))
+            {
+                return false;
+            }
+
+            return TeamUnlockState.CanBuild(team, buildingKind, "build", DisplayName, out failureReason);
         }
     }
 }

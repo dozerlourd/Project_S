@@ -9,10 +9,10 @@ namespace ProjectS.UI
 {
     public sealed class RtsMinimap : MonoBehaviour
     {
-        private const float PanelWidth = 302.4f;
+        private const float PanelWidth = 448f;
         private const float PanelMargin = 12f;
         private const float BattleInfoHeight = 42f;
-        private const float MapHeight = 194.4f;
+        private const float MapHeight = 288f;
         private const float MapToInfoGap = 8f;
         private const float UnitSize = 4f;
         private const float BuildingSize = 8f;

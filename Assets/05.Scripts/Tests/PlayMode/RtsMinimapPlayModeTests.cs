@@ -64,8 +64,8 @@ namespace ProjectS.Tests.PlayMode
 
             yield return null;
 
-            var mapWidth = 302.4f;
-            var mapHeight = 194.4f;
+            var mapWidth = 448f;
+            var mapHeight = 288f;
             var guiCenter = new Vector2(
                 Screen.width - mapWidth - 12f + mapWidth * 0.5f,
                 Screen.height - 12f - 42f - 8f - mapHeight + mapHeight * 0.5f);
@@ -137,8 +137,8 @@ namespace ProjectS.Tests.PlayMode
             minimapObject.AddComponent(GetGameplayType("ProjectS.UI.RtsMinimap"));
             yield return null;
 
-            var mapWidth = 302.4f;
-            var mapHeight = 194.4f;
+            var mapWidth = 448f;
+            var mapHeight = 288f;
             var guiPointInsideMinimap = new Vector2(
                 1280f - mapWidth - 12f + mapWidth * 0.5f,
                 720f - 12f - 42f - 8f - mapHeight + mapHeight * 0.5f);
@@ -174,7 +174,7 @@ namespace ProjectS.Tests.PlayMode
             var method = minimapType.GetMethod("TryHandleUnitCommand", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null, "Could not find TryHandleUnitCommand.");
 
-            var mapRect = new Rect(100f, 100f, 302.4f, 194.4f);
+            var mapRect = new Rect(100f, 100f, 448f, 288f);
             var worldBounds = new Bounds(new Vector3(5f, 5f, 0f), new Vector3(10f, 10f, 0f));
             var guiPoint = new Vector2(mapRect.xMin + mapRect.width * 0.75f, mapRect.yMin + mapRect.height * 0.25f);
             var handled = (bool)method.Invoke(null, new object[] { guiPoint, mapRect, worldBounds, false });

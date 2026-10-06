@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ProjectS.Buildings;
 using ProjectS.Resources;
+using ProjectS.Unlocks;
 using ProjectS.Units;
 using ProjectS.Upgrades;
 using UnityEngine;
@@ -19,8 +20,12 @@ namespace ProjectS.AI
         [SerializeField, Min(0f)] private float initialAttackDelay = 90f;
         [SerializeField, Min(0)] private int supplyBuffer = 2;
         [SerializeField, Min(0.1f)] private float constructionPlacementDistance = 4f;
+        [SerializeField, Min(0.1f)] private float constructionRetryInterval = 6f;
+        [SerializeField, Min(1f)] private float pendingConstructionStartTimeout = 15f;
         [SerializeField, Min(0.1f)] private float defenceRadius = 8f;
         [SerializeField, Min(1)] private int maximumMainBases = 2;
+        [SerializeField, Min(0)] private int minimumCombatUnitsForExpansion = 5;
+        [SerializeField, Min(0.1f)] private float expansionAttemptInterval = 12f;
         [SerializeField, Min(0.1f)] private float expansionMinimumDropOffDistance = 8f;
         [SerializeField, Min(0.1f)] private float expansionSiteOffset = 3f;
         [SerializeField, Min(1)] private int expansionCandidateSearchRadius = 8;
@@ -29,6 +34,7 @@ namespace ProjectS.AI
         [SerializeField, Min(0)] private int minimumCombatUnitsForOccasionalUnit = 5;
         [SerializeField, Min(1)] private int specializedUnitFrequency = 4;
         [SerializeField, Min(0)] private int minimumCombatUnitsForSpecializedUnit = 6;
+        [SerializeField, Min(0.1f)] private float specializedConstructionAttemptInterval = 8f;
         [SerializeField, Min(0)] private int minimumCombatUnitsForResearch = 6;
         [SerializeField] private ResourceAmount researchResourceReserve = new ResourceAmount(200, 50);
         [SerializeField, Min(0.1f)] private float researchAttemptInterval = 5f;
@@ -38,6 +44,10 @@ namespace ProjectS.AI
         private float nextDecisionTime;
         private float nextAttackCommandTime;
         private float nextResearchAttemptTime;
+        private float nextSpecializedConstructionAttemptTime;
+        private float nextConstructionAttemptTime;
+        private float nextExpansionAttemptTime;
+        private float pendingConstructionIssuedAt;
         private int successfulCombatProductions;
         private int successfulSpecializedProductions;
         private int nextSpecializedUnitIndex;
@@ -365,7 +375,7 @@ namespace ProjectS.AI
         {
             RefreshPendingConstruction();
 
-            if (hasPendingConstruction)
+            if (hasPendingConstruction || Time.time < nextConstructionAttemptTime)
             {
                 return;
             }
@@ -382,7 +392,115 @@ namespace ProjectS.AI
                 return;
             }
 
+            if (TryBeginSpecializedProductionBuilding())
+            {
+                return;
+            }
+
             TryBeginExpansion();
+        }
+
+        private bool TryBeginSpecializedProductionBuilding()
+        {
+            var combatUnits = CountCombatUnits();
+            if (Time.time < nextSpecializedConstructionAttemptTime
+                || !ShouldAttemptSpecializedProduction(combatUnits))
+            {
+                return false;
+            }
+
+            nextSpecializedConstructionAttemptTime = Time.time + Mathf.Max(0.1f, specializedConstructionAttemptInterval);
+            ResolveBuildingTemplates();
+            if (buildingTemplates == null || buildingTemplates.Team != team)
+            {
+                return false;
+            }
+
+            for (var offset = 0; offset < 3; offset++)
+            {
+                var candidateIndex = (nextSpecializedUnitIndex + offset) % 3;
+                var unitType = GetSpecializedUnitType(candidateIndex);
+                var buildingKind = GetSpecializedProductionBuilding(candidateIndex);
+                if (HasCompletedBuilding(buildingKind))
+                {
+                    if (HasUsableSpecializedProductionQueue(buildingKind, unitType))
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (!TeamUnlockState.CanBuild(team, buildingKind, "build", buildingKind.ToString(), out _)
+                    || !buildingTemplates.TryGetTemplate(
+                        buildingKind,
+                        out _,
+                        out var cost,
+                        out _,
+                        out var footprint))
+                {
+                    continue;
+                }
+
+                var wallet = buildingTemplates.Wallet;
+                if (!cost.IsEmpty && (wallet == null || !wallet.CanAfford(cost)))
+                {
+                    continue;
+                }
+
+                var desiredPosition = GetConstructionPosition(buildingKind);
+                if (!ConstructionSite.TryFindNearestValidPlacement(
+                        buildingTemplates.TilemapWorld,
+                        desiredPosition,
+                        footprint,
+                        expansionCandidateSearchRadius,
+                        out var placementPosition))
+                {
+                    continue;
+                }
+
+                return TryBeginConstructionAt(buildingKind, placementPosition);
+            }
+
+            return false;
+        }
+
+        private bool HasUsableSpecializedProductionQueue(
+            BuildingKind buildingKind,
+            PrototypeUnitType unitType)
+        {
+            var buildings = BuildingRegistry.GetBuildings(team);
+            for (var i = 0; i < buildings.Count; i++)
+            {
+                var building = buildings[i];
+                if (building == null
+                    || !building.Completed
+                    || !building.gameObject.activeInHierarchy
+                    || building.Kind != buildingKind)
+                {
+                    continue;
+                }
+
+                var queue = building.GetComponent<UnitProductionQueue>();
+                var definition = FindProductionDefinition(queue, unitType);
+                if (definition != null
+                    && definition.CanMeetAdditionalProductionConditions(team, "produce", out _))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static BuildingKind GetSpecializedProductionBuilding(int index)
+        {
+            switch (index % 3)
+            {
+                case 0: return BuildingKind.VehicleFactory;
+                case 1: return BuildingKind.MaintenanceBay;
+                default: return BuildingKind.SignalRelay;
+            }
         }
 
         private bool NeedsSupplyDepot()
@@ -419,16 +537,19 @@ namespace ProjectS.AI
             var builder = FindNearestBuilder(GetConstructionAnchor());
             if (builder == null)
             {
+                ScheduleConstructionRetry();
                 return false;
             }
 
             if (!TryRequestConstructionSite(buildingKind, position, out var site) || site == null)
             {
+                ScheduleConstructionRetry();
                 return false;
             }
 
             pendingConstructionSite = site;
             pendingConstructionKind = buildingKind;
+            pendingConstructionIssuedAt = Time.time;
             hasPendingConstruction = true;
             builder.Issue(new UnitCommand(UnitCommandMode.Interact, site.InteractionPoint, null, site, false));
             return true;
@@ -436,7 +557,14 @@ namespace ProjectS.AI
 
         private void TryBeginExpansion()
         {
-            if (CountCompletedMainBases() >= maximumMainBases)
+            if (Time.time < nextExpansionAttemptTime)
+            {
+                return;
+            }
+
+            nextExpansionAttemptTime = Time.time + Mathf.Max(0.1f, expansionAttemptInterval);
+            if (CountCombatUnits() < minimumCombatUnitsForExpansion
+                || CountCompletedMainBases() >= maximumMainBases)
             {
                 return;
             }
@@ -548,15 +676,40 @@ namespace ProjectS.AI
 
             if (pendingConstructionSite != null && !pendingConstructionSite.Completed)
             {
+                if (!pendingConstructionSite.HasConstructionStarted
+                    && Time.time >= pendingConstructionIssuedAt + pendingConstructionStartTimeout)
+                {
+                    pendingConstructionSite.CancelPendingConstruction();
+                    ClearPendingConstruction();
+                    ScheduleConstructionRetry();
+                }
+
                 return;
             }
 
-            hasPendingConstruction = false;
-            pendingConstructionSite = null;
+            var completed = pendingConstructionSite != null && pendingConstructionSite.Completed;
+            ClearPendingConstruction();
             if (HasCompletedBuilding(pendingConstructionKind))
             {
                 return;
             }
+
+            if (!completed)
+            {
+                ScheduleConstructionRetry();
+            }
+        }
+
+        private void ClearPendingConstruction()
+        {
+            hasPendingConstruction = false;
+            pendingConstructionSite = null;
+            pendingConstructionIssuedAt = 0f;
+        }
+
+        private void ScheduleConstructionRetry()
+        {
+            nextConstructionAttemptTime = Time.time + Mathf.Max(0.1f, constructionRetryInterval);
         }
 
         private bool HasCompletedBuilding(BuildingKind buildingKind)

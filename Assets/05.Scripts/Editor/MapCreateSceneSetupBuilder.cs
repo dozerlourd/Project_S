@@ -10,6 +10,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 
 namespace ProjectS.Editor
 {
@@ -33,6 +34,9 @@ namespace ProjectS.Editor
         private const string VehicleFactoryPrefabPath = FutureTechPrefabFolder + "/PrototypeVehicleFactoryBuilding.prefab";
         private const string MaintenanceBayPrefabPath = FutureTechPrefabFolder + "/PrototypeMaintenanceBayBuilding.prefab";
         private const string SignalRelayPrefabPath = FutureTechPrefabFolder + "/PrototypeSignalRelayBuilding.prefab";
+        private const string MineralsResourceTilePath = "Assets/Assets/Tilemaps/Resource Tiles/ResourceNodes_Minerals.asset";
+        private const string GasResourceTilePath = "Assets/Assets/Tilemaps/Resource Tiles/ResourceNodes_Gas.asset";
+        private const string ObstacleTilePath = "Assets/Assets/Tilemaps/Obstacle Tiles/Obstacle_Stone.asset";
         private const string WorkerPrefabPath = "Assets/03.Prefabs/Units/B_Worker.prefab";
         private const string SoldierPrefabPath = "Assets/03.Prefabs/Units/B_Soldier.prefab";
         private const string SpliterPrefabPath = "Assets/03.Prefabs/Units/B_Spliter.prefab";
@@ -62,6 +66,7 @@ namespace ProjectS.Editor
             SceneManager.MoveGameObjectToScene(root, scene);
 
             GetStartPositions(tilemapWorld, out var playerStart, out var aiStart);
+            EnsureFormalMatchLayout(tilemapWorld, playerStart, aiStart);
             var playerWallet = CreateWallet("Player Wallet", UnitTeam.Team1, new ResourceAmount(100, 0), root.transform);
             var aiWallet = CreateWallet("AI Wallet", UnitTeam.Team2, new ResourceAmount(100, 0), root.transform);
             CreateSupplyManager("Player Supply", UnitTeam.Team1, root.transform);
@@ -141,8 +146,11 @@ namespace ProjectS.Editor
                 EditorUtility.SetDirty(bootstrap);
             }
 
-            CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
-            CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
+            if (!ResourceTilemapNodeSynchronizer.SceneHasResourceTiles())
+            {
+                CreateResourceCluster(playerStart + new Vector3(-3f, -3f, 0f), root.transform, tilemapWorld);
+                CreateResourceCluster(aiStart + new Vector3(3f, 3f, 0f), root.transform, tilemapWorld);
+            }
 
             var mainBaseStatus = mainBasePrefab.GetComponent<BuildingStatus>();
             var mainBaseFootprint = mainBaseStatus != null ? mainBaseStatus.Footprint : new Vector2Int(3, 3);
@@ -590,6 +598,101 @@ namespace ProjectS.Editor
             {
                 productionQueue.Configure(wallet, tilemapWorld, definitions, 5, spawnOffset, rallyOffset);
             }
+        }
+
+        private static void EnsureFormalMatchLayout(
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3 playerStart,
+            Vector3 aiStart)
+        {
+            if (tilemapWorld == null || tilemapWorld.Grid == null)
+            {
+                return;
+            }
+
+            var mineralsTile = AssetDatabase.LoadAssetAtPath<ResourceTile>(MineralsResourceTilePath);
+            var gasTile = AssetDatabase.LoadAssetAtPath<ResourceTile>(GasResourceTilePath);
+            if (mineralsTile == null || gasTile == null)
+            {
+                Debug.LogWarning("Formal match layout skipped because resource tile assets are missing.");
+                return;
+            }
+
+            var resourceTilemap = FindOrCreateTilemap(tilemapWorld.Grid.transform, "Resource", ResourceSortingOrder);
+            if (resourceTilemap.GetUsedTilesCount() == 0)
+            {
+                PaintResourceCluster(resourceTilemap, tilemapWorld, playerStart + new Vector3(-3f, -3f, 0f), mineralsTile, gasTile);
+                PaintResourceCluster(resourceTilemap, tilemapWorld, aiStart + new Vector3(3f, 3f, 0f), mineralsTile, gasTile);
+
+                var center = tilemapWorld.GetCellCenterWorld(new Vector3Int(
+                    Mathf.RoundToInt((tilemapWorld.CellBounds.xMin + tilemapWorld.CellBounds.xMax - 1) * 0.5f),
+                    Mathf.RoundToInt((tilemapWorld.CellBounds.yMin + tilemapWorld.CellBounds.yMax - 1) * 0.5f),
+                    0));
+                PaintResourceCluster(resourceTilemap, tilemapWorld, center + new Vector3(-7f, 0f, 0f), mineralsTile, gasTile);
+                PaintResourceCluster(resourceTilemap, tilemapWorld, center + new Vector3(7f, 0f, 0f), mineralsTile, gasTile);
+            }
+
+            var obstacleTile = AssetDatabase.LoadAssetAtPath<ProjectSTile>(ObstacleTilePath);
+            var obstacleTilemap = FindOrCreateTilemap(tilemapWorld.Grid.transform, "Obstacle", ResourceSortingOrder - 1);
+            if (obstacleTile != null && obstacleTilemap.GetUsedTilesCount() == 0)
+            {
+                var bounds = tilemapWorld.CellBounds;
+                var centerX = Mathf.FloorToInt((bounds.xMin + bounds.xMax - 1) * 0.5f);
+                var centerY = Mathf.FloorToInt((bounds.yMin + bounds.yMax - 1) * 0.5f);
+                for (var offset = -5; offset <= 5; offset++)
+                {
+                    if (offset >= -1 && offset <= 1)
+                    {
+                        continue;
+                    }
+
+                    obstacleTilemap.SetTile(new Vector3Int(centerX, centerY + offset, 0), obstacleTile);
+                }
+            }
+
+            tilemapWorld.MarkNavigationCacheDirty();
+        }
+
+        private static Tilemap FindOrCreateTilemap(Transform grid, string name, int sortingOrder)
+        {
+            foreach (var existingTilemap in grid.GetComponentsInChildren<Tilemap>(true))
+            {
+                if (existingTilemap != null && existingTilemap.gameObject.name == name)
+                {
+                    return existingTilemap;
+                }
+            }
+
+            var tilemapObject = new GameObject(name);
+            tilemapObject.transform.SetParent(grid, false);
+            var tilemap = tilemapObject.AddComponent<Tilemap>();
+            var renderer = tilemapObject.AddComponent<TilemapRenderer>();
+            renderer.sortingOrder = sortingOrder;
+            return tilemap;
+        }
+
+        private static void PaintResourceCluster(
+            Tilemap resourceTilemap,
+            ProjectSTilemapWorld tilemapWorld,
+            Vector3 center,
+            ResourceTile mineralsTile,
+            ResourceTile gasTile)
+        {
+            var centerCell = tilemapWorld.WorldToCell(center);
+            var mineralOffsets = new[]
+            {
+                new Vector3Int(-2, 0, 0),
+                new Vector3Int(-1, 1, 0),
+                new Vector3Int(0, 0, 0),
+                new Vector3Int(-1, -1, 0)
+            };
+
+            for (var i = 0; i < mineralOffsets.Length; i++)
+            {
+                resourceTilemap.SetTile(centerCell + mineralOffsets[i], mineralsTile);
+            }
+
+            resourceTilemap.SetTile(centerCell + new Vector3Int(2, 0, 0), gasTile);
         }
 
         private static void CreateResourceCluster(Vector3 center, Transform parent, ProjectSTilemapWorld tilemapWorld)

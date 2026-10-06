@@ -271,7 +271,7 @@ namespace ProjectS.Units
 
             var tilemapWorld = navigator != null ? navigator.TilemapWorld : null;
             if (tilemapWorld != null
-                && !IsCellAvailable(tilemapWorld, tilemapWorld.WorldToCell(result[result.Count - 1])))
+                && !IsRouteDestinationCellAvailable(tilemapWorld, tilemapWorld.WorldToCell(result[result.Count - 1])))
             {
                 if (!SchedulePathRequest(requestedDestination))
                 {
@@ -328,7 +328,7 @@ namespace ProjectS.Units
                 if (waypointIndex + 1 >= path.Count
                     && navigator != null
                     && navigator.TilemapWorld != null
-                    && !IsCellAvailable(navigator.TilemapWorld, navigator.TilemapWorld.WorldToCell(target)))
+                    && !IsRouteDestinationCellAvailable(navigator.TilemapWorld, navigator.TilemapWorld.WorldToCell(target)))
                 {
                     if (!TryRepathToRequestedDestination())
                     {
@@ -414,7 +414,7 @@ namespace ProjectS.Units
                 navigator,
                 transform.position,
                 scheduledDestinations,
-                GetCurrentTeamOccupiedCells());
+                ShouldIgnoreDynamicOccupancyForCurrentRoute() ? null : GetCurrentTeamOccupiedCells());
             return true;
         }
 
@@ -608,6 +608,34 @@ namespace ProjectS.Units
             }
 
             return true;
+        }
+
+        private bool IsRouteDestinationCellAvailable(ProjectSTilemapWorld tilemapWorld, Vector3Int cell)
+        {
+            if (!ShouldIgnoreDynamicOccupancyForCurrentRoute())
+            {
+                return IsCellAvailable(tilemapWorld, cell);
+            }
+
+            // Gathering routes may enter a resource interaction volume and overlap its workers.
+            // Terrain and completed building footprints remain hard blockers.
+            foreach (var footprintCell in EnumerateFootprintCells(cell))
+            {
+                if (!tilemapWorld.IsWalkable(footprintCell)
+                    || UnitSettlementRegistry.IsCellBlocked(tilemapWorld, footprintCell))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private bool ShouldIgnoreDynamicOccupancyForCurrentRoute()
+        {
+            return hasInteractionDestination
+                && allowInteractionColliderInterior
+                && interactionCollider != null;
         }
 
         private bool IsCellOccupied(ProjectSTilemapWorld tilemapWorld, Vector3Int cell)

@@ -37,8 +37,7 @@ namespace ProjectS.Editor
                 AssetDatabase.SaveAssets();
                 Selection.activeObject = catalog;
                 Debug.Log(
-                    $"Imported {catalog.Entries.Count} unlock rule entries from {AssetDatabase.GetAssetPath(csv)}. "
-                    + "The catalog is not connected to runtime production or construction yet.");
+                    $"Imported {catalog.Entries.Count} unlock rule entries from {AssetDatabase.GetAssetPath(csv)}.");
             }
             catch (FormatException exception)
             {

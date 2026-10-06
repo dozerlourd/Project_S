@@ -171,10 +171,150 @@ namespace ProjectS.Unlocks
         public TextAsset SourceCsv => sourceCsv;
         public IReadOnlyList<UnlockRuleEntry> Entries => entries;
 
+        public static UnlockRuleCatalog LoadDefault()
+        {
+            return UnityEngine.Resources.Load<UnlockRuleCatalog>(ResourceName);
+        }
+
         public void Configure(TextAsset csv, UnlockRuleEntry[] newEntries)
         {
             sourceCsv = csv;
             entries = newEntries ?? Array.Empty<UnlockRuleEntry>();
+        }
+
+        public bool CanAccess(
+            UnlockRuleTargetType targetType,
+            string targetId,
+            UnitTeam team,
+            string action,
+            string itemName,
+            out string failureReason)
+        {
+            var rules = entries ?? Array.Empty<UnlockRuleEntry>();
+            for (var i = 0; i < rules.Length; i++)
+            {
+                var rule = rules[i];
+                if (rule == null
+                    || !rule.Active
+                    || rule.TargetType != targetType
+                    || !string.Equals(rule.TargetId, targetId, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!AreRequiredBuildingsCompleted(rule, team, action, itemName, out failureReason)
+                    || !AreRequiredResearchIdsCompleted(rule, team, action, itemName, out failureReason)
+                    || !ArePrerequisiteUnlocksGranted(rule, team, action, itemName, out failureReason))
+                {
+                    return false;
+                }
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private static bool AreRequiredBuildingsCompleted(
+            UnlockRuleEntry rule,
+            UnitTeam team,
+            string action,
+            string itemName,
+            out string failureReason)
+        {
+            var requiredBuildings = rule.RequiredBuildings;
+            for (var i = 0; i < requiredBuildings.Count; i++)
+            {
+                if (!Enum.TryParse(requiredBuildings[i], true, out BuildingKind buildingKind)
+                    || !HasCompletedBuilding(team, buildingKind))
+                {
+                    failureReason = CreateFailureReason(
+                        action,
+                        itemName,
+                        rule.RuleId,
+                        $"completed building '{requiredBuildings[i]}'");
+                    return false;
+                }
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private static bool AreRequiredResearchIdsCompleted(
+            UnlockRuleEntry rule,
+            UnitTeam team,
+            string action,
+            string itemName,
+            out string failureReason)
+        {
+            var requiredResearchIds = rule.RequiredResearchIds;
+            for (var i = 0; i < requiredResearchIds.Count; i++)
+            {
+                if (!TeamUnlockState.IsResearchCompleted(team, requiredResearchIds[i]))
+                {
+                    failureReason = CreateFailureReason(
+                        action,
+                        itemName,
+                        rule.RuleId,
+                        $"completed research '{requiredResearchIds[i]}'");
+                    return false;
+                }
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private static bool ArePrerequisiteUnlocksGranted(
+            UnlockRuleEntry rule,
+            UnitTeam team,
+            string action,
+            string itemName,
+            out string failureReason)
+        {
+            var prerequisiteUnlockIds = rule.PrerequisiteUnlockIds;
+            for (var i = 0; i < prerequisiteUnlockIds.Count; i++)
+            {
+                if (!TeamUnlockState.IsUnlocked(team, prerequisiteUnlockIds[i]))
+                {
+                    failureReason = CreateFailureReason(
+                        action,
+                        itemName,
+                        rule.RuleId,
+                        $"prerequisite unlock '{prerequisiteUnlockIds[i]}'");
+                    return false;
+                }
+            }
+
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private static bool HasCompletedBuilding(UnitTeam team, BuildingKind buildingKind)
+        {
+            var buildings = BuildingRegistry.GetBuildings(team);
+            for (var i = 0; i < buildings.Count; i++)
+            {
+                var building = buildings[i];
+                if (building != null
+                    && building.Completed
+                    && building.isActiveAndEnabled
+                    && building.Kind == buildingKind)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string CreateFailureReason(
+            string action,
+            string itemName,
+            string ruleId,
+            string requirement)
+        {
+            return $"Cannot {action} {itemName}: unlock rule '{ruleId}' requires {requirement}.";
         }
     }
 

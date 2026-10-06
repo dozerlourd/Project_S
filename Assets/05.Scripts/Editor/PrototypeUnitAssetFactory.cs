@@ -186,6 +186,8 @@ namespace ProjectS.Units.Editor
 
             try
             {
+                root.transform.localScale = GetUnitRootScale(unitType);
+
                 var spriteRenderer = root.AddComponent<SpriteRenderer>();
                 spriteRenderer.sprite = unitSprite;
                 spriteRenderer.color = Color.white;
@@ -193,7 +195,7 @@ namespace ProjectS.Units.Editor
                 spriteRenderer.sortingOrder = 20;
 
                 var collider = root.AddComponent<BoxCollider2D>();
-                collider.size = new Vector2(0.77f, 1f);
+                collider.size = GetUnitColliderSize(unitType);
                 collider.offset = new Vector2(0f, 0.1f);
                 collider.isTrigger = true;
 
@@ -227,6 +229,39 @@ namespace ProjectS.Units.Editor
             finally
             {
                 UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        private static Vector3 GetUnitRootScale(PrototypeUnitType unitType)
+        {
+            switch (unitType)
+            {
+                case PrototypeUnitType.Worker:
+                case PrototypeUnitType.Swarm:
+                    return new Vector3(0.5f, 0.5f, 1f);
+                case PrototypeUnitType.Tank:
+                case PrototypeUnitType.Siege:
+                    return new Vector3(0.7666667f, 0.7666667f, 1f);
+                case PrototypeUnitType.Striker:
+                    return new Vector3(0.5666667f, 0.5666667f, 1f);
+                default:
+                    return new Vector3(0.6666667f, 0.6666667f, 1f);
+            }
+        }
+
+        private static Vector2 GetUnitColliderSize(PrototypeUnitType unitType)
+        {
+            switch (unitType)
+            {
+                case PrototypeUnitType.Tank:
+                case PrototypeUnitType.Siege:
+                    return new Vector2(0.9f, 1.15f);
+                case PrototypeUnitType.Striker:
+                    return new Vector2(0.65f, 0.85f);
+                case PrototypeUnitType.Swarm:
+                    return new Vector2(0.58f, 0.75f);
+                default:
+                    return new Vector2(0.77f, 1f);
             }
         }
 

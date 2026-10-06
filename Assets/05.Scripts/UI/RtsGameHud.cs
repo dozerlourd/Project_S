@@ -809,6 +809,12 @@ namespace ProjectS.UI
 
             var rowCount = Mathf.CeilToInt(optionCount / (float)columns);
             GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 30f + rowCount * (buttonHeight + 4f), panelRect.width - 16f, 20f), "Choose a tile to place. Esc cancels.");
+            if (!string.IsNullOrWhiteSpace(productionFeedback))
+            {
+                GUI.Label(
+                    new Rect(panelRect.x + 8f, panelRect.yMax - 38f, panelRect.width - 16f, 34f),
+                    ShortenFailureReason(productionFeedback));
+            }
         }
 
         private static Rect BuildOptionRect(Rect panelRect, int index, int columns, float width, float height, float gap)
@@ -823,11 +829,18 @@ namespace ProjectS.UI
             int hotkeyIndex,
             BuildingConstructionDefinition definition)
         {
+            var lockReason = "No building placement service is available.";
             var isLocked = buildingPlacementService == null
-                || !buildingPlacementService.CanSelectConstructionDefinition(definition, out _);
+                || !buildingPlacementService.CanSelectConstructionDefinition(definition, out lockReason);
             var buttonLabel = isLocked ? "LOCKED" : FormatBuildOptionLabel(definition);
             if (!GUI.Button(buttonRect, WithHotkeyLabel(buttonLabel, hotkeyIndex)))
             {
+                return;
+            }
+
+            if (isLocked)
+            {
+                productionFeedback = lockReason;
                 return;
             }
 
@@ -1095,13 +1108,23 @@ namespace ProjectS.UI
 
                 var x = panelRect.x + 8f + i * (buttonSize + buttonGap);
                 var y = panelRect.y + 42f;
-                var isLocked = !definition.CanMeetAdditionalProductionConditions(productionQueue.Team, "produce", out _);
+                var isLocked = !definition.CanMeetAdditionalProductionConditions(
+                    productionQueue.Team,
+                    "produce",
+                    out var lockReason);
                 var buttonLabel = isLocked
                     ? WithHotkeyLabel($"LOCKED\n{definition.DisplayName}", i)
                     : WithHotkeyLabel($"{definition.DisplayName}\n{FormatCost(definition.Cost)}", i);
                 if (GUI.Button(new Rect(x, y, buttonSize, buttonSize), buttonLabel))
                 {
-                    TryQueueProduction(productionQueue, i);
+                    if (isLocked)
+                    {
+                        productionFeedback = lockReason;
+                    }
+                    else
+                    {
+                        TryQueueProduction(productionQueue, i);
+                    }
                 }
 
             }

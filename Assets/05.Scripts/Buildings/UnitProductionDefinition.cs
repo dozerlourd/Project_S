@@ -140,12 +140,22 @@ namespace ProjectS.Buildings
                 }
             }
 
-            return UnlockRequirement.AreMet(unlockRequirements, team, action, DisplayName, out failureReason);
+            if (!UnlockRequirement.AreMet(unlockRequirements, team, action, DisplayName, out failureReason))
+            {
+                return false;
+            }
+
+            return TeamUnlockState.CanProduce(team, unitType, action, DisplayName, out failureReason);
         }
 
         public bool CanBeProducedBy(UnitTeam team, out string failureReason)
         {
-            return UnlockRequirement.AreMet(unlockRequirements, team, "produce", DisplayName, out failureReason);
+            if (!UnlockRequirement.AreMet(unlockRequirements, team, "produce", DisplayName, out failureReason))
+            {
+                return false;
+            }
+
+            return TeamUnlockState.CanProduce(team, unitType, "produce", DisplayName, out failureReason);
         }
 
         public bool CanBeProducedAt(BuildingKind buildingKind)

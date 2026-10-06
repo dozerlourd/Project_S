@@ -8,12 +8,14 @@ namespace ProjectS.Upgrades
     public sealed class UnitUpgradeDefinition : ScriptableObject
     {
         [SerializeField] private string displayName = "Unit Upgrade";
+        [SerializeField] private string researchId = string.Empty;
         [SerializeField] private UnitUpgradeKind upgradeKind;
         [SerializeField] private ResourceAmount cost = new ResourceAmount(100, 25);
         [SerializeField, Min(0.1f)] private float researchDuration = 10f;
         [SerializeField, Min(0f)] private float value = 1f;
 
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? upgradeKind.ToString() : displayName;
+        public string ResearchId => string.IsNullOrWhiteSpace(researchId) ? upgradeKind.ToString() : researchId.Trim();
         public UnitUpgradeKind UpgradeKind => upgradeKind;
         public ResourceAmount Cost => cost;
         public float ResearchDuration => Mathf.Max(0.1f, researchDuration);
@@ -31,6 +33,11 @@ namespace ProjectS.Upgrades
             cost = upgradeCost;
             researchDuration = Mathf.Max(0.1f, duration);
             value = Mathf.Max(0f, upgradeValue);
+        }
+
+        public void ConfigureResearchId(string stableResearchId)
+        {
+            researchId = stableResearchId?.Trim() ?? string.Empty;
         }
     }
 }

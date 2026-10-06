@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using ProjectS.Buildings;
 using ProjectS.Resources;
+using ProjectS.Unlocks;
 using ProjectS.Units;
 using UnityEngine;
 
@@ -157,8 +159,10 @@ namespace ProjectS.Upgrades
                 return;
             }
 
-            completedUpgrades.Add(activeDefinition.UpgradeKind);
-            UnitUpgradeStatModifiers.SetUpgrade(team, activeDefinition.UpgradeKind, activeDefinition.Value);
+            var completedDefinition = activeDefinition;
+            completedUpgrades.Add(completedDefinition.UpgradeKind);
+            UnitUpgradeStatModifiers.SetUpgrade(team, completedDefinition.UpgradeKind, completedDefinition.Value);
+            TeamUnlockState.FindForTeam(team)?.MarkResearchCompleted(completedDefinition.ResearchId);
             activeDefinition = null;
             activeElapsed = 0f;
             lastFailureReason = string.Empty;
@@ -216,8 +220,10 @@ namespace ProjectS.Unlocks
 
         [SerializeField] private UnitTeam team = UnitTeam.Team1;
         [SerializeField] private string[] initiallyUnlockedIds = Array.Empty<string>();
+        [SerializeField] private UnlockRuleCatalog ruleCatalog;
 
         private readonly HashSet<string> unlockedIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> completedResearchIds = new HashSet<string>(StringComparer.Ordinal);
         private bool initialized;
 
         public UnitTeam Team => team;
@@ -249,11 +255,69 @@ namespace ProjectS.Unlocks
             return state != null && state.IsUnlocked(unlockId);
         }
 
+        public static bool IsResearchCompleted(UnitTeam team, string researchId)
+        {
+            if (string.IsNullOrWhiteSpace(researchId))
+            {
+                return true;
+            }
+
+            var state = FindForTeam(team);
+            return state != null && state.IsResearchCompleted(researchId);
+        }
+
+        public static bool CanProduce(
+            UnitTeam team,
+            PrototypeUnitType unitType,
+            string action,
+            string itemName,
+            out string failureReason)
+        {
+            var catalog = ResolveRuleCatalog(team);
+            if (catalog == null)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            return catalog.CanAccess(
+                UnlockRuleTargetType.Unit,
+                unitType.ToString(),
+                team,
+                action,
+                itemName,
+                out failureReason);
+        }
+
+        public static bool CanBuild(
+            UnitTeam team,
+            BuildingKind buildingKind,
+            string action,
+            string itemName,
+            out string failureReason)
+        {
+            var catalog = ResolveRuleCatalog(team);
+            if (catalog == null)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+
+            return catalog.CanAccess(
+                UnlockRuleTargetType.Building,
+                buildingKind.ToString(),
+                team,
+                action,
+                itemName,
+                out failureReason);
+        }
+
         public void Configure(UnitTeam ownerTeam, string[] unlockedIdsAtStart = null)
         {
             Unregister();
             team = ownerTeam;
             initiallyUnlockedIds = unlockedIdsAtStart ?? Array.Empty<string>();
+            completedResearchIds.Clear();
             initialized = false;
             InitializeUnlocks();
             if (isActiveAndEnabled)
@@ -266,6 +330,17 @@ namespace ProjectS.Unlocks
         {
             InitializeUnlocks();
             return !string.IsNullOrWhiteSpace(unlockId) && unlockedIds.Contains(unlockId.Trim());
+        }
+
+        public bool IsResearchCompleted(string researchId)
+        {
+            return !string.IsNullOrWhiteSpace(researchId)
+                && completedResearchIds.Contains(researchId.Trim());
+        }
+
+        public void ConfigureRuleCatalog(UnlockRuleCatalog catalog)
+        {
+            ruleCatalog = catalog;
         }
 
         public void Unlock(string unlockId)
@@ -283,6 +358,22 @@ namespace ProjectS.Unlocks
             if (!string.IsNullOrWhiteSpace(unlockId))
             {
                 unlockedIds.Remove(unlockId.Trim());
+            }
+        }
+
+        public void MarkResearchCompleted(string researchId)
+        {
+            if (!string.IsNullOrWhiteSpace(researchId))
+            {
+                completedResearchIds.Add(researchId.Trim());
+            }
+        }
+
+        public void RevokeResearch(string researchId)
+        {
+            if (!string.IsNullOrWhiteSpace(researchId))
+            {
+                completedResearchIds.Remove(researchId.Trim());
             }
         }
 
@@ -322,6 +413,22 @@ namespace ProjectS.Unlocks
             {
                 StatesByTeam.Remove(team);
             }
+        }
+
+        private static UnlockRuleCatalog ResolveRuleCatalog(UnitTeam team)
+        {
+            var state = FindForTeam(team);
+            if (state != null)
+            {
+                if (state.ruleCatalog == null)
+                {
+                    state.ruleCatalog = UnlockRuleCatalog.LoadDefault();
+                }
+
+                return state.ruleCatalog;
+            }
+
+            return UnlockRuleCatalog.LoadDefault();
         }
     }
 
