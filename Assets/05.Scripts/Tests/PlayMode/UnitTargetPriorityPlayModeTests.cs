@@ -16,6 +16,22 @@ namespace ProjectS.Tests.PlayMode
         private static readonly Type BuildingKindType = GetGameplayType("ProjectS.Buildings.BuildingKind");
         private static readonly Type SimpleSkirmishAIType = GetGameplayType("ProjectS.AI.SimpleSkirmishAI");
 
+        [UnityTearDown]
+        public IEnumerator TearDown()
+        {
+            // Test objects use Destroy so Unity unregisters their runtime components at
+            // the end of the frame. Advance once before the next test reads registries.
+            yield return null;
+
+            // This class constructs isolated combat scenes. Clear the private runtime
+            // registry after destruction so the next scenario cannot observe a target
+            // from the previous scenario while Unity completes its destroy callbacks.
+            var reset = typeof(UnitAttackTargetRegistry).GetMethod(
+                "ResetRegistry",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            reset.Invoke(null, null);
+        }
+
         [UnityTest]
         public IEnumerator AttackMove_PrefersCombatUnitOverCloserWorker()
         {
@@ -72,7 +88,9 @@ namespace ProjectS.Tests.PlayMode
         {
             var defender = CreateUnit("RecentAttackerDefender", Vector3.zero, UnitTeam.Team1, UnitRole.Combat, 20f);
             var workerAttacker = CreateUnit("RecentAttackerWorker", new Vector3(1.3f, 0f, 0f), UnitTeam.Team2, UnitRole.Resource, 0f);
-            var combatUnit = CreateUnit("RecentAttackerCombat", new Vector3(0.7f, 0f, 0f), UnitTeam.Team2, UnitRole.Combat, 20f);
+            // This candidate only verifies role priority. It must not attack and replace
+            // the explicitly recorded recent attacker during the observation window.
+            var combatUnit = CreateUnit("RecentAttackerCombat", new Vector3(0.7f, 0f, 0f), UnitTeam.Team2, UnitRole.Combat, 0f);
             var commandAgent = defender.GetComponent<UnitCommandAgent>();
             var defenderStatus = defender.GetComponent<PrototypeUnitStatus>();
             var workerStatus = workerAttacker.GetComponent<PrototypeUnitStatus>();
@@ -126,6 +144,9 @@ namespace ProjectS.Tests.PlayMode
             var attacker = CreateUnit("ExpiredAttackerSource", new Vector3(0.7f, 0f, 0f), UnitTeam.Team2, UnitRole.Combat, 20f);
             var defenderStatus = defender.GetComponent<PrototypeUnitStatus>();
             var attackerStatus = attacker.GetComponent<PrototypeUnitStatus>();
+
+            defender.GetComponent<UnitCommandAgent>().enabled = false;
+            attacker.GetComponent<UnitCommandAgent>().enabled = false;
 
             UnitTargetPriority.RecordRecentAttacker(defenderStatus, attackerStatus);
             yield return new WaitForSeconds(UnitTargetPriority.RecentAttackerMemoryDuration + 0.1f);

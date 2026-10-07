@@ -63,13 +63,14 @@
 - [x] Unity Headless PlayMode 테스트는 `-testPlatform playmode`의 소문자 플랫폼 값을 사용해야 Test Runner에 진입함을 확인했다. `PlayMode`는 실행 전 종료된다.
 - [x] `-nographics` 환경에서 `Camera.Render()`를 호출하던 건물 체력바 스크린샷 테스트는 Null Graphics 장치에서 캡처만 건너뛰도록 수정했고, 레이아웃 단언은 계속 실행한다.
 - [x] Headless 결과는 종료 뒤 `C:/Users/HCH/AppData/LocalLow/DefaultCompany/My project/TestResults.xml`에 안정적으로 기록되는 것을 확인했다. 명령행의 `Temp/playmode-results.xml`은 종료 과정에서 보존되지 않을 수 있다.
-- [ ] 전체 PlayMode 묶음의 기존 실패 테스트를 최신 런타임 API와 격리 규칙에 맞게 정비한다. P0 개별 흐름은 통과했지만 전체 실행에서는 오래된 반사 호출·정적 상태 공유를 포함한 실패가 남아 있다.
+- [ ] `UnitPathAgentMovementTests` 전체 76건 실행에서 현재 45건 실패가 남아 있다. 원인은 구형 `BuildingPlacementService`·`UnitProductionDefinition` 반사 호출, 이전 실패에서 누적된 정적 레지스트리, 변경된 실패 문구·자원 보호 규칙에 대한 오래된 단언이므로 기능 회귀와 분리해 최신 API 기준으로 정비한다.
 
 ### 승패 판정
 
 - [ ] 유닛이 모두 사망해도 해당 팀 건물이 남아 있으면 경기가 종료되지 않는지 Unity PlayMode에서 확인한다.
 - [x] `EnemyBuildingsDestroyed_EndsWithVictoryOnceAndStopsAiActivity` Headless 테스트로 상대 완성 건물 파괴 시 승리가 한 번만 확정되는 것을 확인했다.
 - [x] 경기 종료 시 AI와 활성·비활성 생산 큐를 모두 정지하도록 수정하고 같은 Headless 테스트로 확인했다. 플레이어 명령 컨트롤러 정지는 별도 입력 기반 검증이 남아 있다.
+- [x] `MatchOutcomePlayModeTests` Headless 6건으로 건물 기준 승패, 결과 UI, AI·생산 정지와 중복 종료 방지를 확인했다.
 
 ### 유닛 명령 생명주기
 
@@ -146,6 +147,7 @@
 
 ### 공격 목표 우선순위
 
+- [x] `UnitTargetPriorityPlayModeTests` Headless 12건으로 최근 공격자, 전투·일꾼·건물 역할 우선순위, 목표 전환 완충, 공간 버킷 갱신을 확인했다. 파괴된 Unity 표적 참조는 런타임에서 안전하게 무시하고 테스트 종료 뒤 레지스트리를 격리하도록 보강했다.
 - [ ] 동일 감지 거리의 후보가 있을 때 최근 자신을 공격한 적, 전투 유닛, 작업 유닛, 방어 건물, 생산 건물, 본진 순으로 선택되는지 확인한다.
 - [ ] 명시적 `FocusAttack` 대상은 더 높은 자동 표적 후보가 감지되어도 유지되는지 확인한다.
 - [ ] `AttackMove`가 우선 표적 교전 후 대상 사망 또는 감지 이탈 시 원래 목적지로 이동을 재개하는지 확인한다.
@@ -324,6 +326,7 @@
 
 ### 재경기 및 매치 종료
 
+- [x] `MainMenuFlowPlayModeTests` Headless 2건으로 메뉴 카메라·입력과 단일 씬 전환을 확인했다.
 - [ ] 승패 확정 뒤 결과 오버레이에서 `Rematch`를 누르면 현재 씬이 다시 로드되고 자원, 유닛, 건물, 생산 큐, 매치 타이머가 새 매치 상태로 초기화되는지 확인한다.
 - [ ] 빌드 시작 시 `MainMenu` 씬에서 전장 배경과 명령 버튼 이미지가 표시되고, `PLAY`를 연속 클릭해도 `MapCreate_Scene` 로드가 한 번만 시작되는지 확인한다.
 - [ ] 승패 확정 뒤 `Main Menu`를 누르면 `MainMenu` 씬으로 복귀하고 새 매치를 시작할 수 있는지 확인한다.

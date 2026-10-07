@@ -153,6 +153,11 @@ namespace ProjectS.Units
 
         public static IUnitAttackTarget GetRecentAttacker(IUnitAttackTarget target)
         {
+            if (!IsLiveUnityTarget(target))
+            {
+                return null;
+            }
+
             var targetObject = target != null ? target.SelectionGameObject : null;
             if (targetObject == null)
             {
@@ -198,6 +203,11 @@ namespace ProjectS.Units
 
         private static bool IsValidRecentAttacker(IUnitAttackTarget target, IUnitAttackTarget attacker)
         {
+            if (!IsLiveUnityTarget(target) || !IsLiveUnityTarget(attacker))
+            {
+                return false;
+            }
+
             var attackerObject = attacker != null ? attacker.SelectionGameObject : null;
             return target != null
                 && attacker != null
@@ -206,6 +216,11 @@ namespace ProjectS.Units
                 && attacker.Team != target.Team
                 && attackerObject != null
                 && attackerObject.activeInHierarchy;
+        }
+
+        private static bool IsLiveUnityTarget(IUnitAttackTarget target)
+        {
+            return !(target is Object unityObject) || unityObject != null;
         }
     }
 }

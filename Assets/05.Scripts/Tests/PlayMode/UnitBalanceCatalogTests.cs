@@ -46,7 +46,7 @@ namespace ProjectS.Tests.PlayMode
                 1,
                 null);
 
-            Invoke(definition, "ApplyBalanceCatalog", null);
+            Invoke(definition, "ApplyBalanceCatalog", (object)null);
 
             var cost = GetProperty(definition, "Cost");
             Assert.That(GetProperty(definition, "DisplayName"), Is.EqualTo("Ranger"));
@@ -136,6 +136,7 @@ namespace ProjectS.Tests.PlayMode
 
         private static object Invoke(object target, string methodName, params object[] arguments)
         {
+            arguments ??= Array.Empty<object>();
             var methods = target.GetType().GetMethods();
             for (var i = 0; i < methods.Length; i++)
             {
